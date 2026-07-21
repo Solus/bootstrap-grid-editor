@@ -1,0 +1,14 @@
+/* Typechecks the Playwright tests, which run outside the app's build.
+   Separate from tsconfig.json so Node globals stay out of src/. */
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node"]
+  },
+  "include": ["e2e/**/*.ts", "playwright.config.ts"]
+}
