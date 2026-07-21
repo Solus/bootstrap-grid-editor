@@ -23,6 +23,23 @@ spec.
 - **State assumptions.** If you have to assume something to proceed, name
   it in your reply.
 
+## Capture follow-ups in `FOLLOW-UPS.md`
+Whenever implementation or analysis turns up something relevant that
+isn't part of the task at hand — an open question, a deferred decision, a
+latent bug, a verification gap, a bit of brittleness, doc drift, an
+assumption worth revisiting — **write it into `FOLLOW-UPS.md`**, don't
+just mention it in passing and let it scroll away. Chat is lossy; that
+file is the durable record we review and implement from later.
+- Each entry says *what it is*, *why it matters*, and *a suggested
+  direction* — written to be argued with, not blindly executed. Tag it
+  `[decide]` / `[verify]` / `[chore]` and file it under the right section
+  (add one if none fits).
+- **Verify before you write.** Every file:line reference, count, or claim
+  goes in checked against the tree, not from memory.
+- Surfacing it in your reply too is good; the file is what makes it
+  survive. Still flag genuinely urgent things loudly — the file is for
+  what we'll get to, not a place to bury a real problem.
+
 ## Non-negotiable boundaries (see PLAN.md "Non-negotiables")
 - `packages/core` imports **no DOM and no VS Code** APIs. Ever. If a
   function needs the DOM or `vscode`, it lives in a frontend.
@@ -46,8 +63,14 @@ spec.
 - Run the relevant package's tests before considering a change done.
 
 ## Commits
-- Small, focused commits with clear messages (imperative mood:
-  "Add colSpec dialect detection", not "added stuff").
+- **Never commit without an explicit request from the maintainer.** Not
+  after finishing a task, not "to be safe", not because the tree is
+  green. Do the work, report it, and leave it staged-or-unstaged for
+  review. Only run `git commit` when asked to. (Applies to `git commit`
+  specifically; branching or staging to keep the tree tidy is fine.)
+- When a commit *is* requested: small, focused commits with clear
+  messages (imperative mood: "Add colSpec dialect detection", not "added
+  stuff").
 - Don't commit `node_modules/`, `dist/`, `*.vsix` (see `.gitignore`).
 - Don't bundle unrelated changes into one commit.
 
