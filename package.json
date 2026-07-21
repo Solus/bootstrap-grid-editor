@@ -6,7 +6,7 @@
     "build": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b && tsc -p packages/core/tsconfig.spec.json"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
