@@ -4,3 +4,5 @@ dist-single/
 *.vsix
 .vscode-test/
 *.tsbuildinfo
+test-results/
+playwright-report/
