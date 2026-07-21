@@ -1,0 +1,14 @@
+/* Typechecks the tests, which the build config deliberately excludes.
+   Emits nothing — `npm run typecheck` runs this alongside the build. */
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "lib": ["ES2022"],
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["src/**/*.ts"]
+}
