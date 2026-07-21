@@ -1,0 +1,2578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grid Draft — Bootstrap grid drafting board</title>
+<style>
+  :root{
+    --ink:#0e131b;
+    --panel:#151c27;
+    --panel-2:#1a2231;
+    --line:#26324a;
+    --canvas:#10161f;
+    --blue-grid:rgba(96,148,255,.08);
+    --blue-grid-strong:rgba(96,148,255,.16);
+    --col-fill:rgba(56,132,255,.13);
+    --col-border:rgba(122,170,255,.5);
+    --col-fill-hover:rgba(56,132,255,.22);
+    --amber:#ffb454;
+    --amber-dim:rgba(255,180,84,.15);
+    --text:#d5dce8;
+    --muted:#7d8aa0;
+    --faint:#55617a;
+    --danger:#ff7b72;
+    --ok:#7ee2a8;
+    --mono:ui-monospace,"Cascadia Code","JetBrains Mono",Consolas,Menlo,monospace;
+    --ui:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--ink); color:var(--text);
+    font-family:var(--ui); font-size:14px;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  button{
+    font-family:var(--ui); font-size:12.5px; color:var(--text);
+    background:var(--panel-2); border:1px solid var(--line); border-radius:5px;
+    padding:5px 10px; cursor:pointer;
+  }
+  button:hover{border-color:#3a4a6b; background:#202a3d}
+  button:focus-visible{outline:2px solid var(--amber); outline-offset:1px}
+  button:disabled{opacity:.4; cursor:default}
+  button.primary{background:var(--amber); border-color:var(--amber); color:#211605; font-weight:600}
+  button.primary:hover{background:#ffc271}
+  button.danger{color:var(--danger)}
+
+  /* ── Header ─────────────────────────────── */
+  header{
+    display:flex; align-items:center; gap:14px;
+    padding:8px 14px; border-bottom:1px solid var(--line); background:var(--panel);
+    flex:0 0 auto;
+  }
+  .brand{display:flex; align-items:baseline; gap:8px}
+  .brand b{font-family:var(--mono); font-size:15px; letter-spacing:.06em; color:var(--amber)}
+  .brand span{color:var(--muted); font-size:12px}
+  .bp-switch{display:flex; gap:2px; margin-left:6px; background:var(--ink); border:1px solid var(--line); border-radius:6px; padding:2px}
+  .bp-switch button{border:none; background:transparent; border-radius:4px; padding:4px 9px; font-family:var(--mono); font-size:12px; color:var(--muted)}
+  .bp-switch button.active{background:var(--amber); color:#211605; font-weight:700}
+  .bp-note{font-family:var(--mono); font-size:11px; color:var(--faint)}
+  .spacer{flex:1}
+
+  /* ── Main layout ────────────────────────── */
+  main{flex:1; display:flex; min-height:0}
+  .pane-src{flex:0 0 33%; min-width:260px; max-width:70%; display:flex; flex-direction:column; background:var(--panel)}
+  .pane-canvas{flex:1; min-width:0; display:flex; flex-direction:column; background:var(--canvas)}
+  .pane-inspector{flex:0 0 268px; border-left:1px solid var(--line); background:var(--panel); overflow-y:auto}
+
+  .pane-head{
+    display:flex; align-items:center; gap:8px; padding:6px 10px;
+    font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
+    border-bottom:1px solid var(--line); flex:0 0 auto;
+  }
+  .pane-head .spacer{flex:1}
+
+  .src-wrap{flex:1; position:relative; overflow:hidden; display:flex}
+  textarea#src{
+    flex:1; resize:none; border:none; outline:none; padding:10px 12px;
+    background:var(--panel); color:var(--text); position:relative; z-index:1;
+    font-family:var(--mono); font-size:12.5px; line-height:20px;
+    white-space:pre; tab-size:2;
+  }
+  #srcBand{
+    position:absolute; left:0; width:5px; z-index:2; pointer-events:none;
+    background:var(--amber);
+    display:none;
+  }
+  .src-band-on #srcBand{display:block}
+  .src-dirty #applyBtn{background:var(--amber); color:#211605; border-color:var(--amber); font-weight:600}
+
+  /* ── Canvas ─────────────────────────────── */
+  .canvas-scroll{flex:1; overflow:auto; padding:18px 22px 60px}
+  .sheet{
+    max-width:960px; margin:0 auto; position:relative;
+    transition:max-width .18s ease;
+  }
+  @media (prefers-reduced-motion: reduce){ .sheet{transition:none} }
+
+  .ruler{
+    display:grid; grid-template-columns:repeat(12,1fr);
+    border-bottom:1px solid var(--blue-grid-strong);
+    margin-bottom:14px; user-select:none;
+  }
+  .ruler div{
+    font-family:var(--mono); font-size:10px; color:var(--faint);
+    border-left:1px solid var(--blue-grid); padding:2px 0 4px 4px;
+  }
+  .ruler div:first-child{border-left:none}
+
+  .rows-host{position:relative}
+  .rows-host::before{ /* 12-col blueprint lines behind everything */
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(to right,
+      var(--blue-grid) 0, var(--blue-grid) 1px, transparent 1px, transparent calc(100%/12));
+  }
+
+  .g-row{
+    position:relative; display:flex; flex-wrap:wrap; align-items:stretch;
+    border:1px solid rgba(122,170,255,.16); border-radius:4px;
+    padding:11px 0 8px; margin:8px 0 14px; cursor:pointer;
+  }
+  .g-row:hover{border-color:rgba(122,170,255,.35)}
+  .g-row.selected{border-color:var(--amber)}
+  .row-label{
+    position:absolute; top:-8px; left:8px; padding:0 6px;
+    background:var(--canvas); border-radius:3px;
+    font-family:var(--mono); font-size:9px; font-weight:700; letter-spacing:.14em;
+    color:var(--faint); white-space:nowrap; max-width:70%;
+    overflow:hidden; text-overflow:ellipsis; pointer-events:none;
+  }
+  .row-label .row-title{color:var(--amber); letter-spacing:.06em}
+  .g-row.selected .row-label{color:var(--amber)}
+  .fill-pill{
+    position:absolute; top:-8px; right:8px; z-index:2; pointer-events:none;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:3px;
+    padding:1px 7px; font-family:var(--mono); font-size:9px; color:var(--muted);
+  }
+  .fill-pill.over{
+    background:#3a2708; border-color:#a3660e; color:#ffc775; font-weight:700;
+  }
+  .fill-pill.unreliable{font-style:italic; color:var(--faint)}
+  .g-col .nested .fill-pill{background:var(--panel)}
+  .g-col .nested .fill-pill.over{background:#3a2708}
+  .g-row.overfull{border-color:rgba(239,159,39,.55)}
+  .view-opt{
+    display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted);
+    cursor:pointer; user-select:none;
+  }
+  .view-opt:hover{color:var(--text)}
+  #dropHint{
+    display:none; position:fixed; inset:8px; z-index:50; pointer-events:none;
+    background:rgba(14,19,27,.85); border:3px dashed var(--amber); border-radius:10px;
+    align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:16px; letter-spacing:.08em; color:var(--amber);
+  }
+  body.filedrag #dropHint{display:flex}
+  #fileName{color:var(--faint); text-transform:none; letter-spacing:normal; font-family:var(--mono); font-size:11px}
+  #paneResizer{
+    flex:0 0 5px; cursor:col-resize; background:var(--line); position:relative; z-index:3;
+  }
+  #paneResizer:hover, #paneResizer.active{background:var(--amber)}
+  body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-select:none}
+
+  .g-col{
+    position:relative; min-height:52px; padding:3px; cursor:pointer;
+  }
+  .g-col-inner{
+    height:100%; border:1px solid var(--col-border); border-radius:4px;
+    background:var(--col-fill); padding:5px 8px 6px; overflow:hidden;
+    display:flex; flex-direction:column; gap:3px;
+  }
+  .g-col:hover > .g-col-inner{background:var(--col-fill-hover)}
+  .g-col.selected > .g-col-inner{
+    border-color:var(--amber); background:var(--amber-dim);
+    box-shadow:0 0 0 1px var(--amber);
+  }
+  /* structural (container) columns: pure scaffolding around nested rows */
+  .g-col.container > .g-col-inner{
+    border-style:dashed; border-color:rgba(122,170,255,.32);
+    background:rgba(56,132,255,.05);
+  }
+  .g-col.container:hover > .g-col-inner{background:rgba(56,132,255,.1)}
+  .g-col.container.selected > .g-col-inner{
+    border-color:var(--amber); background:var(--amber-dim);
+  }
+
+  .col-head{display:flex; align-items:center; gap:6px; min-width:0}
+  .type-badge{
+    flex:0 0 auto; font-family:var(--mono); font-size:8.5px; font-weight:700;
+    letter-spacing:.14em; color:#9ecbff; background:rgba(96,148,255,.14);
+    border:1px solid rgba(122,170,255,.4); border-radius:3px; padding:1px 5px;
+  }
+  .g-col.container .type-badge{color:var(--muted); border-color:var(--line); background:var(--panel-2)}
+  .col-title{
+    font-family:var(--mono); font-size:10.5px; font-weight:700;
+    letter-spacing:.06em; color:var(--amber);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .col-num{font-family:var(--mono); font-size:10px; color:var(--faint)}
+  .col-sub{
+    font-family:var(--mono); font-size:10px; color:var(--muted);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .col-sub .tagname{color:#9ecbff}
+  .col-badges{display:flex; gap:4px; position:absolute; top:-6px; right:6px}
+  .badge{
+    font-family:var(--mono); font-size:9px; padding:1px 5px; border-radius:3px;
+    background:var(--panel-2); border:1px solid var(--line); color:var(--muted);
+  }
+  .badge.warn{color:var(--amber); border-color:rgba(255,180,84,.4)}
+  .g-col .nested{margin-top:2px}
+  .g-col .nested .g-row{margin:8px 0 8px; padding:11px 0 4px}
+  .g-col .nested .g-col{min-height:34px}
+  .g-col .nested .row-label{background:var(--panel)}
+  .nested-sep{
+    display:flex; align-items:center; gap:8px; margin:10px 2px 6px;
+    font-family:var(--mono); font-size:9.5px; font-weight:700;
+    letter-spacing:.12em; color:var(--muted); text-transform:none;
+  }
+  .nested-sep::before, .nested-sep::after{
+    content:""; height:1px; background:rgba(122,170,255,.25); flex:1;
+  }
+
+  .width-label{
+    position:absolute; bottom:-6px; right:6px; z-index:2;
+    font-family:var(--mono); font-size:9px; color:var(--muted); pointer-events:none;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:3px;
+    padding:1px 5px;
+  }
+  .g-col.selected .width-label{color:var(--amber); border-color:rgba(255,180,84,.4)}
+
+  /* drag & drop — zones are overlays, no footprint in the flex row */
+  .g-col[draggable="true"]{cursor:grab}
+  .g-col.dragging{opacity:.35}
+  .dropzone{
+    position:absolute; top:2px; bottom:2px; width:10px; z-index:5;
+    border-radius:3px; pointer-events:none;
+  }
+  .dropzone.left{left:-5px}
+  .dropzone.right{right:-5px}
+  body.dnd .dropzone{pointer-events:auto; background:rgba(255,180,84,.18)}
+  .dropzone.flexzone{
+    position:static; flex:1 1 24px; align-self:stretch; margin:3px;
+    min-height:40px; pointer-events:none;
+  }
+  body.dnd .dropzone.flexzone{pointer-events:auto}
+  .dropzone.over{background:var(--amber) !important}
+
+  /* edge-drag resize */
+  .col-resize{
+    position:absolute; top:6px; bottom:6px; right:-1px; width:7px;
+    cursor:ew-resize; z-index:6;
+  }
+  body.dnd .col-resize{pointer-events:none}
+  .col-resize.no-resize{cursor:not-allowed}
+  .g-col:hover > .col-resize.no-resize::after{background:transparent}
+  .col-resize::after{
+    content:""; position:absolute; inset:1px 2px; border-radius:2px;
+  }
+  .g-col:hover > .col-resize::after{background:rgba(122,170,255,.5)}
+  .g-col.resizing > .col-resize::after{background:var(--amber)}
+  body.resizing, body.resizing *{cursor:ew-resize !important; user-select:none}
+
+  /* collapsible rows */
+  .row-label .chev{
+    pointer-events:auto; cursor:pointer; color:var(--muted); margin-right:5px;
+    font-size:10px;
+  }
+  .row-label .chev:hover{color:var(--text)}
+  .row-label .row-sum{color:var(--muted); font-weight:400; letter-spacing:.04em}
+  .g-row.collapsed{padding:10px 8px 6px; min-height:22px}
+
+  .empty-canvas{color:var(--muted); text-align:center; padding:60px 20px; line-height:1.7}
+  .empty-canvas code{font-family:var(--mono); color:#9ecbff}
+
+  /* ── Inspector ──────────────────────────── */
+  .insp-section{padding:12px 14px; border-bottom:1px solid var(--line)}
+  .insp-title{font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:10px}
+  .insp-empty{padding:24px 16px; color:var(--faint); font-size:12.5px; line-height:1.6}
+  .insp-kv{font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-bottom:6px; word-break:break-all}
+  .insp-kv b{color:var(--text); font-weight:500}
+
+  .bp-grid{display:grid; grid-template-columns:auto 1fr; gap:6px 10px; align-items:center}
+  .bp-grid label{font-family:var(--mono); font-size:11.5px; color:var(--muted); text-align:right}
+  .bp-grid label.cur{color:var(--amber); font-weight:700}
+  .bp-grid label.def{color:#9ecbff}
+  .bp-grid label.def.cur{color:var(--amber)}
+  details.insp-details summary{
+    cursor:pointer; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--muted); user-select:none; margin-bottom:10px;
+  }
+  details.insp-details summary:hover{color:var(--text)}
+  details.insp-details .insp-title{margin-top:6px}
+  .stepper{display:flex; align-items:center; gap:4px}
+  .stepper button{padding:2px 8px; font-family:var(--mono)}
+  .stepper .val{
+    flex:1; text-align:center; font-family:var(--mono); font-size:12px;
+    background:var(--ink); border:1px solid var(--line); border-radius:4px; padding:3px 0;
+    min-width:52px; color:var(--text);
+  }
+  .stepper .val.unset{color:var(--faint)}
+  .insp-actions{display:flex; flex-wrap:wrap; gap:6px; margin-top:4px}
+  .hint{font-size:11px; color:var(--faint); margin-top:8px; line-height:1.5}
+
+  .toast{
+    position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
+    background:var(--panel-2); border:1px solid var(--line); border-radius:6px;
+    padding:7px 14px; font-size:12.5px; color:var(--ok); display:none; z-index:9;
+  }
+  .toast.show{display:block}
+  .toast.warn{color:var(--amber); border-color:rgba(255,180,84,.5)}
+
+  /* find field */
+  #findBox{
+    width:160px; background:var(--ink); border:1px solid var(--line); border-radius:4px;
+    color:var(--text); font-family:var(--mono); font-size:11px; padding:3px 7px; outline:none;
+    text-transform:none; letter-spacing:normal;
+  }
+  #findBox:focus{border-color:var(--amber)}
+  #findCount{font-family:var(--mono); font-size:10px; color:var(--muted)}
+  .g-col.find-hit > .g-col-inner{box-shadow:0 0 0 2px #57d9a3}
+  .g-col.find-hit.selected > .g-col-inner{box-shadow:0 0 0 1px var(--amber), 0 0 0 3px #57d9a3}
+  .g-row.find-hit{border-color:#57d9a3}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><b>GRID·DRAFT</b><span>Bootstrap grid drafting board</span></div>
+  <div class="bp-switch" id="bpSwitch" role="tablist" aria-label="Breakpoint"></div>
+  <div class="bp-note" id="bpNote"></div>
+  <div class="spacer"></div>
+  <button id="undoBtn" title="Undo (Ctrl+Z)">↶ Undo</button>
+  <button id="redoBtn" title="Redo (Ctrl+Y)">↷ Redo</button>
+  <button id="openBtn" title="Open a template file">Open…</button>
+  <button id="sampleBtn">Load sample</button>
+  <button id="downloadBtn" title="Download current template">Download</button>
+  <button id="copyBtn" class="primary">Copy HTML</button>
+  <input type="file" id="fileInput" accept=".html,.htm,.txt,text/html,text/plain" hidden>
+</header>
+<div id="dropHint">Drop template file to open</div>
+
+<main>
+  <section class="pane-src" id="srcPane">
+    <div class="pane-head">Template source <span id="fileName"></span> <span class="spacer"></span>
+      <button id="revertBtn" disabled title="Discard typing, restore canvas state">Revert</button>
+      <button id="applyBtn">Apply changes</button>
+    </div>
+    <div class="src-wrap" id="srcWrap" style="background:var(--panel)">
+      <div id="srcBand"></div>
+      <textarea id="src" spellcheck="false" aria-label="Template source"></textarea>
+    </div>
+  </section>
+
+  <div id="paneResizer"></div>
+
+  <section class="pane-canvas">
+    <div class="pane-head">Layout — schematic, not a render
+      <span class="spacer"></span>
+      <span id="findCount"></span>
+      <input id="findBox" type="text" placeholder="find… ( / )" spellcheck="false" aria-label="Find field">
+    </div>
+    <div class="canvas-scroll">
+      <div class="sheet" id="sheet">
+        <div class="ruler" id="ruler"></div>
+        <div class="rows-host" id="rowsHost"></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="pane-inspector" id="inspector" aria-label="Inspector"></aside>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script id="core">
+/* ═══════════════════════════════════════════════════════════════════
+   CORE — pure functions, no DOM. Offset-preserving template parser,
+   grid model, class-token math and text-splice edit operations.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const VOID_TAGS = new Set(['area','base','br','col','embed','hr','img','input',
+  'link','meta','param','source','track','wbr']);
+
+/* Parse HTML-ish Angular template text into an element tree where every
+   element remembers exact source offsets, so edits can be surgical.
+   Tolerant of unclosed/mismatched tags. */
+function parseTemplate2(src){
+  const root = {tag:'#root', attrs:[], children:[], start:0, end:src.length,
+                contentStart:0, contentEnd:src.length, parent:null};
+  const stack = [root];
+  let i = 0;
+  while(i < src.length){
+    const lt = src.indexOf('<', i);
+    if(lt < 0) break;
+    i = lt;
+    if(src.startsWith('<!--', i)){
+      const e = src.indexOf('-->', i);
+      i = e < 0 ? src.length : e + 3;
+      continue;
+    }
+    if(src[i+1] === '!' || src[i+1] === '?'){
+      const gt = src.indexOf('>', i);
+      i = gt < 0 ? src.length : gt + 1;
+      continue;
+    }
+    if(src[i+1] === '/'){
+      const gt = src.indexOf('>', i);
+      if(gt < 0){ break; }
+      const name = src.slice(i+2, gt).trim().toLowerCase();
+      let k = stack.length - 1;
+      while(k > 0 && stack[k].tag.toLowerCase() !== name) k--;
+      if(k > 0){
+        // implicitly close inner unclosed elements at position i
+        while(stack.length - 1 > k){
+          const inner = stack.pop();
+          inner.contentEnd = i; inner.end = i;
+        }
+        const el = stack.pop();
+        el.contentEnd = i;
+        el.end = gt + 1;
+      }
+      i = gt + 1;
+      continue;
+    }
+    const parsed = parseOpenTag(src, i);
+    if(!parsed){ i++; continue; }
+    const el = {
+      tag: parsed.tag, attrs: parsed.attrs, children: [],
+      start: i, openEnd: parsed.end, end: parsed.end,
+      contentStart: parsed.end, contentEnd: parsed.end,
+      selfClosing: parsed.selfClosing, parent: stack[stack.length-1]
+    };
+    stack[stack.length-1].children.push(el);
+    if(!parsed.selfClosing && !VOID_TAGS.has(parsed.tag.toLowerCase())){
+      stack.push(el);
+    }
+    i = parsed.end;
+  }
+  while(stack.length > 1){
+    const el = stack.pop();
+    el.contentEnd = src.length; el.end = src.length;
+  }
+  return root;
+}
+
+/* Parse one opening tag starting at `start` ('<'). Quote-aware so Angular
+   bindings like [disabled]="a > b" don't break tag-end detection. */
+function parseOpenTag(src, start){
+  let i = start + 1;
+  const nameM = /^[A-Za-z][^\s/>]*/.exec(src.slice(i));
+  if(!nameM) return null;
+  const tag = nameM[0];
+  i += tag.length;
+  const attrs = [];
+  let selfClosing = false;
+
+  while(i < src.length){
+    // skip whitespace
+    while(i < src.length && /\s/.test(src[i])) i++;
+    if(i >= src.length) break;
+    const ch = src[i];
+    if(ch === '>'){ i++; return {tag, attrs, selfClosing, end:i}; }
+    if(ch === '/' && src[i+1] === '>'){ selfClosing = true; i += 2; return {tag, attrs, selfClosing, end:i}; }
+    // attribute name: anything up to ws, '=', '>' ( '/' allowed only as part of '/>' )
+    let ns = i;
+    while(i < src.length && !/[\s=>]/.test(src[i])){
+      if(src[i] === '/' && src[i+1] === '>') break;
+      i++;
+    }
+    const name = src.slice(ns, i);
+    if(!name){ i++; continue; }
+    const attr = {name, valueStart:-1, valueEnd:-1, value:null, quote:''};
+    // skip ws before possible '='
+    let j = i;
+    while(j < src.length && /\s/.test(src[j])) j++;
+    if(src[j] === '='){
+      j++;
+      while(j < src.length && /\s/.test(src[j])) j++;
+      const q = src[j];
+      if(q === '"' || q === "'"){
+        const vEnd = src.indexOf(q, j+1);
+        attr.quote = q;
+        attr.valueStart = j + 1;
+        attr.valueEnd = vEnd < 0 ? src.length : vEnd;
+        attr.value = src.slice(attr.valueStart, attr.valueEnd);
+        i = (vEnd < 0 ? src.length : vEnd + 1);
+      }else{
+        // unquoted value
+        let ve = j;
+        while(ve < src.length && !/[\s>]/.test(src[ve])) ve++;
+        attr.quote = '';
+        attr.valueStart = j; attr.valueEnd = ve;
+        attr.value = src.slice(j, ve);
+        i = ve;
+      }
+    }
+    attrs.push(attr);
+  }
+  return {tag, attrs, selfClosing, end:i};
+}
+
+/* ── class helpers ─────────────────────────────────────────────── */
+
+function getAttr(el, name){
+  const lower = name.toLowerCase();
+  return el.attrs.find(a => a.name.toLowerCase() === lower) || null;
+}
+function classValue(el){
+  const a = getAttr(el, 'class');
+  return a && a.value != null ? a.value : '';
+}
+function classTokens(el){
+  const v = classValue(el).trim();
+  return v ? v.split(/\s+/) : [];
+}
+function hasClass(el, name){
+  return classTokens(el).includes(name);
+}
+function hasDynamicClassBinding(el){
+  return el.attrs.some(a => {
+    const n = a.name.toLowerCase();
+    return n === '[ngclass]' || n === 'ngclass' || n === '[class]' || n.startsWith('[class.');
+  });
+}
+function classIsInterpolated(el){
+  return classValue(el).includes('{{');
+}
+
+const BPS = ['xs','sm','md','lg','xl','xxl'];
+const BP_LABEL = {xs:'<576px', sm:'≥576px', md:'≥768px', lg:'≥992px', xl:'≥1200px', xxl:'≥1400px'};
+
+/* Extract {width:{bp:val}, offset:{bp:n}} from class tokens.
+   val: 1–12 | 'auto' | 'equal' (bare col / col-md)
+   Understands both dialects:
+     BS4/5: col-6, col-md-4, offset-2, offset-md-3
+     BS3:   col-xs-6, col-sm-offset-4, col-md-offset-2 */
+function colSpec(tokens){
+  const spec = {width:{}, offset:{}};
+  for(const t of tokens){
+    let m = /^col-(xs|sm|md|lg|xl|xxl)-offset-(\d{1,2})$/.exec(t);   // BS3 offset
+    if(m){ spec.offset[m[1]] = parseInt(m[2],10); continue; }
+    m = /^col-xs(?:-(\d{1,2}|auto))?$/.exec(t);                      // BS3 xs width
+    if(m){
+      spec.width.xs = m[1] == null ? 'equal' : (m[1] === 'auto' ? 'auto' : parseInt(m[1],10));
+      continue;
+    }
+    m = /^col(?:-(sm|md|lg|xl|xxl))?(?:-(\d{1,2}|auto))?$/.exec(t);
+    if(m){
+      const bp = m[1] || 'xs';
+      spec.width[bp] = m[2] == null ? 'equal' : (m[2] === 'auto' ? 'auto' : parseInt(m[2],10));
+      continue;
+    }
+    m = /^offset(?:-(sm|md|lg|xl|xxl))?-(\d{1,2})$/.exec(t);         // BS4/5 offset
+    if(m){
+      spec.offset[m[1] || 'xs'] = parseInt(m[2],10);
+    }
+  }
+  return spec;
+}
+function isColTokens(tokens){
+  return tokens.some(t => /^col(-|$)/.test(t) || /^offset(-|$)/.test(t));
+}
+
+/* Which breakpoint does this token set width/offset for? (null = neither) */
+function widthTokenBp(t){
+  if(/^col-(xs|sm|md|lg|xl|xxl)-offset-\d{1,2}$/.test(t)) return null;  // offset, not width
+  let m = /^col-xs(?:-(\d{1,2}|auto))?$/.exec(t);
+  if(m) return 'xs';
+  m = /^col(?:-(sm|md|lg|xl|xxl))?(?:-(\d{1,2}|auto))?$/.exec(t);
+  if(m) return m[1] || 'xs';
+  return null;
+}
+function offsetTokenBp(t){
+  let m = /^col-(xs|sm|md|lg|xl|xxl)-offset-(\d{1,2})$/.exec(t);
+  if(m) return m[1];
+  m = /^offset(?:-(sm|md|lg|xl|xxl))?-(\d{1,2})$/.exec(t);
+  if(m) return m[1] || 'xs';
+  return null;
+}
+/* Does this token list look like Bootstrap 3? */
+function usesBs3(tokens){
+  return tokens.some(t => /^col-xs(-|$)/.test(t) ||
+                          /^col-(xs|sm|md|lg|xl|xxl)-offset-\d/.test(t));
+}
+
+/* Rebuild the class string with the width token for `bp` set to `val`
+   (1–12, 'auto', 'equal', or null to remove). Preserves other tokens,
+   the token's position, and its BS3/BS4+ dialect. */
+function setWidthToken(tokens, bp, val, bs3Hint){
+  const isW = t => widthTokenBp(t) === bp;
+  const idx = tokens.findIndex(isW);
+  const oldTok = idx >= 0 ? tokens[idx] : null;
+  const bs3 = oldTok ? /^col-xs/.test(oldTok)
+                     : (bp === 'xs' && (usesBs3(tokens) || !!bs3Hint));
+  let newTok = null;
+  if(val != null){
+    if(bp === 'xs'){
+      newTok = bs3
+        ? (val === 'equal' ? 'col-xs' : `col-xs-${val}`)
+        : (val === 'equal' ? 'col' : `col-${val}`);
+    }else{
+      newTok = val === 'equal' ? `col-${bp}` : `col-${bp}-${val}`;
+    }
+  }
+  const out = tokens.filter(t => !isW(t));
+  if(newTok != null){
+    if(idx >= 0) out.splice(Math.min(idx, out.length), 0, newTok);
+    else{
+      let last = -1;
+      out.forEach((t,i2) => { if(/^col(-|$)/.test(t)) last = i2; });
+      if(last >= 0) out.splice(last + 1, 0, newTok); else out.push(newTok);
+    }
+  }
+  return out;
+}
+function setOffsetToken(tokens, bp, val, bs3Hint, keepZero){
+  const isO = t => offsetTokenBp(t) === bp;
+  const idx = tokens.findIndex(isO);
+  const oldTok = idx >= 0 ? tokens[idx] : null;
+  const bs3 = oldTok ? /^col-/.test(oldTok) : (usesBs3(tokens) || !!bs3Hint);
+  // 0 normally means "remove the token"; keepZero writes an explicit
+  // offset-*-0 so an inherited nonzero offset can be cancelled.
+  const remove = val == null || (val === 0 && !keepZero);
+  const newTok = remove ? null
+    : bs3 ? `col-${bp}-offset-${val}`
+    : (bp === 'xs' ? `offset-${val}` : `offset-${bp}-${val}`);
+  const out = tokens.filter(t => !isO(t));
+  if(newTok != null){
+    if(idx >= 0) out.splice(Math.min(idx, out.length), 0, newTok);
+    else out.push(newTok);
+  }
+  return out;
+}
+
+/* effective value at breakpoint bp with mobile-first cascade; null if none */
+function effectiveAt(map, bp){
+  for(let i = BPS.indexOf(bp); i >= 0; i--){
+    if(map[BPS[i]] !== undefined) return map[BPS[i]];
+  }
+  return null;
+}
+
+/* which breakpoint's token produces the effective value at bp (null if none) */
+function definingBp(map, bp){
+  for(let i = BPS.indexOf(bp); i >= 0; i--){
+    if(map[BPS[i]] !== undefined) return BPS[i];
+  }
+  return null;
+}
+
+/* Halve one numeric width token, preserving its exact format/dialect:
+   col-sm-6 → col-sm-3, col-xs-8 → col-xs-4. Non-numeric (col, col-md,
+   col-auto) returned unchanged. mode: 'ceil' (first half) | 'floor'. */
+function halveWidthTokenStr(t, mode){
+  const m = /^(.*-)(\d{1,2})$/.exec(t);
+  if(!m) return t;
+  const v = parseInt(m[2],10);
+  const h = Math.max(1, mode === 'ceil' ? Math.ceil(v/2) : Math.floor(v/2));
+  return m[1] + h;
+}
+
+/* The width tokens of a class list, halved (offsets and other classes dropped). */
+function halvedWidthTokens(tokens, mode){
+  return tokens.filter(t => widthTokenBp(t) != null)
+               .map(t => halveWidthTokenStr(t, mode));
+}
+
+/* ── grid model ────────────────────────────────────────────────── */
+
+function isRowEl(el){
+  return hasClass(el, 'row') || hasClass(el, 'form-row');
+}
+
+/* Collect rows whose nearest grid ancestor is `el` (stops at rows). */
+function findRows(el, out){
+  for(const c of el.children){
+    if(isRowEl(c)) out.push(buildRow(c));
+    else findRows(c, out);
+  }
+  return out;
+}
+function buildRow(el){
+  const cols = el.children.map(buildCol);
+  return {kind:'row', el, cols};
+}
+function buildCol(el){
+  const tokens = classTokens(el);
+  return {
+    kind:'col', el,
+    spec: colSpec(tokens),
+    isCol: isColTokens(tokens),
+    nestedRows: findRows(el, [])
+  };
+}
+function buildModel(root){
+  return findRows(root, []);
+}
+
+/* A "container" column is structural scaffolding: it leads to nested rows,
+   every element child is a row, a heading (legend/h1-h6 as section title),
+   a spacer (br/hr), or a wrapper whose subtree contains rows (panel
+   sections, fieldsets, ng-container...), and it has no loose content text. */
+function isHeadingEl(el){
+  return /^(legend|h[1-6])$/i.test(el.tag);
+}
+function isSpacerEl(el){
+  return /^(br|hr)$/i.test(el.tag);
+}
+function subtreeHasRow(el){
+  return el.children.some(c => isRowEl(c) || subtreeHasRow(c));
+}
+/* The element's own text outside child elements (comments stripped). */
+function looseText(src, el){
+  let txt = '', pos = el.contentStart;
+  for(const c of el.children){
+    txt += src.slice(pos, c.start);
+    pos = c.end;
+  }
+  txt += src.slice(pos, el.contentEnd);
+  return txt.replace(/<!--[\s\S]*?-->/g, '');
+}
+
+/* Angular 17 control-flow blocks (@if/@else/@for/@switch) make a row's
+   fill sum unreliable — all branches parse as simultaneous columns. */
+function rowHasControlFlow(src, el){
+  return /@(if|else|for|switch)\b/.test(looseText(src, el));
+}
+
+function isContainerCol(src, el){
+  if(!el.children.length) return false;
+  if(!el.children.some(c => isRowEl(c) || subtreeHasRow(c))) return false;
+  if(!el.children.every(c =>
+      isRowEl(c) || isHeadingEl(c) || isSpacerEl(c) || subtreeHasRow(c))) return false;
+  return looseText(src, el).trim() === '';
+}
+
+/* ── titles & content hints from the markup itself ─────────────── */
+
+function i18nKey(el){
+  const a = el.attrs.find(x => {
+    const n = x.name.toLowerCase();
+    return n === 'app-i18n' || n === 'lc-l10n' || n.includes('i18n');
+  });
+  return a && a.value ? a.value : null;
+}
+function lastKeySegment(key){
+  const p = key.split('.');
+  return p[p.length - 1] || key;
+}
+
+/* Label of one heading element: its text, else its i18n key's last segment. */
+function headingLabel(src, h){
+  const txt = src.slice(h.contentStart, h.contentEnd)
+    .replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+  if(txt) return {text: txt, full: txt};
+  const k = i18nKey(h);
+  if(k) return {text: lastKeySegment(k), full: k};
+  return null;
+}
+
+/* Title from the column's first heading child. */
+function headingTitle(src, el){
+  const h = el.children.find(isHeadingEl);
+  if(!h) return null;
+  return headingLabel(src, h);
+}
+
+/* sectionTitle="demo.editor.sectionF" on wrapper components (panel-section). */
+function sectionTitleAttr(el){
+  const a = el.attrs.find(x => {
+    const n = x.name.toLowerCase();
+    return n === 'sectiontitle' || n === '[sectiontitle]';
+  });
+  if(!a || !a.value) return null;
+  return {text: lastKeySegment(a.value), full: a.value};
+}
+
+/* Ordered walk of a column's inner structure: rows interleaved with the
+   headings and titled wrappers between them. Row tokens appear in exactly
+   the order findRows collects them. Direct headings are marked so the one
+   consumed as the column's title can be skipped by the renderer. */
+function colSequence(src, el, out, direct){
+  if(out === undefined){ out = []; direct = true; }
+  for(const c of el.children){
+    if(isRowEl(c)){
+      out.push({kind:'row', el:c});
+    }else if(isHeadingEl(c)){
+      const lab = headingLabel(src, c);
+      if(lab) out.push({kind:'sep', text:lab.text, full:lab.full, direct: !!direct});
+    }else if(isSpacerEl(c)){
+      continue;
+    }else if(subtreeHasRow(c)){
+      const t = sectionTitleAttr(c);
+      if(t) out.push({kind:'sep', text:t.text, full:t.full, direct:false});
+      colSequence(src, c, out, false);
+    }
+  }
+  return out;
+}
+
+/* Small stable hash for identity tracking. */
+function hashStr(s){
+  let h = 0;
+  for(let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+/* Deepest row/col in the model whose source span contains offset pos.
+   Returns {path, kind:'row'|'col'} or null. */
+function nodeAtOffset(model, pos){
+  let best = null;
+  (function walk(rlist, base){
+    rlist.forEach((r, i) => {
+      const p = base.concat(i);
+      if(pos >= r.el.start && pos < r.el.end){
+        best = {path: p, kind:'row'};
+        r.cols.forEach((c, ci) => {
+          if(pos >= c.el.start && pos < c.el.end){
+            best = {path: p.concat(ci), kind:'col'};
+            walk(c.nestedRows, p.concat(ci));
+          }
+        });
+      }
+    });
+  })(model, []);
+  return best;
+}
+
+/* Everything a column is findable by: its title (short and full), its
+   content hint (name + providing tag), and the section separators inside
+   it — so searching "sectionM" finds the container that holds it. */
+function colSearchText(src, el){
+  const parts = [];
+  const t = colTitle(src, el);
+  if(t){ parts.push(t.text); if(t.full !== t.text) parts.push(t.full); }
+  const h = contentHint(src, el);
+  if(h){ parts.push(h.text); if(h.tag) parts.push(h.tag); }
+  for(const item of colSequence(src, el)){
+    if(item.kind === 'sep'){
+      parts.push(item.text);
+      if(item.full && item.full !== item.text) parts.push(item.full);
+    }
+  }
+  return parts.join(' ').toLowerCase();
+}
+
+/* Combined title: explicit comment wins, then the heading. */
+function colTitle(src, el){
+  const c = elementTitle(src, el);
+  if(c) return {text: c, full: c};
+  return headingTitle(src, el);
+}
+
+function controlName(el){
+  const a = el.attrs.find(x => {
+    const n = x.name.toLowerCase();
+    return n === 'formcontrolname' || n === '[formcontrol]' || n === 'formcontrol';
+  });
+  return a && a.value ? a.value : null;
+}
+
+/* Best content hint for a column, searched shallowly (depth 3) among
+   non-row descendants: a form control's name beats an i18n key beats
+   the first tag name. `tag` says which element type supplied the name.
+   Returns {text, kind:'control'|'i18n'|'tag', tag?} or null. */
+function contentHint(src, el){
+  const q = el.children.filter(c => !isRowEl(c) && !isSpacerEl(c)).map(c => ({e:c, d:1}));
+  let firstTag = null, firstI18n = null, firstI18nTag = null;
+  while(q.length){
+    const {e, d} = q.shift();
+    const cn = controlName(e);
+    if(cn) return {text: cn, kind:'control', tag: e.tag};
+    if(!firstI18n){
+      const k = i18nKey(e);
+      if(k){ firstI18n = lastKeySegment(k); firstI18nTag = e.tag; }
+    }
+    if(!firstTag && !isHeadingEl(e)) firstTag = '<' + e.tag + '>';
+    if(d < 3) e.children.forEach(c => { if(!isRowEl(c) && !isSpacerEl(c)) q.push({e:c, d:d+1}); });
+  }
+  if(firstI18n) return {text: firstI18n, kind:'i18n', tag: firstI18nTag};
+  if(firstTag) return {text: firstTag, kind:'tag'};
+  return null;
+}
+
+/* ── text splicing ─────────────────────────────────────────────── */
+
+function splice(src, start, end, text){
+  return src.slice(0, start) + text + src.slice(end);
+}
+
+/* Replace the class attribute value of el (adds the attribute if missing). */
+function writeClass(src, el, newTokens){
+  const val = newTokens.join(' ');
+  const a = getAttr(el, 'class');
+  if(a && a.valueStart >= 0){
+    if(a.quote === ''){
+      return splice(src, a.valueStart, a.valueEnd, '"' + val + '"');
+    }
+    return splice(src, a.valueStart, a.valueEnd, val);
+  }
+  // no class attribute — insert before '>' (or '/>')
+  let pos = el.openEnd - 1;                    // at '>'
+  if(src[el.openEnd - 2] === '/') pos = el.openEnd - 2;
+  const lead = /\s/.test(src[pos-1]) ? '' : ' ';
+  return splice(src, pos, pos, `${lead}class="${val}"`);
+}
+
+/* ── title comments ────────────────────────────────────────────── */
+
+/* A comment directly above `pos` (only whitespace between), e.g.
+   <!--COL3-->  →  {open, text:'COL3'}. Commented-out markup is ignored. */
+function precedingCommentRange(src, pos){
+  let i = pos;
+  // walk back over whitespace, but stop if there's a blank line between the
+  // comment and the element — a blank-line-separated comment describes a
+  // section, not this element, so it isn't adopted as a title / carried on move
+  let newlines = 0;
+  while(i > 0 && /\s/.test(src[i-1])){
+    if(src[i-1] === '\n' && ++newlines >= 2) return null;
+    i--;
+  }
+  if(src.slice(i-3, i) !== '-->') return null;
+  const open = src.lastIndexOf('<!--', i-3);
+  if(open < 0) return null;
+  const text = src.slice(open+4, i-3).trim();
+  if(!text || text.includes('<')) return null;
+  return {open, text};
+}
+
+/* Title of an element: comment above it, else first comment inside it. */
+function elementTitle(src, el){
+  const pre = precedingCommentRange(src, el.start);
+  if(pre) return pre.text;
+  let i = el.contentStart;
+  while(i < el.contentEnd && /\s/.test(src[i])) i++;
+  if(src.startsWith('<!--', i)){
+    const e = src.indexOf('-->', i);
+    if(e >= 0 && e < el.contentEnd){
+      const text = src.slice(i+4, e).trim();
+      if(text && !text.includes('<')) return text;
+    }
+  }
+  return null;
+}
+
+/* Range of el including its leading indentation, plus any title comments
+   directly above it (so moves/deletes carry the label along).
+   Returns {cutStart, cutEnd, textStart, indent}:
+   - cutStart..cutEnd  → remove for delete/move (swallows preceding newline)
+   - textStart..el.end → the text to re-insert when moving */
+function elementCutRange(src, el){
+  let s = el.start;
+  while(s > 0 && (src[s-1] === ' ' || src[s-1] === '\t')) s--;
+  const indent = src.slice(s, el.start);
+
+  let anchor = el.start, c;
+  while((c = precedingCommentRange(src, anchor))) anchor = c.open;
+
+  let cs = anchor;
+  while(cs > 0 && (src[cs-1] === ' ' || src[cs-1] === '\t')) cs--;
+  let cutStart = cs;
+  if(cs > 0 && src[cs-1] === '\n') cutStart = cs - 1;
+  return {cutStart, cutEnd: el.end, textStart: anchor, indent};
+}
+
+/* Indent used for children of a row (from first element child, else +2). */
+function rowChildIndent(src, rowEl){
+  const first = rowEl.children[0];
+  if(first) return elementCutRange(src, first).indent;
+  return elementCutRange(src, rowEl).indent + '  ';
+}
+</script>
+
+<script id="app">
+/* ═══════════════════════════════════════════════════════════════════
+   APP — state, rendering, edits, drag & drop
+   ═══════════════════════════════════════════════════════════════════ */
+
+const $ = s => document.querySelector(s);
+const srcTA = $('#src');
+const rowsHost = $('#rowsHost');
+const inspector = $('#inspector');
+const sheet = $('#sheet');
+
+const SHEET_WIDTH = {xs:400, sm:560, md:740, lg:920, xl:1080, xxl:1180};
+
+let state = {
+  src: '',
+  root: null,
+  model: [],
+  bp: 'md',
+  sel: null,          // {path:[...indices], kind:'row'|'col'}
+  history: [],
+  hIndex: -1,
+  dirty: false,       // textarea edited but not applied
+  collapsed: new Set(), // row identity keys collapsed via chevron
+  tintOverfull: false,  // amber row border on overfull rows (View section)
+  fileName: null        // name of the opened file, used for Download
+};
+const resize = {active:false};
+
+/* ── state / history ───────────────────────────────────────────── */
+
+function apply(newSrc, {pushHistory = true, keepSel = true, fromSource = false} = {}){
+  if(state.dirty && !fromSource){
+    toast('Source pane has unapplied edits — Apply (Ctrl+Enter) or Revert first', 'warn');
+    render();               // restore any live previews (e.g. resize)
+    return;
+  }
+  dnd.src = null;
+  document.body.classList.remove('dnd');
+  if(pushHistory){
+    state.history = state.history.slice(0, state.hIndex + 1);
+    state.history.push(newSrc);
+    state.hIndex = state.history.length - 1;
+  }
+  state.src = newSrc;
+  state.root = parseTemplate2(newSrc);
+  state.model = buildModel(state.root);
+  state.docBs3 = computeDocBs3(state.root);
+  if(!keepSel) state.sel = null;
+  if(state.sel && !resolvePath(state.sel.path)) state.sel = null;
+  if(!state.sel) state._bandLines = null;
+  srcTA.value = newSrc;
+  state.dirty = false;
+  $('#srcPane').classList.remove('src-dirty');
+  $('#revertBtn').disabled = true;
+  render();
+}
+
+function undo(){
+  if(state.dirty){
+    toast('Source pane has unapplied edits — Apply (Ctrl+Enter) or Revert first', 'warn');
+    return;
+  }
+  if(state.hIndex > 0){
+    state.hIndex--;
+    apply(state.history[state.hIndex], {pushHistory:false});
+  }
+}
+function redo(){
+  if(state.dirty){
+    toast('Source pane has unapplied edits — Apply (Ctrl+Enter) or Revert first', 'warn');
+    return;
+  }
+  if(state.hIndex < state.history.length - 1){
+    state.hIndex++;
+    apply(state.history[state.hIndex], {pushHistory:false});
+  }
+}
+
+/* path = [rowIdx, colIdx, rowIdx, colIdx, ...] into the model tree */
+function resolvePath(path){
+  if(!path) return null;
+  let node = null, list = state.model;
+  for(let i = 0; i < path.length; i++){
+    node = list[path[i]];
+    if(!node) return null;
+    list = node.kind === 'row' ? node.cols : node.nestedRows;
+  }
+  return node;
+}
+
+/* any BS3-style grid class anywhere in the document? */
+function computeDocBs3(root){
+  let found = false;
+  (function walk(e){
+    if(found) return;
+    for(const c of e.children){
+      const v = classValue(c);
+      if(v && usesBs3(v.trim().split(/\s+/))){ found = true; return; }
+      walk(c);
+    }
+  })(root);
+  return found;
+}
+
+/* Tier to create a new token at when the element defines none for this
+   property: the element's own width tier, else the tier its row siblings
+   use most, else the current view breakpoint. */
+function fallbackTier(node, rowNode){
+  const wdef = definingBp(node.spec.width, state.bp);
+  if(wdef) return wdef;
+  const own = Object.keys(node.spec.width);
+  if(own.length) return own[0];
+  const dom = dominantTier(rowNode);
+  return dom || state.bp;
+}
+function dominantTier(rowNode){
+  if(!rowNode) return null;
+  const count = {};
+  rowNode.cols.forEach(c =>
+    Object.keys(c.spec.width).forEach(b => count[b] = (count[b]||0) + 1));
+  let best = null;
+  for(const b of BPS) if(count[b] && (best == null || count[b] > count[best])) best = b;
+  return best;
+}
+function rowOfSel(){
+  return state.sel ? resolvePath(state.sel.path.slice(0, -1)) : null;
+}
+
+/* Width classes for a brand-new column: copy the reference element's width
+   tokens verbatim; else follow the row's dominant tier in the doc dialect. */
+function conventionNewColTokens(refTokens, rowNode){
+  const w = (refTokens || []).filter(t => widthTokenBp(t) != null);
+  if(w.length) return w.slice();
+  const tier = dominantTier(rowNode) || state.bp;
+  if(state.docBs3) return [`col-${tier}-6`];
+  return [tier === 'xs' ? 'col' : `col-${tier}`];
+}
+
+/* ── rendering ─────────────────────────────────────────────────── */
+
+function summarize(colNode){
+  const hint = contentHint(state.src, colNode.el);
+  if(hint){
+    if(hint.kind === 'tag') return {tag: hint.text};
+    return {text: hint.text, styled: true, type: hint.tag};
+  }
+  let txt = '', pos = colNode.el.contentStart;
+  for(const c of colNode.el.children){
+    txt += state.src.slice(pos, c.start);
+    pos = c.end;
+  }
+  txt += state.src.slice(pos, colNode.el.contentEnd);
+  txt = txt.replace(/<!--[\s\S]*?-->/g,'').replace(/\s+/g,' ').trim();
+  if(txt) return {text: txt.length > 34 ? txt.slice(0,34) + '…' : txt};
+  return {text:'empty'};
+}
+
+function computeWidths(rowNode, bp){
+  // returns per col: {span:number|'auto', offset:number, source:'set'|'equal'|'default'}
+  const infos = rowNode.cols.map(c => {
+    const w = effectiveAt(c.spec.width, bp);
+    const o = effectiveAt(c.spec.offset, bp) || 0;
+    return {w, o};
+  });
+  let equals = 0, used = 0;
+  for(const i of infos){
+    if(typeof i.w === 'number') used += i.w + i.o;
+    else if(i.w === 'auto') used += 2 + i.o;       // schematic guess for auto
+    else if(i.w === null) used += 12 + i.o;        // non-col child: full width
+    else { equals++; used += i.o; }                // 'equal'
+  }
+  const leftover = Math.max(12 - used, equals);      // at least 1 each
+  const perEq = equals ? Math.max(1, Math.floor(leftover / equals)) : 0;
+
+  return infos.map(i => ({
+    span: i.w === 'equal' ? perEq
+        : i.w === 'auto'  ? 'auto'
+        : i.w === null    ? 12
+        : i.w,
+    offset: i.o,
+    kind: i.w === null ? 'plain' : (i.w === 'equal' ? 'equal' : (i.w === 'auto' ? 'auto' : 'set'))
+  }));
+}
+
+/* Fill sum for a row at the current breakpoint: spans + offsets.
+   approx: contains auto/equal columns (their spans are schematic).
+   unreliable: contains @if/@else — branches counted as simultaneous. */
+function rowFill(rowNode){
+  const widths = computeWidths(rowNode, state.bp);
+  let sum = 0, approx = false;
+  widths.forEach(w => {
+    sum += (w.span === 'auto' ? 2 : w.span) + (w.offset || 0);
+    if(w.span === 'auto' || w.kind === 'equal') approx = true;
+  });
+  return {widths, sum, approx,
+          unreliable: rowHasControlFlow(state.src, rowNode.el)};
+}
+
+function render(){
+  state._rowIds = computeRowIds();
+  computeFind();
+  renderRuler();
+  renderCanvas();
+  renderInspector();
+  renderHeader();
+  updateFindCount();
+}
+
+/* Identity for collapse state: hash of the row's exact source text plus an
+   occurrence counter to tell identical rows apart. Computed for the whole
+   model in one deterministic pass so identities don't depend on what's
+   currently collapsed. */
+function computeRowIds(){
+  const ids = new Map(), counts = new Map();
+  (function walk(rlist, base){
+    rlist.forEach((r, i) => {
+      const p = base.concat(i);
+      const h = hashStr(state.src.slice(r.el.start, r.el.end));
+      const n = counts.get(h) || 0;
+      counts.set(h, n + 1);
+      ids.set(p.join(','), h + ':' + n);
+      r.cols.forEach((c, ci) => walk(c.nestedRows, p.concat(ci)));
+    });
+  })(state.model, []);
+  return ids;
+}
+
+/* ── find field ────────────────────────────────────────────────── */
+
+function computeFind(){
+  state.findMatches = [];
+  state._findSet = null;
+  const q = (state.find || '').trim().toLowerCase();
+  if(!q) return;
+  (function walk(rlist, base){
+    rlist.forEach((r, i) => {
+      const p = base.concat(i);
+      const rt = elementTitle(state.src, r.el);
+      if(rt && rt.toLowerCase().includes(q))
+        state.findMatches.push({path: p, kind:'row'});
+      r.cols.forEach((c, ci) => {
+        const cp = p.concat(ci);
+        if(colSearchText(state.src, c.el).includes(q))
+          state.findMatches.push({path: cp, kind:'col'});
+        walk(c.nestedRows, cp);
+      });
+    });
+  })(state.model, []);
+  state._findSet = new Set(state.findMatches.map(m => m.kind + ':' + m.path.join(',')));
+  if(state.findIdx != null){
+    if(!state.findMatches.length) state.findIdx = null;
+    else if(state.findIdx >= state.findMatches.length)
+      state.findIdx = state.findMatches.length - 1;
+  }
+}
+
+function updateFindCount(){
+  const c = $('#findCount');
+  if(!c) return;
+  if(!(state.find || '').trim()){ c.textContent = ''; return; }
+  const n = state.findMatches.length;
+  c.textContent = n === 0 ? '0 hits'
+    : state.findIdx == null ? n + ' hit' + (n === 1 ? '' : 's')
+    : (state.findIdx + 1) + '/' + n;
+}
+
+/* Expand any collapsed rows above this path so it can be seen. */
+function expandAncestors(path){
+  for(let len = 1; len < path.length; len += 2){
+    const key = state._rowIds.get(path.slice(0, len).join(','));
+    if(key && state.collapsed.has(key)) state.collapsed.delete(key);
+  }
+}
+
+function findGo(dir){
+  const m = state.findMatches;
+  if(!m.length) return;
+  state.findIdx = ((state.findIdx == null ? -1 : state.findIdx) + dir + m.length) % m.length;
+  const hit = m[state.findIdx];
+  expandAncestors(hit.path);
+  state.sel = {path: hit.path.slice(), kind: hit.kind};
+  render();
+  const el = rowsHost.querySelector('[data-path="' + hit.path.join(',') + '"]');
+  if(el) el.scrollIntoView({block:'center', behavior:'smooth'});
+  updateFindCount();
+}
+
+/* ── reverse selection sync: caret in source → canvas block ────── */
+
+function syncSelFromCaret(){
+  if(state.dirty) return;                       // offsets map to canvas state only
+  const hit = nodeAtOffset(state.model, srcTA.selectionStart);
+  if(!hit) return;                              // caret outside any grid element
+  if(state.sel && state.sel.kind === hit.kind &&
+     state.sel.path.join(',') === hit.path.join(',')) return;
+  expandAncestors(hit.path);
+  state.sel = hit;
+  render();                                     // no select(): keep caret untouched
+  const node = resolvePath(hit.path);
+  if(node){                                     // band only; don't move the caret
+    const sl = state.src.slice(0, node.el.start).split('\n').length - 1;
+    const el2 = state.src.slice(0, node.el.end).split('\n').length - 1;
+    state._bandLines = [sl, el2];
+    positionBand();
+  }
+  const el = rowsHost.querySelector('[data-path="' + hit.path.join(',') + '"]');
+  if(el) el.scrollIntoView({block:'nearest', behavior:'smooth'});
+}
+
+function renderHeader(){
+  $('#undoBtn').disabled = !(state.hIndex > 0);
+  $('#redoBtn').disabled = !(state.hIndex < state.history.length - 1);
+  $('#bpNote').textContent = BP_LABEL[state.bp];
+  document.querySelectorAll('#bpSwitch button').forEach(b =>
+    b.classList.toggle('active', b.dataset.bp === state.bp));
+  sheet.style.maxWidth = SHEET_WIDTH[state.bp] + 'px';
+}
+
+function renderRuler(){
+  const r = $('#ruler');
+  if(r.children.length) return;
+  for(let i = 1; i <= 12; i++){
+    const d = document.createElement('div');
+    d.textContent = i;
+    r.appendChild(d);
+  }
+}
+
+function renderCanvas(){
+  rowsHost.innerHTML = '';
+  if(!state.model.length){
+    const d = document.createElement('div');
+    d.className = 'empty-canvas';
+    d.innerHTML = 'No <code>.row</code> elements found.<br>' +
+      'Paste an Angular/Bootstrap template on the left and press <b>Apply changes</b>,<br>' +
+      'or hit <b>Load sample</b> in the header.';
+    rowsHost.appendChild(d);
+    return;
+  }
+  state.model.forEach((row, i) => rowsHost.appendChild(renderRow(row, [i], false)));
+}
+
+function renderRow(rowNode, path, nested){
+  const rowDiv = document.createElement('div');
+  rowDiv.className = 'g-row';
+  rowDiv.dataset.path = path.join(',');
+  if(pathEq(state.sel, path, 'row')) rowDiv.classList.add('selected');
+  if(state._findSet && state._findSet.has('row:' + path.join(','))) rowDiv.classList.add('find-hit');
+
+  const key = state._rowIds.get(path.join(',')) || path.join(',');
+  const isCollapsed = state.collapsed.has(key);
+  if(isCollapsed) rowDiv.classList.add('collapsed');
+
+  const label = document.createElement('div');
+  label.className = 'row-label';
+  const chev = document.createElement('span');
+  chev.className = 'chev';
+  chev.textContent = isCollapsed ? '▸' : '▾';
+  chev.title = isCollapsed ? 'Expand row' : 'Collapse row';
+  chev.addEventListener('click', e => {
+    e.stopPropagation();
+    if(state.collapsed.has(key)) state.collapsed.delete(key);
+    else state.collapsed.add(key);
+    render();
+  });
+  label.appendChild(chev);
+  label.appendChild(document.createTextNode('ROW'));
+  const rTitle = elementTitle(state.src, rowNode.el);
+  if(rTitle){
+    const t = document.createElement('span');
+    t.className = 'row-title';
+    t.textContent = ' · ' + rTitle;
+    label.appendChild(t);
+    label.title = rTitle;
+  }
+  if(isCollapsed){
+    const s = document.createElement('span');
+    s.className = 'row-sum';
+    s.textContent = ' (' + rowNode.cols.length + ' col' + (rowNode.cols.length === 1 ? '' : 's') + ')';
+    label.appendChild(s);
+  }
+  rowDiv.appendChild(label);
+
+  const fill = rowFill(rowNode);
+  const pill = document.createElement('span');
+  pill.className = 'fill-pill';
+  if(fill.unreliable){
+    pill.classList.add('unreliable');
+    pill.textContent = '~' + fill.sum + '/12';
+    pill.title = 'Contains @if/@else — all branches counted, sum unreliable';
+  }else if(fill.sum > 12){
+    pill.classList.add('over');
+    pill.textContent = '\u26a0 ' + fill.sum + '/12 \u2192 wraps';
+    pill.title = 'Columns + offsets exceed 12 at ' + state.bp + ' — row wraps';
+    if(state.tintOverfull) rowDiv.classList.add('overfull');
+  }else{
+    pill.textContent = (fill.approx ? '~' : '') + fill.sum + '/12';
+    if(fill.approx) pill.title = 'Contains auto/equal columns — approximate';
+  }
+  rowDiv.appendChild(pill);
+
+  rowDiv.addEventListener('click', e => {
+    e.stopPropagation();
+    select({path, kind:'row'});
+  });
+
+  if(isCollapsed) return rowDiv;
+
+  const widths = fill.widths;
+  rowNode.cols.forEach((col, ci) => {
+    rowDiv.appendChild(renderCol(col, widths[ci], path.concat(ci), ci,
+                                 ci === rowNode.cols.length - 1));
+  });
+  if(!rowNode.cols.length){
+    rowDiv.appendChild(makeDropzone(path, 0, 'flexzone'));
+  }
+  return rowDiv;
+}
+
+function renderCol(colNode, w, path, index, isLast){
+  const colDiv = document.createElement('div');
+  colDiv.className = 'g-col';
+  colDiv.dataset.path = path.join(',');
+  const spanNum = w.span === 'auto' ? 2 : w.span;
+  const pct = v => (v / 12 * 100).toFixed(4) + '%';
+  colDiv.style.flex = '0 0 ' + pct(Math.min(spanNum, 12));
+  colDiv.style.maxWidth = pct(Math.min(spanNum, 12));
+  if(w.offset) colDiv.style.marginLeft = pct(w.offset);
+
+  const editable = !classIsInterpolated(colNode.el);
+  if(!editable || hasDynamicClassBinding(colNode.el)) colDiv.classList.add('dynamic');
+  const container = isContainerCol(state.src, colNode.el);
+  if(container) colDiv.classList.add('container');
+  if(pathEq(state.sel, path, 'col')) colDiv.classList.add('selected');
+  if(state._findSet && state._findSet.has('col:' + path.join(','))) colDiv.classList.add('find-hit');
+
+  const inner = document.createElement('div');
+  inner.className = 'g-col-inner';
+
+  // header: type badge (always) + comment title, or positional number
+  const head = document.createElement('div');
+  head.className = 'col-head';
+  head.appendChild(mkTypeBadge(container ? 'COL ⊞' : 'COL'));
+  const title = colTitle(state.src, colNode.el);
+  if(title){
+    const t = document.createElement('div');
+    t.className = 'col-title';
+    t.textContent = title.text;
+    t.title = title.full;
+    head.appendChild(t);
+  }else{
+    const n = document.createElement('div');
+    n.className = 'col-num';
+    n.textContent = '#' + (index + 1);
+    head.appendChild(n);
+  }
+  inner.appendChild(head);
+
+  // secondary line: content hint (content cols only) + classes
+  const sub = document.createElement('div');
+  sub.className = 'col-sub';
+  const cls = classValue(colNode.el) || '(no class)';
+  if(!container){
+    const sum = summarize(colNode);
+    const hintText = sum.tag || sum.text;
+    if(sum.tag || sum.styled){
+      if(sum.type){
+        sub.appendChild(document.createTextNode(sum.type + ' · '));
+      }
+      const t = document.createElement('span');
+      t.className = 'tagname';
+      t.textContent = hintText;
+      sub.appendChild(t);
+      sub.appendChild(document.createTextNode(' · ' + cls));
+    }else{
+      sub.textContent = hintText + ' · ' + cls;
+    }
+  }else{
+    sub.textContent = cls;
+  }
+  sub.title = cls;
+  inner.appendChild(sub);
+
+  // badges
+  const badges = document.createElement('div');
+  badges.className = 'col-badges';
+  const ngFor = colNode.el.attrs.find(a => a.name.toLowerCase() === '*ngfor');
+  if(ngFor){ badges.appendChild(mkBadge('×n *ngFor','')); }
+  if(colNode.el.attrs.find(a => a.name.toLowerCase() === '*ngif')){ badges.appendChild(mkBadge('*ngIf','')); }
+  if(hasDynamicClassBinding(colNode.el) || !editable){ badges.appendChild(mkBadge('dyn','warn')); }
+  if(badges.children.length) colDiv.appendChild(badges);
+
+  // nested rows, interleaved with section separators (mid-column legends,
+  // titled wrapper components) in source order
+  if(colNode.nestedRows.length){
+    const nest = document.createElement('div');
+    nest.className = 'nested';
+    const seq = colSequence(state.src, colNode.el);
+    const titleFromHeading = title && !elementTitle(state.src, colNode.el);
+    let ri = 0, skippedTitle = false;
+    for(const item of seq){
+      if(item.kind === 'row'){
+        if(ri < colNode.nestedRows.length){
+          nest.appendChild(renderRow(colNode.nestedRows[ri], path.concat(ri), true));
+          ri++;
+        }
+      }else{
+        if(item.direct && titleFromHeading && !skippedTitle){
+          skippedTitle = true;          // this heading is already the block title
+          continue;
+        }
+        const sep = document.createElement('div');
+        sep.className = 'nested-sep';
+        sep.textContent = item.text;
+        sep.title = item.full;
+        nest.appendChild(sep);
+      }
+    }
+    inner.appendChild(nest);
+  }
+
+  const wl = document.createElement('div');
+  wl.className = 'width-label';
+  wl.textContent = w.span === 'auto' ? 'auto' : (w.offset ? `+${w.offset} / ` : '') + w.span + '/12';
+  colDiv.appendChild(wl);
+
+  colDiv.appendChild(inner);
+
+  // overlay dropzones: left gap = insert before me; last column also owns
+  // the insert-at-end zone on its right edge
+  const rowPath = path.slice(0, -1);
+  colDiv.appendChild(makeDropzone(rowPath, index, 'left'));
+  if(isLast) colDiv.appendChild(makeDropzone(rowPath, index + 1, 'right'));
+
+  // edge-drag resize (independent: only this column changes)
+  if(editable) attachResize(colDiv, colNode, path, w);
+
+  colDiv.addEventListener('click', e => {
+    e.stopPropagation();
+    select({path, kind:'col'});
+  });
+
+  // drag & drop
+  colDiv.draggable = true;
+  colDiv.addEventListener('dragstart', e => {
+    if(resize.active){ e.preventDefault(); return; }
+    if(state.dirty){
+      e.preventDefault();
+      toast('Source pane has unapplied edits — Apply (Ctrl+Enter) or Revert first', 'warn');
+      return;
+    }
+    e.stopPropagation();
+    dnd.src = path;
+    colDiv.classList.add('dragging');
+    document.body.classList.add('dnd');
+    e.dataTransfer.effectAllowed = 'move';
+    try{ e.dataTransfer.setData('text/plain', path.join(',')); }catch(_){}
+  });
+  colDiv.addEventListener('dragend', () => {
+    colDiv.classList.remove('dragging');
+    document.body.classList.remove('dnd');
+    dnd.src = null;
+  });
+  return colDiv;
+}
+
+function mkBadge(text, cls){
+  const b = document.createElement('span');
+  b.className = 'badge ' + cls;
+  b.textContent = text;
+  return b;
+}
+function mkTypeBadge(text){
+  const b = document.createElement('span');
+  b.className = 'type-badge';
+  b.textContent = text;
+  return b;
+}
+
+function pathEq(sel, path, kind){
+  return sel && sel.kind === kind && sel.path.join(',') === path.join(',');
+}
+
+/* ── drag & drop plumbing ──────────────────────────────────────── */
+
+const dnd = {src: null};
+
+function makeDropzone(rowPath, index, posCls){
+  const z = document.createElement('div');
+  z.className = 'dropzone ' + (posCls || '');
+  z.addEventListener('dragover', e => {
+    if(!dnd.src) return;
+    e.preventDefault(); e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    z.classList.add('over');
+  });
+  z.addEventListener('dragleave', () => z.classList.remove('over'));
+  z.addEventListener('drop', e => {
+    e.preventDefault(); e.stopPropagation();
+    z.classList.remove('over');
+    if(dnd.src) moveCol(dnd.src, rowPath, index);
+  });
+  return z;
+}
+
+/* ── edge-drag resize ──────────────────────────────────────────── */
+
+function attachResize(colDiv, colNode, path, w){
+  const h = document.createElement('div');
+  colDiv.appendChild(h);
+
+  // equal-width / auto columns have no fixed width to drag — refuse with
+  // an explanation instead of silently converting them to numeric
+  if(w.kind === 'equal' || w.kind === 'auto'){
+    const label = w.kind === 'equal' ? 'equal-width' : 'auto-width';
+    h.className = 'col-resize no-resize';
+    h.title = label + ' — resize with the stepper';
+    h.addEventListener('pointerdown', e => {
+      if(e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      toast(w.kind === 'equal'
+        ? 'col is equal-width (auto-sized) — set a fixed width with the stepper or +/−'
+        : 'col-auto is content-sized — set a fixed width with the stepper or +/−', 'warn');
+    });
+    return;
+  }
+
+  h.className = 'col-resize';
+  h.title = 'Drag to resize';
+
+  h.addEventListener('pointerdown', e => {
+    if(e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if(state.dirty){
+      toast('Source pane has unapplied edits — Apply (Ctrl+Enter) or Revert first', 'warn');
+      return;
+    }
+    const rowDiv = colDiv.closest('.g-row');
+    if(!rowDiv) return;
+    const unit = rowDiv.getBoundingClientRect().width / 12;
+    if(unit <= 0) return;
+    const startSpan = w.span === 'auto' ? 2 : w.span;
+    const st = {x: e.clientX, span: startSpan, cur: startSpan};
+    resize.active = true;
+    colDiv.classList.add('resizing');
+    document.body.classList.add('resizing');
+    h.setPointerCapture(e.pointerId);
+
+    const pct = v => (v / 12 * 100).toFixed(4) + '%';
+    const wl = colDiv.querySelector(':scope > .width-label');
+
+    const onMove = ev => {
+      const d = Math.round((ev.clientX - st.x) / unit);
+      const next = Math.min(12, Math.max(1, st.span + d));
+      if(next === st.cur) return;
+      st.cur = next;
+      colDiv.style.flex = '0 0 ' + pct(next);
+      colDiv.style.maxWidth = pct(next);
+      if(wl) wl.textContent = (w.offset ? `+${w.offset} / ` : '') + next + '/12';
+    };
+    const onUp = ev => {
+      h.releasePointerCapture(ev.pointerId);
+      h.removeEventListener('pointermove', onMove);
+      h.removeEventListener('pointerup', onUp);
+      h.removeEventListener('pointercancel', onUp);
+      resize.active = false;
+      colDiv.classList.remove('resizing');
+      document.body.classList.remove('resizing');
+      state.sel = {path: path.slice(), kind:'col'};
+      if(st.cur !== st.span){
+        const bp = definingBp(colNode.spec.width, state.bp)
+                || fallbackTier(colNode, resolvePath(path.slice(0, -1)));
+        const tokens = setWidthToken(classTokens(colNode.el), bp, st.cur, state.docBs3);
+        apply(writeClass(state.src, colNode.el, tokens));
+      }else{
+        render();
+      }
+    };
+    h.addEventListener('pointermove', onMove);
+    h.addEventListener('pointerup', onUp);
+    h.addEventListener('pointercancel', onUp);
+  });
+}
+
+/* ── selection & inspector ─────────────────────────────────────── */
+
+function select(sel){
+  state.sel = sel;
+  render();
+  const node = resolvePath(sel.path);
+  if(node) highlightInSource(node.el);
+}
+
+const LINE_H = 20, PAD_TOP = 10;
+function highlightInSource(el){
+  // No focus steal: an unfocused textarea still renders the selection
+  // (inactive gray) and scrolls — keyboard focus stays on the canvas
+  // so arrow-key navigation keeps working after a click.
+  srcTA.setSelectionRange(el.start, Math.min(el.openEnd, el.end));
+  const startLine = state.src.slice(0, el.start).split('\n').length - 1;
+  const endLine = state.src.slice(0, el.end).split('\n').length - 1;
+  srcTA.scrollTop = Math.max(0, startLine * LINE_H - srcTA.clientHeight / 2);
+  state._bandLines = [startLine, endLine];
+  positionBand();
+}
+
+function positionBand(){
+  const band = $('#srcBand');
+  if(!state._bandLines || !state.sel || state.dirty){
+    $('#srcWrap').classList.remove('src-band-on');
+    return;
+  }
+  const [a, b] = state._bandLines;
+  const top = PAD_TOP + a * LINE_H - srcTA.scrollTop;
+  band.style.top = top + 'px';
+  band.style.height = ((b - a + 1) * LINE_H) + 'px';
+  $('#srcWrap').classList.add('src-band-on');
+}
+
+function renderInspector(){
+  const node = state.sel && resolvePath(state.sel.path);
+  inspector.innerHTML = '';
+  if(!node){
+    const d = document.createElement('div');
+    d.className = 'insp-empty';
+    d.innerHTML = 'Select a column or row on the canvas.' +
+      '<br><br>Drag a column onto the amber slots to move it — within a row or into another row.';
+    inspector.appendChild(d);
+  }else if(node.kind === 'col') renderColInspector(node);
+  else renderRowInspector(node);
+  renderViewSection();
+}
+
+function renderViewSection(){
+  const vs = sec('View');
+  const lab = document.createElement('label');
+  lab.className = 'view-opt';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = state.tintOverfull;
+  cb.addEventListener('change', () => {
+    state.tintOverfull = cb.checked;
+    render();
+  });
+  lab.appendChild(cb);
+  lab.appendChild(document.createTextNode(' Tint overfull rows'));
+  lab.title = 'Amber border on rows whose columns exceed 12 — off by default since wrapping can be intentional';
+  vs.appendChild(lab);
+}
+
+function sec(title){
+  const s = document.createElement('div');
+  s.className = 'insp-section';
+  if(title){
+    const t = document.createElement('div');
+    t.className = 'insp-title'; t.textContent = title;
+    s.appendChild(t);
+  }
+  inspector.appendChild(s);
+  return s;
+}
+
+function renderColInspector(node){
+  const el = node.el;
+  const editable = !classIsInterpolated(el);
+
+  const head = sec('Column');
+  const title = colTitle(state.src, el);
+  if(title){
+    const kv0 = document.createElement('div');
+    kv0.className = 'insp-kv';
+    kv0.innerHTML = 'title <b>' + escapeHtml(title.text) + '</b>' +
+      (title.full !== title.text ? ' <span style="color:var(--faint)">(' + escapeHtml(title.full) + ')</span>' : '');
+    head.appendChild(kv0);
+  }
+  const kv1 = document.createElement('div');
+  kv1.className = 'insp-kv';
+  kv1.innerHTML = 'element <b>&lt;' + el.tag + '&gt;</b> · ' +
+    (isContainerCol(state.src, el) ? '<b>⊞ container</b> (holds nested rows)' : 'content');
+  head.appendChild(kv1);
+  const kv2 = document.createElement('div');
+  kv2.className = 'insp-kv';
+  kv2.innerHTML = 'class <b>' + escapeHtml(classValue(el) || '—') + '</b>';
+  head.appendChild(kv2);
+  if(!editable){
+    const warn = document.createElement('div');
+    warn.className = 'hint';
+    warn.textContent = 'Class contains {{ interpolation }} — shown read-only; edit it in the source.';
+    head.appendChild(warn);
+    return;
+  }
+  if(hasDynamicClassBinding(el)){
+    const warn = document.createElement('div');
+    warn.className = 'hint';
+    warn.textContent = 'Also has an [ngClass]/[class] binding; only the static class attribute is edited here.';
+    head.appendChild(warn);
+  }
+
+  // ── effective values at the current view breakpoint ──
+  const es = sec('Effective at ' + state.bp);
+  const eg = document.createElement('div');
+  eg.className = 'bp-grid';
+  es.appendChild(eg);
+
+  const effW = effectiveAt(node.spec.width, state.bp);
+  const defW = definingBp(node.spec.width, state.bp);
+  const effO = effectiveAt(node.spec.offset, state.bp);
+  const defO = definingBp(node.spec.offset, state.bp);
+
+  const wLab = document.createElement('label');
+  wLab.textContent = 'width';
+  eg.appendChild(wLab);
+  const wDisp = (effW === null ? '12' : (effW === 'equal' ? 'equal' : effW === 'auto' ? 'auto' : effW))
+              + (defW ? ' @' + defW : '');
+  const wSt = stepper(wDisp, effW === null,
+    () => quickWidth(node, -1), () => quickWidth(node, +1));
+  if(effW === 'equal' || effW === 'auto') disableStepper(wSt);
+  eg.appendChild(wSt);
+
+  const oLab = document.createElement('label');
+  oLab.textContent = 'offset';
+  eg.appendChild(oLab);
+  const oSt = stepper((effO == null ? '0' : effO) + (defO ? ' @' + defO : ''), effO == null,
+    () => quickOffset(node, -1), () => quickOffset(node, +1));
+  eg.appendChild(oSt);
+
+  const ehint = document.createElement('div');
+  ehint.className = 'hint';
+  ehint.textContent = defW || defO
+    ? 'These edit the defining token (@' + (defW || defO) + '), wherever it lives — no ' + state.bp + ' overrides are created.'
+    : 'No grid classes yet — a new token will follow the row\'s tier and dialect.';
+  es.appendChild(ehint);
+
+  // ── all breakpoints (explicit, for overrides and mixed tiers) ──
+  const ds = sec(null);
+  const det = document.createElement('details');
+  det.className = 'insp-details';
+  det.open = !!state.inspDetailsOpen;
+  det.addEventListener('toggle', () => { state.inspDetailsOpen = det.open; });
+  const dsum = document.createElement('summary');
+  dsum.textContent = 'All breakpoints';
+  det.appendChild(dsum);
+  ds.appendChild(det);
+
+  const wt = document.createElement('div');
+  wt.className = 'insp-title';
+  wt.textContent = 'Width';
+  det.appendChild(wt);
+  const grid = document.createElement('div');
+  grid.className = 'bp-grid';
+  det.appendChild(grid);
+  const W_STEPS = [null, 'equal', 'auto', 1,2,3,4,5,6,7,8,9,10,11,12];
+  for(const bp of BPS){
+    const lab = document.createElement('label');
+    lab.textContent = (node.spec.width[bp] !== undefined ? '● ' : '') + bp;
+    if(node.spec.width[bp] !== undefined) lab.classList.add('def');
+    if(bp === state.bp) lab.classList.add('cur');
+    grid.appendChild(lab);
+    const cur = node.spec.width[bp] !== undefined ? node.spec.width[bp] : null;
+    let disp, unset;
+    if(cur !== null){
+      disp = cur === 'equal' ? 'equal' : cur === 'auto' ? 'auto' : cur;
+      unset = false;
+    }else{
+      const inh = effectiveAt(node.spec.width, bp);
+      const from = definingBp(node.spec.width, bp);
+      disp = inh === null ? '—' : (inh === 'equal' ? 'equal' : inh === 'auto' ? 'auto' : inh) + ' ↑' + from;
+      unset = true;
+    }
+    grid.appendChild(stepper(disp, unset,
+      () => stepWidth(node, bp, -1, W_STEPS),
+      () => stepWidth(node, bp, +1, W_STEPS)));
+  }
+
+  const ot = document.createElement('div');
+  ot.className = 'insp-title';
+  ot.textContent = 'Offset';
+  det.appendChild(ot);
+  const ogrid = document.createElement('div');
+  ogrid.className = 'bp-grid';
+  det.appendChild(ogrid);
+  for(const bp of BPS){
+    const lab = document.createElement('label');
+    lab.textContent = (node.spec.offset[bp] !== undefined ? '● ' : '') + bp;
+    if(node.spec.offset[bp] !== undefined) lab.classList.add('def');
+    if(bp === state.bp) lab.classList.add('cur');
+    ogrid.appendChild(lab);
+    const cur = node.spec.offset[bp] !== undefined ? node.spec.offset[bp] : null;
+    let disp, unset;
+    if(cur !== null){ disp = cur; unset = false; }
+    else{
+      const inh = effectiveAt(node.spec.offset, bp);
+      const from = definingBp(node.spec.offset, bp);
+      disp = inh == null ? '—' : inh + ' ↑' + from;
+      unset = true;
+    }
+    ogrid.appendChild(stepper(disp, unset,
+      () => changeOffset(node, bp, -1),
+      () => changeOffset(node, bp, +1)));
+  }
+  const dhint = document.createElement('div');
+  dhint.className = 'hint';
+  dhint.textContent = '● = defined at that breakpoint; gray ↑ values are inherited. Editing an inherited row creates an explicit override at that breakpoint.';
+  det.appendChild(dhint);
+
+  // actions
+  const as = sec('Actions');
+  const act = document.createElement('div');
+  act.className = 'insp-actions';
+  as.appendChild(act);
+  actBtn(act, 'Split in two', () => splitCol(node));
+  actBtn(act, 'Add column after', () => addColAfter(node));
+  actBtn(act, '◀ Move', () => nudgeCol(node, -1));
+  actBtn(act, 'Move ▶', () => nudgeCol(node, +1));
+  const del = actBtn(act, 'Delete', () => deleteEl(node));
+  del.classList.add('danger');
+}
+
+function fmtEff(v){
+  if(v === null) return '12/12 (no col class)';
+  if(v === 'equal') return 'equal share';
+  if(v === 'auto') return 'auto (content width)';
+  return v + '/12';
+}
+
+function renderRowInspector(node){
+  const head = sec('Row');
+  const kv = document.createElement('div');
+  kv.className = 'insp-kv';
+  kv.innerHTML = 'class <b>' + escapeHtml(classValue(node.el)) + '</b> · ' +
+    node.cols.length + ' column' + (node.cols.length === 1 ? '' : 's');
+  head.appendChild(kv);
+
+  const as = sec('Actions');
+  const act = document.createElement('div');
+  act.className = 'insp-actions';
+  as.appendChild(act);
+  actBtn(act, 'Add column', () => addColToRow(node));
+  actBtn(act, 'Add row after', () => addRowAfter(node));
+  const del = actBtn(act, 'Delete row', () => deleteEl(node));
+  del.classList.add('danger');
+}
+
+function stepper(display, unset, onMinus, onPlus){
+  const w = document.createElement('div');
+  w.className = 'stepper';
+  const minus = document.createElement('button');
+  minus.textContent = '−';
+  minus.addEventListener('click', onMinus);
+  const val = document.createElement('div');
+  val.className = 'val' + (unset ? ' unset' : '');
+  val.textContent = display;
+  const plus = document.createElement('button');
+  plus.textContent = '+';
+  plus.addEventListener('click', onPlus);
+  w.append(minus, val, plus);
+  return w;
+}
+
+function actBtn(host, label, fn){
+  const b = document.createElement('button');
+  b.textContent = label;
+  b.addEventListener('click', fn);
+  host.appendChild(b);
+  return b;
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── edit operations ───────────────────────────────────────────── */
+
+function disableStepper(st){
+  st.querySelectorAll('button').forEach(b => b.disabled = true);
+}
+
+/* Quick edits: target the token that DEFINES the effective value at the
+   current view breakpoint (cascade-aware); only create a new token when
+   none exists at any tier. */
+function quickWidth(node, dir){
+  const eff = effectiveAt(node.spec.width, state.bp);
+  if(eff === 'equal' || eff === 'auto') return;
+  const cur = eff === null ? 12 : eff;
+  const next = Math.min(12, Math.max(1, cur + dir));
+  if(next === cur) return;
+  const bp = definingBp(node.spec.width, state.bp) || fallbackTier(node, rowOfSel());
+  const tokens = setWidthToken(classTokens(node.el), bp, next, state.docBs3);
+  apply(writeClass(state.src, node.el, tokens));
+}
+function quickOffset(node, dir){
+  const cur = effectiveAt(node.spec.offset, state.bp) || 0;
+  const next = Math.min(11, Math.max(0, cur + dir));
+  if(next === cur) return;
+  const defBp = definingBp(node.spec.offset, state.bp);
+  const bp = defBp || fallbackTier(node, rowOfSel());
+  // Going to 0 at the view breakpoint while a *smaller* tier still supplies
+  // a nonzero offset → write an explicit offset-*-0 at the view breakpoint
+  // instead of editing/removing the lower token.
+  let targetBp = bp, keepZero = false;
+  if(next === 0){
+    const belowDef = definingBp(node.spec.offset, state.bp);
+    if(belowDef && belowDef !== state.bp){ targetBp = state.bp; keepZero = true; }
+  }
+  const tokens = setOffsetToken(classTokens(node.el), targetBp,
+                                next === 0 ? 0 : next, state.docBs3, keepZero);
+  apply(writeClass(state.src, node.el, tokens));
+}
+
+/* Explicit per-breakpoint edits (the "All breakpoints" grids). Editing a
+   breakpoint with no token creates an override there, seeded from the
+   inherited value when it's numeric. */
+function stepWidth(node, bp, dir, steps){
+  const cur = node.spec.width[bp] !== undefined ? node.spec.width[bp] : null;
+  let next;
+  if(cur === null){
+    const inh = effectiveAt(node.spec.width, bp);
+    if(typeof inh === 'number'){
+      next = Math.min(12, Math.max(1, inh + dir));
+    }else{
+      let i = Math.min(steps.length - 1, Math.max(0, 0 + dir));
+      next = steps[i];
+    }
+  }else{
+    let i = steps.findIndex(s => s === cur);
+    if(i < 0) i = 0;
+    i = Math.min(steps.length - 1, Math.max(0, i + dir));
+    next = steps[i];
+  }
+  const tokens = setWidthToken(classTokens(node.el), bp, next, state.docBs3);
+  apply(writeClass(state.src, node.el, tokens));
+}
+
+function changeOffset(node, bp, dir){
+  const own = node.spec.offset[bp];
+  const cur = own !== undefined ? own : (effectiveAt(node.spec.offset, bp) || 0);
+  const next = Math.min(11, Math.max(0, cur + dir));
+  if(next === cur) return;
+  // Setting 0 at a tier that has no own token but inherits a nonzero offset
+  // → explicit offset-*-0 to cancel the inheritance (rather than a no-op).
+  const inheritsNonzero = own === undefined && cur !== 0;
+  const keepZero = next === 0 && inheritsNonzero;
+  const tokens = setOffsetToken(classTokens(node.el), bp,
+                                next === 0 ? 0 : next, state.docBs3, keepZero);
+  apply(writeClass(state.src, node.el, tokens));
+}
+
+function splitCol(node){
+  const el = node.el;
+  const tokens = classTokens(el);
+  const hasW = tokens.some(t => widthTokenBp(t) != null);
+  let firstTokens, secondClasses;
+  if(hasW){
+    // halve every defined tier: col-sm-8 col-lg-6 → col-sm-4 col-lg-3 + col-sm-4 col-lg-3
+    firstTokens = tokens.map(t => widthTokenBp(t) != null ? halveWidthTokenStr(t, 'ceil') : t);
+    secondClasses = halvedWidthTokens(tokens, 'floor');
+  }else{
+    firstTokens = tokens;
+    secondClasses = conventionNewColTokens(null, rowOfSel());
+  }
+  let src2 = hasW ? writeClass(state.src, el, firstTokens) : state.src;
+  const delta = src2.length - state.src.length;
+  const insertAt = el.end + delta;
+  const {indent} = elementCutRange(state.src, el);
+  const newColHtml = '\n' + indent +
+    '<div class="' + secondClasses.join(' ') + '">\n' + indent + '  <!-- new column -->\n' + indent + '</div>';
+  src2 = splice(src2, insertAt, insertAt, newColHtml);
+  apply(src2);
+}
+
+function addColAfter(node){
+  const el = node.el;
+  const {indent} = elementCutRange(state.src, el);
+  const cls = conventionNewColTokens(classTokens(el), rowOfSel()).join(' ');
+  const html = '\n' + indent +
+    '<div class="' + cls + '">\n' + indent + '  <!-- new column -->\n' + indent + '</div>';
+  apply(splice(state.src, el.end, el.end, html));
+}
+
+function addColToRow(rowNode){
+  const rowEl = rowNode.el;
+  const indent = rowChildIndent(state.src, rowEl);
+  const lastCol = rowNode.cols[rowNode.cols.length - 1];
+  const cls = conventionNewColTokens(lastCol ? classTokens(lastCol.el) : null, rowNode).join(' ');
+  const html = '\n' + indent +
+    '<div class="' + cls + '">\n' + indent + '  <!-- new column -->\n' + indent + '</div>';
+  const last = rowEl.children[rowEl.children.length - 1];
+  const at = last ? last.end : rowEl.contentStart;
+  apply(splice(state.src, at, at, html));
+}
+
+function addRowAfter(rowNode){
+  const el = rowNode.el;
+  const {indent} = elementCutRange(state.src, el);
+  const html = '\n\n' + indent + '<div class="row">\n' +
+    indent + '  <div class="col">\n' + indent + '    <!-- new column -->\n' + indent + '  </div>\n' +
+    indent + '</div>';
+  apply(splice(state.src, el.end, el.end, html));
+}
+
+function deleteEl(node){
+  const {cutStart, cutEnd} = elementCutRange(state.src, node.el);
+  state.sel = null;
+  apply(splice(state.src, cutStart, cutEnd, ''));
+}
+
+function nudgeCol(node, dir){
+  const parentPath = state.sel.path.slice(0, -1);
+  const idx = state.sel.path[state.sel.path.length - 1];
+  const row = resolvePath(parentPath);
+  const to = idx + dir;
+  if(!row || to < 0 || to >= row.cols.length) return;
+  swapSiblings(row.cols[idx].el, row.cols[to].el, parentPath.concat(to), 'col');
+}
+
+/* Swap a row with an adjacent sibling row (reorder within its container). */
+function nudgeRow(node, dir){
+  const parent = state.sel.path.slice(0, -1);
+  const idx = state.sel.path[state.sel.path.length - 1];
+  const siblings = parent.length ? resolvePath(parent).nestedRows : state.model;
+  const to = idx + dir;
+  if(to < 0 || to >= siblings.length) return;
+  swapSiblings(siblings[idx].el, siblings[to].el, parent.concat(to), 'row');
+}
+
+function swapSiblings(elA, elB, selPath, selKind){
+  const [first, second] = elA.start < elB.start ? [elA, elB] : [elB, elA];
+  const rFirst = elementCutRange(state.src, first);
+  const rSecond = elementCutRange(state.src, second);
+  const tFirst = state.src.slice(rFirst.textStart, first.end);
+  const tSecond = state.src.slice(rSecond.textStart, second.end);
+  let s = state.src;
+  s = splice(s, rSecond.textStart, second.end, tFirst);   // later range first
+  s = splice(s, rFirst.textStart, first.end, tSecond);
+  state.sel = {path: selPath.slice(), kind: selKind};
+  apply(s);
+}
+
+function moveCol(srcPath, dstRowPath, dstIndex){
+  const srcNode = resolvePath(srcPath);
+  const dstRow = resolvePath(dstRowPath);
+  if(!srcNode || !dstRow) return;
+  // moving into itself / into own nested row → refuse
+  const inSelf = dstRowPath.join(',').startsWith(srcPath.join(',') + ',') ||
+                 dstRowPath.join(',') === srcPath.join(',');
+  if(inSelf) return;
+
+  const el = srcNode.el;
+  const {cutStart, cutEnd, textStart} = elementCutRange(state.src, el);
+  const elText = state.src.slice(textStart, el.end);
+  const removedLen = cutEnd - cutStart;
+
+  // insertion point in ORIGINAL coordinates
+  const indent = rowChildIndent(state.src, dstRow.el);
+  let insertAt;
+  if(dstIndex < dstRow.cols.length){
+    const target = dstRow.cols[dstIndex].el;
+    insertAt = elementCutRange(state.src, target).cutStart;
+  } else {
+    const last = dstRow.el.children[dstRow.el.children.length - 1];
+    insertAt = last ? last.end : dstRow.el.contentStart;
+  }
+  // same-row same-position no-op
+  if(insertAt >= cutStart && insertAt <= cutEnd) return;
+
+  let s = state.src;
+  const insText = '\n' + indent + elText;
+  if(insertAt > cutEnd){
+    s = splice(s, insertAt, insertAt, insText);      // later position first
+    s = splice(s, cutStart, cutEnd, '');
+  } else {
+    s = splice(s, cutStart, cutEnd, '');
+    s = splice(s, insertAt, insertAt, insText);
+  }
+  state.sel = null;
+  apply(s);
+}
+
+/* ── wiring ────────────────────────────────────────────────────── */
+
+BPS.forEach(bp => {
+  const b = document.createElement('button');
+  b.textContent = bp;
+  b.dataset.bp = bp;
+  b.setAttribute('role','tab');
+  b.addEventListener('click', () => { state.bp = bp; render(); });
+  $('#bpSwitch').appendChild(b);
+});
+
+$('#applyBtn').addEventListener('click', () => apply(srcTA.value, {keepSel:false, fromSource:true}));
+$('#revertBtn').addEventListener('click', () => {
+  srcTA.value = state.src;
+  state.dirty = false;
+  $('#srcPane').classList.remove('src-dirty');
+  $('#revertBtn').disabled = true;
+  positionBand();          // restore the strip (dirty cleared)
+  toast('Reverted to canvas state');
+});
+srcTA.addEventListener('input', () => {
+  state.dirty = state.src !== srcTA.value;
+  $('#srcPane').classList.toggle('src-dirty', state.dirty);
+  $('#revertBtn').disabled = !state.dirty;
+  positionBand();          // hide the strip while dirty, restore when matched
+});
+srcTA.addEventListener('scroll', positionBand);
+
+/* ── pane resizer ──────────────────────────────────────────────── */
+const paneResizer = $('#paneResizer');
+const srcPane = $('#srcPane');
+paneResizer.addEventListener('pointerdown', e => {
+  if(e.button !== 0) return;
+  e.preventDefault();
+  paneResizer.setPointerCapture(e.pointerId);
+  paneResizer.classList.add('active');
+  document.body.classList.add('pane-resizing');
+  const mainEl = srcPane.parentElement;
+  const mainRect = mainEl.getBoundingClientRect();
+  const minW = 260, maxW = mainRect.width * 0.7;
+  const onMove = ev => {
+    const w = Math.min(maxW, Math.max(minW, ev.clientX - mainRect.left));
+    srcPane.style.flexBasis = w + 'px';
+  };
+  const onUp = ev => {
+    paneResizer.releasePointerCapture(ev.pointerId);
+    paneResizer.removeEventListener('pointermove', onMove);
+    paneResizer.removeEventListener('pointerup', onUp);
+    paneResizer.removeEventListener('pointercancel', onUp);
+    paneResizer.classList.remove('active');
+    document.body.classList.remove('pane-resizing');
+  };
+  paneResizer.addEventListener('pointermove', onMove);
+  paneResizer.addEventListener('pointerup', onUp);
+  paneResizer.addEventListener('pointercancel', onUp);
+});
+
+srcTA.addEventListener('click', syncSelFromCaret);
+srcTA.addEventListener('keyup', e => {
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','PageUp','PageDown'].includes(e.key)){
+    syncSelFromCaret();
+  }
+});
+srcTA.addEventListener('keydown', e => {
+  if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); apply(srcTA.value, {keepSel:false, fromSource:true}); }
+});
+
+$('#undoBtn').addEventListener('click', undo);
+$('#redoBtn').addEventListener('click', redo);
+document.addEventListener('keydown', e => {
+  if(e.target === srcTA) return;                     // don't hijack textarea undo
+  if((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z'){ e.preventDefault(); undo(); }
+  if((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))){ e.preventDefault(); redo(); }
+});
+
+$('#copyBtn').addEventListener('click', async () => {
+  if(state.dirty && !confirm('Source pane has unapplied edits — copy the applied (canvas) version anyway?')) return;
+  try{
+    await navigator.clipboard.writeText(state.src);
+    toast('Copied to clipboard');
+  }catch(_){
+    const prev = srcTA.value;
+    srcTA.value = state.src;
+    srcTA.select();
+    document.execCommand('copy');
+    srcTA.value = prev;
+    toast('Copied (fallback)');
+  }
+});
+
+const findBox = $('#findBox');
+findBox.addEventListener('input', () => {
+  state.find = findBox.value;
+  state.findIdx = null;
+  render();
+});
+findBox.addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); findGo(e.shiftKey ? -1 : 1); }
+  if(e.key === 'Escape'){
+    findBox.value = ''; state.find = ''; state.findIdx = null;
+    render(); findBox.blur();
+  }
+  e.stopPropagation();
+});
+document.addEventListener('keydown', e => {
+  if(e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey){
+    const t = e.target;
+    if(t !== srcTA && t !== findBox && t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA'){
+      e.preventDefault();
+      findBox.focus();
+      findBox.select();
+    }
+  }
+});
+
+const fileInput = $('#fileInput');
+function confirmDiscardDirty(){
+  return !state.dirty || confirm('Source pane has unapplied edits — discard them?');
+}
+function openText(text, name){
+  if(name){
+    state.fileName = name;
+    $('#fileName').textContent = '— ' + name;
+  }
+  apply(text, {keepSel:false, fromSource:true});
+}
+/* ── keyboard navigation ───────────────────────────────────────── */
+
+function kbNav(e){
+  const t = e.target;
+  if(t === srcTA || t === findBox || t.tagName === 'INPUT' ||
+     t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) return;
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  const key = e.key;
+  const sel = state.sel;
+  const node = sel && resolvePath(sel.path);
+
+  const setSel = (path, kind) => {
+    expandAncestors(path);
+    select({path, kind});
+    const el = rowsHost.querySelector('[data-path="' + path.join(',') + '"]');
+    if(el) el.scrollIntoView({block:'nearest', behavior:'smooth'});
+  };
+
+  if(key === 'Escape'){
+    if(sel){ state.sel = null; state._bandLines = null; positionBand(); render(); e.preventDefault(); }
+    return;
+  }
+  if(!sel || !node){
+    if((key === 'ArrowDown' || key === 'ArrowRight') && state.model.length){
+      setSel([0], 'row');
+      e.preventDefault();
+    }
+    return;
+  }
+  if(key.startsWith('Arrow')) e.preventDefault();   // navigation owns arrows while something is selected
+
+  if(e.shiftKey && key.startsWith('Arrow')){         // ── move the selected item ──
+    if(sel.kind === 'col'){
+      if(key === 'ArrowLeft') nudgeCol(node, -1);
+      else if(key === 'ArrowRight') nudgeCol(node, +1);
+    }else{
+      if(key === 'ArrowUp') nudgeRow(node, -1);
+      else if(key === 'ArrowDown') nudgeRow(node, +1);
+    }
+    return;
+  }
+
+  if(sel.kind === 'col'){
+    const rowPath = sel.path.slice(0, -1);
+    const idx = sel.path[sel.path.length - 1];
+    const row = resolvePath(rowPath);
+    if(key === 'ArrowLeft' && idx > 0) setSel(rowPath.concat(idx - 1), 'col');
+    else if(key === 'ArrowRight' && row && idx < row.cols.length - 1) setSel(rowPath.concat(idx + 1), 'col');
+    else if(key === 'ArrowUp') setSel(rowPath, 'row');
+    else if(key === 'ArrowDown' && node.nestedRows.length) setSel(sel.path.concat(0), 'row');
+    else if(key === 'Delete'){ e.preventDefault(); deleteEl(node); }
+    else if(key === '+' || key === '='){ e.preventDefault(); quickWidth(node, +1); }
+    else if(key === '-'){ e.preventDefault(); quickWidth(node, -1); }
+  }else{
+    const parent = sel.path.slice(0, -1);
+    const idx = sel.path[sel.path.length - 1];
+    const siblings = parent.length ? resolvePath(parent).nestedRows : state.model;
+    if(key === 'ArrowUp' && idx > 0) setSel(parent.concat(idx - 1), 'row');
+    else if(key === 'ArrowDown' && idx < siblings.length - 1) setSel(parent.concat(idx + 1), 'row');
+    else if(key === 'ArrowRight' || key === 'Enter'){
+      if(node.cols.length){
+        const rowKey = state._rowIds.get(sel.path.join(','));
+        if(rowKey && state.collapsed.has(rowKey)) state.collapsed.delete(rowKey);
+        setSel(sel.path.concat(0), 'col');
+        if(key === 'Enter') e.preventDefault();
+      }
+    }
+    else if(key === 'ArrowLeft' && parent.length) setSel(parent, 'col');
+    else if(key === 'Delete'){ e.preventDefault(); deleteEl(node); }
+  }
+}
+document.addEventListener('keydown', kbNav);
+
+$('#openBtn').addEventListener('click', () => {
+  if(confirmDiscardDirty()) fileInput.click();
+});
+fileInput.addEventListener('change', () => {
+  const f = fileInput.files[0];
+  if(f) f.text().then(t => openText(t, f.name));
+  fileInput.value = '';
+});
+$('#downloadBtn').addEventListener('click', () => {
+  if(state.dirty && !confirm('Source pane has unapplied edits — download the applied (canvas) version anyway?')) return;
+  const name = state.fileName || 'template.html';
+  const blob = new Blob([state.src], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Downloaded ' + name);
+});
+
+let fileDragDepth = 0;
+function isFileDrag(e){
+  return e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
+}
+document.addEventListener('dragenter', e => {
+  if(!isFileDrag(e)) return;
+  fileDragDepth++;
+  document.body.classList.add('filedrag');
+});
+document.addEventListener('dragleave', e => {
+  if(!isFileDrag(e)) return;
+  if(--fileDragDepth <= 0){
+    fileDragDepth = 0;
+    document.body.classList.remove('filedrag');
+  }
+});
+document.addEventListener('dragover', e => {
+  if(isFileDrag(e)) e.preventDefault();
+});
+document.addEventListener('drop', e => {
+  if(!isFileDrag(e)) return;
+  e.preventDefault();
+  fileDragDepth = 0;
+  document.body.classList.remove('filedrag');
+  const f = e.dataTransfer.files[0];
+  if(!f || !confirmDiscardDirty()) return;
+  f.text().then(t => openText(t, f.name));
+});
+
+$('#sampleBtn').addEventListener('click', () => {
+  if(confirmDiscardDirty()) apply(SAMPLE, {keepSel:false, fromSource:true});
+});
+
+rowsHost.addEventListener('click', () => { state.sel = null; state._bandLines = null; positionBand(); render(); });
+
+let toastTimer;
+function toast(msg, cls){
+  const t = $('#toast');
+  t.className = 'toast show' + (cls ? ' ' + cls : '');
+  t.textContent = msg;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ── sample ────────────────────────────────────────────────────── */
+
+const SAMPLE = `<div class="container-fluid">
+
+  <!--PAGE-HEADER-->
+  <div class="row">
+    <div class="col-12">
+      <app-page-header [title]="'Customer'" (back)="onBack()"></app-page-header>
+    </div>
+  </div>
+
+  <!-- Row with mixed tiers, a label vs control pair, and a modern offset -->
+  <div class="row">
+    <div class="col-md-4 col-lg-3">
+      <label app-i18n="demo.editor.code"></label>
+      <text-input formControlName="code"></text-input>
+    </div>
+    <div class="col-md-8 col-lg-6">
+      <label app-i18n="demo.editor.name"></label>
+      <text-input formControlName="name"></text-input>
+    </div>
+    <div class="col-lg-3 offset-lg-0 d-none d-lg-block">
+      <status-display [statusInput]="customer.status"></status-display>
+    </div>
+  </div>
+
+  <!-- Equal-width row: bare col + col-auto both refuse edge-drag -->
+  <div class="row">
+    <div class="col">
+      <lookup-input formControlName="segment"></lookup-input>
+    </div>
+    <div class="col">
+      <lookup-input formControlName="region"></lookup-input>
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-outline" app-i18n="demo.editor.action001"></button>
+    </div>
+  </div>
+
+  <!-- Bootstrap 3 dialect: col-xs width and col-sm-offset -->
+  <div class="row">
+    <div class="col-xs-6 col-sm-4">
+      <label app-i18n="demo.editor.field010"></label>
+      <date-input formControlName="field010"></date-input>
+    </div>
+    <div class="col-sm-4 col-sm-offset-4">
+      <label app-i18n="demo.editor.field011"></label>
+      <text-input [formControl]="helper011"></text-input>
+    </div>
+  </div>
+
+  <!--ADDRESS-->
+  <div class="row">
+    <div class="col-md-6">
+      <legend class="group-title" app-i18n="demo.editor.sectionAddress"></legend>
+      <div class="row">
+        <!--COL-CITY-->
+        <div class="col-sm-8 col-sm-offset-0">
+          <label app-i18n="demo.editor.city"></label>
+          <text-input formControlName="city"></text-input>
+        </div>
+        <div class="col-sm-4">
+          <label app-i18n="demo.editor.zip"></label>
+          <text-input formControlName="zip"></text-input>
+        </div>
+      </div>
+      <legend class="group-title" app-i18n="demo.editor.sectionContact"></legend>
+      <div class="row">
+        <div class="col-12">
+          <text-input formControlName="email"></text-input>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6" [ngClass]="{'has-error': addressInvalid}">
+      <!-- HDR:Address -->
+      <label app-i18n="demo.editor.notes"></label>
+      <textarea class="form-control" formControlName="notes"></textarea>
+    </div>
+  </div>
+
+  <!-- Wrapper component with sectionTitle attributes → separators -->
+  <div class="row">
+    <div class="col-12">
+      <expandable-panel [settings]="panelSettings">
+        <panel-section id="p1" sectionTitle="demo.editor.sectionPricing">
+          <div class="row">
+            <div class="col-sm-4">
+              <label app-i18n="demo.editor.field020"></label>
+              <text-input formControlName="field020"></text-input>
+            </div>
+            <div class="col-sm-4">
+              <div class="input-group">
+                <text-input formControlName="field021"></text-input>
+                <div class="input-group-addon">%</div>
+              </div>
+            </div>
+          </div>
+        </panel-section>
+        <panel-section id="p2" sectionTitle="demo.editor.sectionTotals">
+          <div class="row">
+            <div class="col-sm-6">
+              <label app-i18n="demo.editor.field030"></label>
+              <text-input formControlName="field030"></text-input>
+            </div>
+          </div>
+        </panel-section>
+      </expandable-panel>
+    </div>
+  </div>
+
+  <!-- Overfull row: widths + offset exceed 12 → amber wraps pill -->
+  <div class="row">
+    <div class="col-md-6">
+      <label app-i18n="demo.editor.field040"></label>
+      <text-input formControlName="field040"></text-input>
+    </div>
+    <div class="col-md-6 offset-md-2">
+      <label app-i18n="demo.editor.field041"></label>
+      <text-input formControlName="field041"></text-input>
+    </div>
+  </div>
+
+  <!-- Dynamic class bindings: interpolated (read-only) and *ngFor / *ngIf -->
+  <div class="row" *ngIf="showItems">
+    <div class="col-{{ itemSpan }}" *ngFor="let item of items">
+      <item-card [item]="item"></item-card>
+    </div>
+  </div>
+
+  <!-- Angular 17 control flow: unreliable fill pill, no false warning -->
+  <div class="row">
+    @if (compactMode) {
+    <div class="col-sm-12">
+      <summary-bar [data]="summary"></summary-bar>
+    </div>
+    } @else {
+    <div class="col-sm-8">
+      <summary-bar [data]="summary"></summary-bar>
+    </div>
+    <div class="col-sm-4">
+      <detail-bar [data]="detail"></detail-bar>
+    </div>
+    }
+  </div>
+
+  <div class="row">
+    <div class="col-md-3 offset-md-6">
+      <button class="btn btn-secondary w-100" (click)="onCancel()" app-i18n="demo.editor.cancel"></button>
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-primary w-100" [disabled]="form.invalid" (click)="onSave()" app-i18n="demo.editor.save"></button>
+    </div>
+  </div>
+
+</div>
+`;
+
+apply(SAMPLE, {keepSel:false});
+</script>
+</body>
+</html>
