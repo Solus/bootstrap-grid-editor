@@ -1,0 +1,201 @@
+/* Application state, history, and the model-path helpers everything else
+   navigates by. `apply` is the single funnel through which every edit
+   reaches the document. */
+
+import {
+  BPS, buildModel, classTokens, classValue, definingBp, parseTemplate,
+  usesBs3, widthTokenBp,
+} from '@bootstrap-visualizer/core';
+import type {
+  Breakpoint, ColNode, El, NodePath, RootEl, RowNode,
+} from '@bootstrap-visualizer/core';
+import { $, srcTA, toast } from './dom.js';
+import { render } from './render.js';
+import { dnd } from './dnd.js';
+
+export interface Selection {
+  path: NodePath;
+  kind: 'row' | 'col';
+}
+
+export interface AppState {
+  src: string;
+  root: RootEl | null;
+  model: RowNode[];
+  bp: Breakpoint;
+  sel: Selection | null;
+  history: string[];
+  hIndex: number;
+  /** Textarea edited but not applied. */
+  dirty: boolean;
+  /** Row identity keys collapsed via the chevron. */
+  collapsed: Set<string>;
+  /** Amber row border on overfull rows (View section). */
+  tintOverfull: boolean;
+  /** Name of the opened file, used for Download. */
+  fileName: string | null;
+  /** Any BS3-style grid class anywhere in the document. */
+  docBs3: boolean;
+  find: string;
+  findMatches: Selection[];
+  findIdx: number | null;
+  inspDetailsOpen: boolean;
+  _rowIds: Map<string, string>;
+  _findSet: Set<string> | null;
+  _bandLines: [number, number] | null;
+}
+
+export const SHEET_WIDTH: Record<Breakpoint, number> = {
+  xs: 400, sm: 560, md: 740, lg: 920, xl: 1080, xxl: 1180,
+};
+
+export const state: AppState = {
+  src: '',
+  root: null,
+  model: [],
+  bp: 'md',
+  sel: null,
+  history: [],
+  hIndex: -1,
+  dirty: false,
+  collapsed: new Set(),
+  tintOverfull: false,
+  fileName: null,
+  docBs3: false,
+  find: '',
+  findMatches: [],
+  findIdx: null,
+  inspDetailsOpen: false,
+  _rowIds: new Map(),
+  _findSet: null,
+  _bandLines: null,
+};
+
+export const resize = { active: false };
+
+export const DIRTY_MSG =
+  'Source pane has unapplied edits — Apply (Ctrl+Enter) or Revert first';
+
+/* ── state / history ─────────────────────────────────────────────── */
+
+export interface ApplyOpts {
+  pushHistory?: boolean;
+  keepSel?: boolean;
+  fromSource?: boolean;
+}
+
+export function apply(newSrc: string, opts: ApplyOpts = {}): void {
+  const { pushHistory = true, keepSel = true, fromSource = false } = opts;
+  if (state.dirty && !fromSource) {
+    toast(DIRTY_MSG, 'warn');
+    render();               // restore any live previews (e.g. resize)
+    return;
+  }
+  dnd.src = null;
+  document.body.classList.remove('dnd');
+  if (pushHistory) {
+    state.history = state.history.slice(0, state.hIndex + 1);
+    state.history.push(newSrc);
+    state.hIndex = state.history.length - 1;
+  }
+  state.src = newSrc;
+  state.root = parseTemplate(newSrc);
+  state.model = buildModel(state.root);
+  state.docBs3 = computeDocBs3(state.root);
+  if (!keepSel) state.sel = null;
+  if (state.sel && !resolvePath(state.sel.path)) state.sel = null;
+  if (!state.sel) state._bandLines = null;
+  srcTA.value = newSrc;
+  state.dirty = false;
+  $('#srcPane').classList.remove('src-dirty');
+  $<HTMLButtonElement>('#revertBtn').disabled = true;
+  render();
+}
+
+export function undo(): void {
+  if (state.dirty) { toast(DIRTY_MSG, 'warn'); return; }
+  if (state.hIndex > 0) {
+    state.hIndex--;
+    apply(state.history[state.hIndex]!, { pushHistory: false });
+  }
+}
+
+export function redo(): void {
+  if (state.dirty) { toast(DIRTY_MSG, 'warn'); return; }
+  if (state.hIndex < state.history.length - 1) {
+    state.hIndex++;
+    apply(state.history[state.hIndex]!, { pushHistory: false });
+  }
+}
+
+/* ── model paths ─────────────────────────────────────────────────── */
+
+/** path = [rowIdx, colIdx, rowIdx, colIdx, …] into the model tree */
+export function resolvePath(path: NodePath | null): RowNode | ColNode | null {
+  if (!path) return null;
+  let node: RowNode | ColNode | null = null;
+  let list: (RowNode | ColNode)[] = state.model;
+  for (let i = 0; i < path.length; i++) {
+    node = list[path[i]!] ?? null;
+    if (!node) return null;
+    list = node.kind === 'row' ? node.cols : node.nestedRows;
+  }
+  return node;
+}
+
+export function rowOfSel(): RowNode | ColNode | null {
+  return state.sel ? resolvePath(state.sel.path.slice(0, -1)) : null;
+}
+
+/** Any BS3-style grid class anywhere in the document? */
+export function computeDocBs3(root: El): boolean {
+  let found = false;
+  (function walk(e: El) {
+    if (found) return;
+    for (const c of e.children) {
+      const v = classValue(c);
+      if (v && usesBs3(v.trim().split(/\s+/))) { found = true; return; }
+      walk(c);
+    }
+  })(root);
+  return found;
+}
+
+/* ── tier conventions for newly created tokens ───────────────────── */
+
+/** Tier to create a new token at when the element defines none for this
+    property: the element's own width tier, else the tier its row siblings
+    use most, else the current view breakpoint. */
+export function fallbackTier(node: ColNode, rowNode: RowNode | ColNode | null): Breakpoint {
+  const wdef = definingBp(node.spec.width, state.bp);
+  if (wdef) return wdef;
+  const own = Object.keys(node.spec.width) as Breakpoint[];
+  if (own.length) return own[0]!;
+  const dom = dominantTier(rowNode);
+  return dom || state.bp;
+}
+
+export function dominantTier(rowNode: RowNode | ColNode | null): Breakpoint | null {
+  if (!rowNode || rowNode.kind !== 'row') return null;
+  const count: Partial<Record<Breakpoint, number>> = {};
+  rowNode.cols.forEach(c =>
+    (Object.keys(c.spec.width) as Breakpoint[]).forEach(b => count[b] = (count[b] ?? 0) + 1));
+  let best: Breakpoint | null = null;
+  for (const b of BPS) if (count[b] && (best == null || count[b]! > count[best]!)) best = b;
+  return best;
+}
+
+/** Width classes for a brand-new column: copy the reference element's width
+    tokens verbatim; else follow the row's dominant tier in the doc dialect. */
+export function conventionNewColTokens(
+  refTokens: string[] | null, rowNode: RowNode | ColNode | null,
+): string[] {
+  const w = (refTokens ?? []).filter(t => widthTokenBp(t) != null);
+  if (w.length) return w.slice();
+  const tier = dominantTier(rowNode) || state.bp;
+  if (state.docBs3) return [`col-${tier}-6`];
+  return [tier === 'xs' ? 'col' : `col-${tier}`];
+}
+
+/* Re-exported so callers don't need a second import for the common case. */
+export { classTokens };

@@ -1,14 +1,17 @@
 {
   "name": "bootstrap-visualizer",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b && tsc -p packages/core/tsconfig.spec.json"
+    "typecheck": "tsc -b && tsc -p packages/core/tsconfig.spec.json && tsc -p packages/app-standalone/tsconfig.json"
   },
   "devDependencies": {
+    "jsdom": "^29.1.1",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }

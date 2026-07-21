@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grid Draft — Bootstrap grid drafting board</title>
+</head>
+<body>
+
+<header>
+  <div class="brand"><b>GRID·DRAFT</b><span>Bootstrap grid drafting board</span></div>
+  <div class="bp-switch" id="bpSwitch" role="tablist" aria-label="Breakpoint"></div>
+  <div class="bp-note" id="bpNote"></div>
+  <div class="spacer"></div>
+  <button id="undoBtn" title="Undo (Ctrl+Z)">↶ Undo</button>
+  <button id="redoBtn" title="Redo (Ctrl+Y)">↷ Redo</button>
+  <button id="openBtn" title="Open a template file">Open…</button>
+  <button id="sampleBtn">Load sample</button>
+  <button id="downloadBtn" title="Download current template">Download</button>
+  <button id="copyBtn" class="primary">Copy HTML</button>
+  <input type="file" id="fileInput" accept=".html,.htm,.txt,text/html,text/plain" hidden>
+</header>
+<div id="dropHint">Drop template file to open</div>
+
+<main>
+  <section class="pane-src" id="srcPane">
+    <div class="pane-head">Template source <span id="fileName"></span> <span class="spacer"></span>
+      <button id="revertBtn" disabled title="Discard typing, restore canvas state">Revert</button>
+      <button id="applyBtn">Apply changes</button>
+    </div>
+    <div class="src-wrap" id="srcWrap" style="background:var(--panel)">
+      <div id="srcBand"></div>
+      <textarea id="src" spellcheck="false" aria-label="Template source"></textarea>
+    </div>
+  </section>
+
+  <div id="paneResizer"></div>
+
+  <section class="pane-canvas">
+    <div class="pane-head">Layout — schematic, not a render
+      <span class="spacer"></span>
+      <span id="findCount"></span>
+      <input id="findBox" type="text" placeholder="find… ( / )" spellcheck="false" aria-label="Find field">
+    </div>
+    <div class="canvas-scroll">
+      <div class="sheet" id="sheet">
+        <div class="ruler" id="ruler"></div>
+        <div class="rows-host" id="rowsHost"></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="pane-inspector" id="inspector" aria-label="Inspector"></aside>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
