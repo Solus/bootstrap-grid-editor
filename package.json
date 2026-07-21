@@ -1,0 +1,5 @@
+{
+  "name": "bootstrap-visualizer",
+  "private": true,
+  "workspaces": ["packages/*"]
+}
