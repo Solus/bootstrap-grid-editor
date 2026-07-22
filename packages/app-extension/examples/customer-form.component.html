@@ -1,0 +1,86 @@
+<div class="container-fluid">
+
+  <!--PAGE-HEADER-->
+  <div class="row">
+    <div class="col-12">
+      <app-page-header [title]="'Customer'" (back)="onBack()"></app-page-header>
+    </div>
+  </div>
+
+  <!-- Mixed tiers, a label vs control pair, and a modern offset -->
+  <div class="row">
+    <div class="col-md-4 col-lg-3">
+      <label app-i18n="demo.editor.code"></label>
+      <text-input formControlName="code"></text-input>
+    </div>
+    <div class="col-md-8 col-lg-6">
+      <label app-i18n="demo.editor.name"></label>
+      <text-input formControlName="name"></text-input>
+    </div>
+    <div class="col-lg-3 offset-lg-0 d-none d-lg-block">
+      <status-display [statusInput]="customer.status"></status-display>
+    </div>
+  </div>
+
+  <!-- Equal-width row: bare col + col-auto -->
+  <div class="row">
+    <div class="col">
+      <lookup-input formControlName="segment"></lookup-input>
+    </div>
+    <div class="col">
+      <lookup-input formControlName="region"></lookup-input>
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-outline" app-i18n="demo.editor.action001"></button>
+    </div>
+  </div>
+
+  <!--ADDRESS-->
+  <div class="row">
+    <div class="col-md-6">
+      <legend class="group-title" app-i18n="demo.editor.sectionAddress"></legend>
+      <div class="row">
+        <!--COL-CITY-->
+        <div class="col-sm-8">
+          <label app-i18n="demo.editor.city"></label>
+          <text-input formControlName="city"></text-input>
+        </div>
+        <div class="col-sm-4">
+          <label app-i18n="demo.editor.zip"></label>
+          <text-input formControlName="zip"></text-input>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6" [ngClass]="{'has-error': addressInvalid}">
+      <!-- HDR:Address -->
+      <label app-i18n="demo.editor.notes"></label>
+      <textarea class="form-control" formControlName="notes"></textarea>
+    </div>
+  </div>
+
+  <!-- Angular 17 control flow -->
+  <div class="row">
+    @if (compactMode) {
+    <div class="col-sm-12">
+      <summary-bar [data]="summary"></summary-bar>
+    </div>
+    } @else {
+    <div class="col-sm-8">
+      <summary-bar [data]="summary"></summary-bar>
+    </div>
+    <div class="col-sm-4">
+      <detail-bar [data]="detail"></detail-bar>
+    </div>
+    }
+  </div>
+
+  <div class="row">
+    <div class="col-md-3 offset-md-6">
+      <button class="btn btn-secondary w-100" (click)="onCancel()" app-i18n="demo.editor.cancel"></button>
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-primary w-100" [disabled]="form.invalid" (click)="onSave()" app-i18n="demo.editor.save"></button>
+    </div>
+  </div>
+
+</div>
