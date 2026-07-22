@@ -212,18 +212,31 @@ mutants elsewhere are likely.
 If this matters later, StrykerJS over `packages/core` would give a real
 number. Not worth it yet.
 
-### 3.2 Interactive paths still untested **[verify]**
+### 3.2 Interactive paths still untested **[RESOLVED — the four named paths]**
 
-Playwright covers resize, drag & drop, keyboard, undo/redo, dirty cycle,
-find, inspector, breakpoints, collapse, and file I/O. Still uncovered:
+All four now have Playwright coverage (`e2e/app.spec.ts`), each
+mutation-checked:
 
-- **Pane resizer** drag (`source-pane.ts:wirePaneResizer`).
-- **File drag & drop onto the window** — the `dragenter`/`dragleave`
-  depth counter and `#dropHint` overlay (`file-io.ts:wireFileDrag`).
-  The depth counter is the fiddly part and is exactly the kind of thing
-  that breaks silently.
-- **Toast auto-dismiss** timing.
-- **`scrollIntoView`** behavior on find/keyboard navigation.
+- **Pane resizer** (`source-pane.ts`) — drag resizes and sets the
+  `active`/`pane-resizing` flags, plus a clamp test. Note the clamp test
+  asserts on the inline `flexBasis` the handler sets, **not** the rendered
+  width: `.pane-src` also has CSS `min-width`/`max-width`, so a
+  boundingBox assertion would pass even with the JS clamp removed (it was,
+  in the first draft — mutation testing caught it). flexBasis isolates the
+  JS.
+- **Window file drop** (`file-io.ts`) — the depth counter (two enters, one
+  leave keeps the overlay up; the second leave clears it), the drop→open
+  path, and the dirty-guard refusal. Native OS file drag can't be
+  simulated, so these dispatch real `DragEvent`s carrying a `DataTransfer`
+  with a `File` (which makes `types` include `'Files'`). That drives the
+  actual handlers, including `f.text()` on drop.
+- **Toast auto-dismiss** — shows, then clears within the 2600ms timer.
+- **`scrollIntoView`** — find and keyboard nav to an off-screen block
+  assert `toBeInViewport()`.
+
+Still genuinely untested, but lower-risk and left for later: `pointercancel`
+paths on resize/pane-drag (aborted gestures), and the clipboard *fallback*
+branch in Copy (`execCommand` path when `navigator.clipboard` throws).
 
 ### 3.3 Chromium only **[decide]**
 
