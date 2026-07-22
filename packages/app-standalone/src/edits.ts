@@ -155,7 +155,11 @@ export function deleteEl(node: RowNode | ColNode): void {
 
 /* ── reordering ──────────────────────────────────────────────────── */
 
-export function nudgeCol(_node: ColNode, dir: number): void {
+/** Move the selected column one place in `dir` (-1 left, +1 right).
+    Operates on the current selection — every caller invokes it on the
+    selected column, and the swap needs the selection's path, not just a
+    node (a ColNode doesn't carry its position). */
+export function nudgeCol(dir: number): void {
   if (!state.sel) return;
   const parentPath = state.sel.path.slice(0, -1);
   const idx = state.sel.path[state.sel.path.length - 1]!;
@@ -165,8 +169,9 @@ export function nudgeCol(_node: ColNode, dir: number): void {
   swapSiblings(row.cols[idx]!.el, row.cols[to]!.el, parentPath.concat(to), 'col');
 }
 
-/** Swap a row with an adjacent sibling row (reorder within its container). */
-export function nudgeRow(_node: RowNode, dir: number): void {
+/** Swap the selected row with an adjacent sibling row (reorder within its
+    container). Selection-based, for the same reason as nudgeCol. */
+export function nudgeRow(dir: number): void {
   if (!state.sel) return;
   const parent = state.sel.path.slice(0, -1);
   const idx = state.sel.path[state.sel.path.length - 1]!;

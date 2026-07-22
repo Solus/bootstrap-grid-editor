@@ -211,8 +211,8 @@ function renderColInspector(node: ColNode): void {
   as.appendChild(act);
   actBtn(act, 'Split in two', () => splitCol(node));
   actBtn(act, 'Add column after', () => addColAfter(node));
-  actBtn(act, '◀ Move', () => nudgeCol(node, -1));
-  actBtn(act, 'Move ▶', () => nudgeCol(node, +1));
+  actBtn(act, '◀ Move', () => nudgeCol(-1));
+  actBtn(act, 'Move ▶', () => nudgeCol(+1));
   const del = actBtn(act, 'Delete', () => deleteEl(node));
   del.classList.add('danger');
 }

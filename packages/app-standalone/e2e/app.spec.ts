@@ -399,6 +399,21 @@ test.describe('inspector', () => {
     expect(after).toContain('<!-- new column -->');
   });
 
+  test('the Move buttons reorder the selected column', async ({ page }) => {
+    const before = await source(page);
+    expect(before.indexOf('formControlName="code"'))
+      .toBeLessThan(before.indexOf('formControlName="name"'));
+
+    await colWithClass(page, 'col-md-4 col-lg-3').click();   // the "code" column
+    await page.locator('#inspector').getByText('Move ▶').click();
+
+    const after = await source(page);
+    expect(after.indexOf('formControlName="code"'))
+      .toBeGreaterThan(after.indexOf('formControlName="name"'));
+    // still selected after the move, so a second Move keeps operating on it
+    await expect(page.locator('.g-col.selected')).toHaveCount(1);
+  });
+
   test('Delete row removes the row', async ({ page }) => {
     const before = await page.locator('.rows-host > .g-row').count();
     // click the row's own padding strip — clicking its centre would land on a

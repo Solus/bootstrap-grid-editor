@@ -91,11 +91,11 @@ function kbNav(e: KeyboardEvent): void {
 
   if (e.shiftKey && key.startsWith('Arrow')) {       // ── move the selected item ──
     if (sel.kind === 'col' && node.kind === 'col') {
-      if (key === 'ArrowLeft') nudgeCol(node, -1);
-      else if (key === 'ArrowRight') nudgeCol(node, +1);
+      if (key === 'ArrowLeft') nudgeCol(-1);
+      else if (key === 'ArrowRight') nudgeCol(+1);
     } else if (node.kind === 'row') {
-      if (key === 'ArrowUp') nudgeRow(node, -1);
-      else if (key === 'ArrowDown') nudgeRow(node, +1);
+      if (key === 'ArrowUp') nudgeRow(-1);
+      else if (key === 'ArrowDown') nudgeRow(+1);
     }
     return;
   }
