@@ -60,14 +60,21 @@ describe('span semantics (the edit contract)', () => {
   });
 });
 
-/* The Angular parser flattens control flow so the model shape is unchanged;
-   the legacy fallback (used on parse errors) must agree on that shape. */
-describe('control-flow flattening (Angular path)', () => {
-  it('@if/@else columns become direct columns of the row', () => {
+/* `@if` is modeled as a CondRegion (only the active branch's cols appear);
+   `@for`/`@switch`/`*ngFor` still flatten. The legacy fallback agrees on the
+   flattened shape. */
+describe('control-flow (Angular path)', () => {
+  it('@if/@else becomes a CondRegion; only the active branch column shows', () => {
     const s = `<div class="row">@if (x) { <div class="col-6">a</div> } @else { <div class="col-4">b</div> }</div>`;
     const row = buildModel(parseTemplate(s))[0]!;
-    expect(row.cols.map(c => c.el.tag)).toEqual(['div', 'div']);
-    expect(row.cols.length).toBe(2);
+    // default active branch 0 → only the @if branch's col
+    expect(row.cols.length).toBe(1);
+    expect(row.cols[0]!.el.attrs.find(a => a.name === 'class')!.value).toBe('col-6');
+    expect(row.conds).toHaveLength(1);
+    expect(row.conds![0]!.branches.map(b => b.condition)).toEqual(['x', null]);
+    // selecting the else branch swaps which col is shown
+    const elseRow = buildModel(parseTemplate(s), { [row.conds![0]!.region]: 1 })[0]!;
+    expect(elseRow.cols[0]!.el.attrs.find(a => a.name === 'class')!.value).toBe('col-4');
   });
 
   it('@for body and @empty columns are lifted into the row', () => {
@@ -98,6 +105,117 @@ describe('legacy fallback on parse errors', () => {
     const viaLegacy = parseTemplateLegacy(s);
     expect(viaMain.children[0]!.children.length)
       .toBe(viaLegacy.children[0]!.children.length);
+  });
+});
+
+describe('@if region tagging', () => {
+  // find every element in the tree that carries a cond tag
+  function tagged(root: ReturnType<typeof parseTemplate>) {
+    const out: { region: string; branch: number; cls: string }[] = [];
+    const walk = (el: any) => {
+      if (el.cond) out.push({ region: el.cond.region, branch: el.cond.branch, cls: el.cls ?? '' });
+      el.children?.forEach(walk);
+    };
+    root.children.forEach(walk);
+    return out;
+  }
+
+  it('registers a two-branch region and tags each branch element', () => {
+    const s = `<div class="row">
+      @if (a) { <div class="col-6">A</div> }
+      @else { <div class="col-4">B</div> }
+    </div>`;
+    const root = parseTemplate(s);
+    const regions = Object.values(root.condRegions);
+    expect(regions.length).toBe(1);
+    const reg = regions[0]!;
+    expect(reg.branches.map(b => b.condition)).toEqual(['a', null]);
+    expect(reg.branches.map(b => b.label)).toEqual(['@if (a)', '@else']);
+
+    const tags = tagged(root);
+    expect(tags.map(t => t.branch)).toEqual([0, 1]);
+    expect(tags.every(t => t.region === reg.region)).toBe(true);
+  });
+
+  it('models @else if as three branches with conditions', () => {
+    const s = `<div class="row">
+      @if (a) { <div class="col-6">A</div> }
+      @else if (b) { <div class="col-4">B</div> }
+      @else { <div class="col-2">C</div> }
+    </div>`;
+    const reg = Object.values(parseTemplate(s).condRegions)[0]!;
+    expect(reg.branches.length).toBe(3);
+    expect(reg.branches.map(b => b.condition)).toEqual(['a', 'b', null]);
+    expect(reg.branches.map(b => b.label)).toEqual(['@if (a)', '@else if (b)', '@else']);
+  });
+
+  it('a no-@else @if is a single-branch region', () => {
+    const s = `<div class="row">@if (x) { <div class="col-6">A</div> }</div>`;
+    const reg = Object.values(parseTemplate(s).condRegions)[0]!;
+    expect(reg.branches.length).toBe(1);
+    expect(reg.branches[0]!.condition).toBe('x');
+  });
+
+  it('records an empty branch in the registry even though it tags no element', () => {
+    const s = `<div class="row">
+      @if (a) { <div class="col-6">A</div> }
+      @else { }
+    </div>`;
+    const root = parseTemplate(s);
+    const reg = Object.values(root.condRegions)[0]!;
+    expect(reg.branches.length).toBe(2);
+    // only the non-empty branch contributed a tagged element
+    expect(tagged(root).map(t => t.branch)).toEqual([0]);
+  });
+
+  it('gives nested @if its own region key', () => {
+    const s = `<div class="col-6">
+      @if (a) {
+        <div class="row">
+          @if (b) { <div class="col-4">B</div> }
+          @else { <div class="col-8">C</div> }
+        </div>
+      }
+    </div>`;
+    const root = parseTemplate(s);
+    const keys = Object.keys(root.condRegions);
+    expect(keys.length).toBe(2);
+    expect(new Set(keys).size).toBe(2); // distinct
+  });
+
+  it('models a column *ngIf as a single-branch region (like a bare @if)', () => {
+    const s = `<div class="row">
+      <div class="col-6">head</div>
+      <div class="col-6" *ngIf="hasWarning"><warn-banner></warn-banner></div>
+    </div>`;
+    const root = parseTemplate(s);
+    const regs = Object.values(root.condRegions);
+    expect(regs.length).toBe(1);
+    expect(regs[0]!.branches.length).toBe(1);
+    expect(regs[0]!.branches[0]!.condition).toBe('hasWarning');
+    expect(regs[0]!.branches[0]!.label).toBe('*ngIf (hasWarning)');
+    // only the *ngIf column is tagged; the plain column is not
+    expect(tagged(root).map(t => t.branch)).toEqual([0]);
+  });
+
+  it('drops the `; else tpl` reference, modeling only the boolean condition', () => {
+    const s = `<div class="row"><div class="col-6" *ngIf="ready; else tpl">x</div></div>`;
+    const reg = Object.values(parseTemplate(s).condRegions)[0]!;
+    expect(reg.branches[0]!.condition).toBe('ready');
+  });
+
+  it('leaves *ngFor flattened (no region)', () => {
+    const s = `<div class="row"><div class="col-4" *ngFor="let x of xs">{{x}}</div></div>`;
+    expect(Object.keys(parseTemplate(s).condRegions).length).toBe(0);
+  });
+
+  it('region key is content-derived: stable across a column edit, changes on a condition edit', () => {
+    const key = (s: string) => Object.keys(parseTemplate(s).condRegions)[0]!;
+    const base = `<div class="row">@if (a) { <div class="col-6">A</div> } @else { <div class="col-4">B</div> }</div>`;
+    const editedCol = `<div class="row">@if (a) { <div class="col-8">A</div> } @else { <div class="col-4">B</div> }</div>`;
+    const editedCond = `<div class="row">@if (z) { <div class="col-6">A</div> } @else { <div class="col-4">B</div> }</div>`;
+    expect(key(editedCol)).toBe(key(base));      // column width change → same region
+    expect(key(editedCond)).not.toBe(key(base)); // condition change → new region
   });
 });
 

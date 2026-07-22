@@ -25,10 +25,11 @@
 
 import {
   parseTemplate as ngParseTemplate,
-  TmplAstElement, TmplAstForLoopBlock, TmplAstIfBlock, TmplAstSwitchBlock,
-  TmplAstTemplate,
+  TmplAstElement, TmplAstForLoopBlock, TmplAstIfBlock, TmplAstIfBlockBranch,
+  TmplAstSwitchBlock, TmplAstTemplate,
 } from '@angular/compiler';
-import type { Attr, El, RootEl } from './types.js';
+import type { Attr, CondBranchMeta, El, RootEl } from './types.js';
+import { hashStr } from './model.js';
 
 export const VOID_TAGS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
@@ -45,10 +46,18 @@ interface OpenTag {
 /** Any AST node produced by the compiler; we only reach into a few shapes. */
 type Node = { sourceSpan?: unknown; children?: Node[] };
 
+/** Per-parse state threaded through the walk: the root (for the `@if` region
+    registry) and an occurrence counter for stable region keys. */
+interface Ctx {
+  root: RootEl;
+  occ: Map<string, number>;
+}
+
 function newRoot(src: string): RootEl {
   return {
     tag: '#root', attrs: [], children: [], start: 0, end: src.length,
     openEnd: 0, contentStart: 0, contentEnd: src.length, parent: null,
+    condRegions: {},
   };
 }
 
@@ -70,26 +79,31 @@ export function parseTemplate(src: string): RootEl {
     return parseTemplateLegacy(src);
   }
   const root = newRoot(src);
-  root.children = collectElements(parsed.nodes as Node[], root, src);
+  const ctx: Ctx = { root, occ: new Map() };
+  root.children = collectElements(parsed.nodes as Node[], root, src, ctx);
   return root;
 }
 
 /** Walk a node list into the El children it contributes, flattening control
-    flow and unwrapping structural-directive / ng-template wrappers. */
-function collectElements(nodes: Node[], parent: El, src: string): El[] {
+    flow and unwrapping structural-directive / ng-template wrappers. `@if`
+    branches are flattened too, but each branch's top-level elements are
+    tagged (`el.cond`) so the model can group them back into a CondRegion. */
+function collectElements(nodes: Node[], parent: El, src: string, ctx: Ctx): El[] {
   const out: El[] = [];
   for (const n of nodes) {
     if (n instanceof TmplAstElement) {
-      out.push(buildEl(n, parent, src));
+      out.push(buildEl(n, parent, src, ctx));
     } else if (n instanceof TmplAstTemplate) {
-      out.push(...collectElements(n.children as unknown as Node[], parent, src));
+      const els = collectElements(n.children as unknown as Node[], parent, src, ctx);
+      tagNgIf(els, ctx);
+      out.push(...els);
     } else if (n instanceof TmplAstIfBlock) {
-      for (const b of n.branches) out.push(...collectElements(b.children as unknown as Node[], parent, src));
+      out.push(...collectIf(n, parent, src, ctx));
     } else if (n instanceof TmplAstForLoopBlock) {
-      out.push(...collectElements(n.children as unknown as Node[], parent, src));
-      if (n.empty) out.push(...collectElements(n.empty.children as unknown as Node[], parent, src));
+      out.push(...collectElements(n.children as unknown as Node[], parent, src, ctx));
+      if (n.empty) out.push(...collectElements(n.empty.children as unknown as Node[], parent, src, ctx));
     } else if (n instanceof TmplAstSwitchBlock) {
-      for (const g of n.groups) out.push(...collectElements(g.children as unknown as Node[], parent, src));
+      for (const g of n.groups) out.push(...collectElements(g.children as unknown as Node[], parent, src, ctx));
     }
     // Text, BoundText, comments, @let, deferred blocks, … contribute no
     // element children; they remain in the source gaps that looseText reads.
@@ -97,7 +111,71 @@ function collectElements(nodes: Node[], parent: El, src: string): El[] {
   return out;
 }
 
-function buildEl(node: TmplAstElement, parent: El, src: string): El {
+/** Flatten an `@if`, tagging each branch's top-level elements with a shared
+    region key + branch index, and registering the full branch list (incl.
+    empty branches) on the root. Innermost region wins if an element is already
+    tagged by a nested `@if` sitting directly inside a branch. */
+function collectIf(n: TmplAstIfBlock, parent: El, src: string, ctx: Ctx): El[] {
+  const branches: CondBranchMeta[] = n.branches.map((b, index) => ({
+    index,
+    label: ifBranchLabel(src, b),
+    condition: ifBranchCondition(src, b),
+  }));
+  const key = hashStr(branches.map(b => b.condition ?? '@else').join('|'));
+  const occ = ctx.occ.get(key) ?? 0;
+  ctx.occ.set(key, occ + 1);
+  const region = `${key}:${occ}`;
+  ctx.root.condRegions[region] = { region, branches };
+
+  const out: El[] = [];
+  n.branches.forEach((b, branch) => {
+    const els = collectElements(b.children as unknown as Node[], parent, src, ctx);
+    for (const el of els) if (!el.cond) el.cond = { region, branch };
+    out.push(...els);
+  });
+  return out;
+}
+
+/** `*ngIf` desugars to a `<ng-template>` wrapper; after unwrapping, the inner
+    element keeps its `*ngIf` attribute. Model it like a bare `@if` — a single-
+    branch region — so the frontend boxes it with a show/hide toggle. `*ngFor`
+    and plain `<ng-template>` carry no `*ngIf` attr and stay flattened. Only the
+    boolean condition is modeled; a `; else tpl` / `; then tpl` reference is
+    dropped (the detached template stays flat, as today). */
+function tagNgIf(els: El[], ctx: Ctx): void {
+  for (const el of els) {
+    if (el.cond) continue;                    // already a branch of an inline @if
+    const attr = el.attrs.find(a => a.name.toLowerCase() === '*ngif');
+    if (!attr) continue;
+    const condition = (attr.value ?? '').split(';')[0]!.trim();
+    const key = hashStr('*ngIf|' + condition);
+    const occ = ctx.occ.get(key) ?? 0;
+    ctx.occ.set(key, occ + 1);
+    const region = `${key}:${occ}`;
+    ctx.root.condRegions[region] = {
+      region,
+      branches: [{ index: 0, label: `*ngIf (${condition})`, condition }],
+    };
+    el.cond = { region, branch: 0 };
+  }
+}
+
+/** The branch header without the trailing `{`, e.g. `@if (x)`, `@else if (y)`,
+    `@else`. `startSourceSpan` covers exactly that header. */
+function ifBranchLabel(src: string, b: TmplAstIfBlockBranch): string {
+  return src.slice(b.startSourceSpan.start.offset, b.startSourceSpan.end.offset)
+    .replace(/\s*\{?\s*$/, '').trim();
+}
+
+/** The condition text, or null for the bare `@else`. */
+function ifBranchCondition(src: string, b: TmplAstIfBlockBranch): string | null {
+  if (b.expression == null) return null;
+  const raw = src.slice(b.startSourceSpan.start.offset, b.startSourceSpan.end.offset);
+  const m = /\(([\s\S]*)\)\s*\{?\s*$/.exec(raw);
+  return m ? m[1]!.trim() : null;
+}
+
+function buildEl(node: TmplAstElement, parent: El, src: string, ctx: Ctx): El {
   const start = node.sourceSpan.start.offset;
   const openEnd = node.startSourceSpan.end.offset;
   const end = node.sourceSpan.end.offset;
@@ -117,7 +195,7 @@ function buildEl(node: TmplAstElement, parent: El, src: string): El {
     selfClosing: open ? open.selfClosing : false,
     parent,
   };
-  el.children = collectElements(node.children as unknown as Node[], el, src);
+  el.children = collectElements(node.children as unknown as Node[], el, src, ctx);
   return el;
 }
 

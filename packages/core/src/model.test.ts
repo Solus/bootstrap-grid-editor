@@ -138,6 +138,63 @@ describe('control-flow detection & looseText', () => {
       .toBe('hey there'));
 });
 
+describe('@if grouping into active-branch cols', () => {
+  const cf = `<div class="row">
+    <div class="col-2">head</div>
+    @if (a) { <div class="col-6">A</div> }
+    @else { <div class="col-4">B1</div> <div class="col-4">B2</div> }
+    <div class="col-1">tail</div>
+  </div>`;
+  const root = parseTemplate(cf);
+  const region = Object.keys(root.condRegions)[0]!;
+  // pull the col-* token straight out of each column's source span
+  const clsOf = (src: string) => (c: { el: { start: number; openEnd: number } }) =>
+    /col-\d+/.exec(src.slice(c.el.start, c.el.openEnd))?.[0];
+
+  it('default (no active map) shows branch 0, interleaved with untagged cols', () => {
+    const row = buildModel(root)[0]!;
+    // head + A + tail  (B1/B2 are the hidden @else branch)
+    expect(row.cols.map(clsOf(cf))).toEqual(['col-2', 'col-6', 'col-1']);
+  });
+
+  it('a modeled @if row is not marked unreliable', () => {
+    const row = buildModel(root)[0]!;
+    expect(rowHasControlFlow(cf, row.el)).toBe(true); // regex still matches...
+    expect(row.conds?.length).toBe(1);                // ...but it is modeled
+  });
+
+  it('active map switches to branch 1 and preserves interleaving order', () => {
+    const row = buildModel(root, { [region]: 1 })[0]!;
+    expect(row.cols.map(clsOf(cf))).toEqual(['col-2', 'col-4', 'col-4', 'col-1']);
+  });
+
+  it('attaches CondRegion metadata with the resolved activeIndex', () => {
+    const row = buildModel(root, { [region]: 1 })[0]!;
+    const cr = row.conds![0]!;
+    expect(cr.region).toBe(region);
+    expect(cr.activeIndex).toBe(1);
+    expect(cr.branches.map(b => b.condition)).toEqual(['a', null]);
+  });
+
+  it('an @if wrapping nested rows in a container column toggles per-column', () => {
+    const s = `<div class="row"><div class="col-6">
+      @if (a) { <div class="row"><div class="col-3">A</div></div> }
+      @else { <div class="row"><div class="col-9">B</div></div> }
+    </div></div>`;
+    const root2 = parseTemplate(s);
+    const reg2 = Object.keys(root2.condRegions)[0]!;
+    // the container column is the sole col of a synthetic-less parse: find it
+    const findCol = (m: ReturnType<typeof buildModel>) => {
+      for (const r of m) for (const c of r.cols) if (c.conds?.length) return c;
+      return null;
+    };
+    const c0 = findCol(buildModel(root2))!;
+    expect(c0.nestedRows[0]!.cols.map(clsOf(s))).toEqual(['col-3']);
+    const c1 = findCol(buildModel(root2, { [reg2]: 1 }))!;
+    expect(c1.nestedRows[0]!.cols.map(clsOf(s))).toEqual(['col-9']);
+  });
+});
+
 describe('hashStr identity stability', () => {
   const hs = `<div class="row"><div class="col">a</div></div>
 <div class="row"><div class="col">TARGET</div></div>`;
