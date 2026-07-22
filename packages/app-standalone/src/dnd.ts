@@ -4,11 +4,11 @@
    rewrites one class attribute value. */
 
 import {
-  classTokens, definingBp, setWidthToken, writeClass,
+  classEdit, classTokens, definingBp, setWidthToken,
 } from '@bootstrap-visualizer/core';
 import type { ColNode, NodePath } from '@bootstrap-visualizer/core';
 import { toast } from './dom.js';
-import { DIRTY_MSG, apply, fallbackTier, resize, resolvePath, state } from './state.js';
+import { applyOps, canApplyEdit, fallbackTier, resize, resolvePath, state } from './state.js';
 import { moveCol } from './edits.js';
 import { render, type ColWidth } from './render.js';
 
@@ -37,9 +37,10 @@ export function startColDrag(colDiv: HTMLElement, path: NodePath): void {
   colDiv.draggable = true;
   colDiv.addEventListener('dragstart', e => {
     if (resize.active) { e.preventDefault(); return; }
-    if (state.dirty) {
+    const guard = canApplyEdit();
+    if (!guard.ok) {
       e.preventDefault();
-      toast(DIRTY_MSG, 'warn');
+      toast(guard.reason, 'warn');
       return;
     }
     e.stopPropagation();
@@ -90,8 +91,9 @@ export function attachResize(
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    if (state.dirty) {
-      toast(DIRTY_MSG, 'warn');
+    const guard = canApplyEdit();
+    if (!guard.ok) {
+      toast(guard.reason, 'warn');
       return;
     }
     const rowDiv = colDiv.closest('.g-row');
@@ -130,7 +132,7 @@ export function attachResize(
         const bp = definingBp(colNode.spec.width, state.bp)
                 || fallbackTier(colNode, resolvePath(path.slice(0, -1)));
         const tokens = setWidthToken(classTokens(colNode.el), bp, st.cur, state.docBs3);
-        apply(writeClass(state.src, colNode.el, tokens));
+        applyOps([classEdit(state.src, colNode.el, tokens)]);
       } else {
         render();
       }
