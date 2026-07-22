@@ -49,9 +49,22 @@ jobs:
           cp packages/app-standalone/dist-single/index.html "artifacts/bootstrap-visualizer-${GITHUB_REF_NAME}.html"
           cp packages/app-extension/releases/*.vsix artifacts/
 
+      # Release notes = this version's section from the extension CHANGELOG,
+      # so the changes are written once (CHANGELOG shows in VS Code too).
+      - name: Extract release notes from CHANGELOG
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VER" '
+            $0 ~ "^## " ver "([ ]|$)" { flag=1; next }
+            /^## / && flag { flag=0 }
+            flag { print }
+          ' packages/app-extension/CHANGELOG.md > RELEASE_NOTES.md
+          echo "----- release notes -----"; cat RELEASE_NOTES.md
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: RELEASE_NOTES.md
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
