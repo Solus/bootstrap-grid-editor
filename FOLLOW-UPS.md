@@ -362,12 +362,12 @@ time matters; not worth the churn now. A near-zero-risk alternative if only
 *felt* load matters: show the panel instantly and parse the first document
 a tick later — doesn't shrink the bundle.
 
-### 7.2 No explicit "saved to persist" cue **[chore]**
+### 7.2 "Saved to persist" cue **[RESOLVED]**
 
-Canvas edits apply to the buffer immediately (decision §7), so the buffer
-goes dirty; VS Code's dirty dot is the only cue. A gentle one-time hint
-("canvas edits go to the editor — Ctrl+S to persist") on the first edit of
-a session would help discoverability. Minor.
+The webview shows a one-time toast — "Applied to the editor — press Ctrl+S
+to save" — on the first canvas edit of a session (`webview/main.ts`, on the
+first `applied` message). Gentle and where the user is looking (the panel),
+rather than a VS Code modal.
 
 ### 7.3 Extension tests — sync logic covered; VS Code wiring still not **[partly done]**
 
