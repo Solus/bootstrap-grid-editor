@@ -326,3 +326,37 @@ for whoever writes them:
 - **`README.md`** expanded from two lines to cover the workspace layout,
   develop/test/build commands (including that `npm test` ≠ typecheck), and
   the single-file build.
+
+---
+
+## 7. Extension (Session 3) — deferred polish
+
+### 7.1 The webview bundle ships `@angular/compiler` **[decide]**
+
+The webview bundle is ~508 kB (141 kB gzipped) because the shared editor
+imports `core`, which imports `@angular/compiler` for the parser. Every
+webview load pays for the whole Angular parser.
+
+Options: (a) accept it — it's a one-time load, gzipped it's ~140 kB;
+(b) move parsing to the **extension host** (Node) and send the `GridModel`
+(or the `El` tree) to the webview over `postMessage`, so the webview
+bundles no parser. (b) is the real fix but a meaningful change — it
+crosses the core/host boundary and the model would have to be serializable
+(it currently holds `parent` back-references and live `El` nodes). Worth
+doing before the extension ships for real; not blocking.
+
+### 7.2 No explicit "saved to persist" cue **[chore]**
+
+Canvas edits apply to the buffer immediately (decision §7), so the buffer
+goes dirty; VS Code's dirty dot is the only cue. A gentle one-time hint
+("canvas edits go to the editor — Ctrl+S to persist") on the first edit of
+a session would help discoverability. Minor.
+
+### 7.3 Extension has no automated tests **[verify]**
+
+The standalone has jsdom + Playwright suites; the extension host and
+webview are only typecheck- and build-verified, then smoke-tested by hand
+in the Extension Development Host. The sync/version/divergence logic in
+`host/extension.ts` is the fiddliest part and has no regression net.
+`@vscode/test-electron` (or `@vscode/test-cli`) could drive an integration
+test. Worth it once the extension stabilizes.
