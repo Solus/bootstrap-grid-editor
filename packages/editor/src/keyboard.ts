@@ -16,7 +16,17 @@ import { clearSelection, select } from './selection.js';
 import { expandAncestors, findGo } from './find.js';
 import { deleteEl, nudgeCol, nudgeRow, quickWidth } from './edits.js';
 
-export function wireKeyboard(): void {
+/** Canvas navigation and find — everything except undo/redo. Both frontends
+    wire this. */
+export function wireKeyboardNav(): void {
+  wireFindBox();
+  document.addEventListener('keydown', kbNav);
+}
+
+/** The app's own undo/redo — buttons + Ctrl+Z/Y. The standalone wires this;
+    the extension does NOT (undo there is the editor's native undo, decision
+    §6 / FOLLOW-UPS). Assumes the host HTML provides #undoBtn / #redoBtn. */
+export function wireUndoRedo(): void {
   $('#undoBtn').addEventListener('click', undo);
   $('#redoBtn').addEventListener('click', redo);
 
@@ -30,9 +40,12 @@ export function wireKeyboard(): void {
       e.preventDefault(); redo();
     }
   });
+}
 
-  wireFindBox();
-  document.addEventListener('keydown', kbNav);
+/** Convenience for the standalone: navigation + undo/redo together. */
+export function wireKeyboard(): void {
+  wireKeyboardNav();
+  wireUndoRedo();
 }
 
 function wireFindBox(): void {
