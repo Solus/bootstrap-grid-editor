@@ -66,10 +66,31 @@ describe('sample exercises the interesting paths', () => {
     expect(pills[0]!.textContent).toContain('wraps');
   });
 
-  it('marks control-flow rows unreliable rather than overfull', () => {
-    const pill = document.querySelector('.fill-pill.unreliable');
-    expect(pill).not.toBeNull();
-    expect(pill!.textContent).toMatch(/^~\d+\/12$/);
+  it('models the @if row as a branch toggle (not the unreliable pill)', () => {
+    // the sample's @if/@else row is now modeled per-branch — no ~unreliable
+    expect(document.querySelector('.fill-pill.unreliable')).toBeNull();
+    // the @if region renders as a bounding box with the toggle chip as header
+    const box = document.querySelector('.cond-box');
+    expect(box).not.toBeNull();
+    const chip = box!.querySelector('.branch-chip')!;
+    expect(chip.classList.contains('active')).toBe(true);
+    expect(chip.textContent).toContain('@if');
+  });
+
+  it('toggling a branch re-renders view-only (source untouched)', () => {
+    const srcBefore = document.querySelector<HTMLTextAreaElement>('#src')!.value;
+    const colsBefore = document.querySelectorAll('.g-col').length;
+    // re-query after each click — render() rebuilds the DOM
+    const chip = () => document.querySelector<HTMLButtonElement>('.cond-box .branch-chip')!;
+    chip().click();   // @if → @else (the sample's region has a trailing @else)
+    // the shown branch changed...
+    expect(chip().textContent).toContain('@else');
+    // ...and the canvas re-rendered (the @else branch has a different column count)
+    expect(document.querySelectorAll('.g-col').length).not.toBe(colsBefore);
+    // ...but the underlying source was never rewritten (no commit / no dirty)
+    expect(document.querySelector<HTMLTextAreaElement>('#src')!.value).toBe(srcBefore);
+    chip().click();   // cycle back to @if so later tests see the default view
+    expect(chip().textContent).toContain('@if');
   });
 
   it('badges dynamic classes', () => {

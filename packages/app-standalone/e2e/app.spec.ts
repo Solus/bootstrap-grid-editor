@@ -482,6 +482,55 @@ test.describe('view controls', () => {
   });
 });
 
+/* The sample's @if/@else row is modeled as a branch toggle: only the active
+   branch's columns show, and switching is a pure view change. */
+test.describe('@if branch toggle', () => {
+  test('switching branch changes which columns show', async ({ page }) => {
+    const box = page.locator('.cond-box').first();
+    await expect(box).toBeVisible();
+    const chip = box.locator('.branch-chip');
+    // default = @if branch; the @else branch's <detail-bar> is hidden
+    await expect(chip).toHaveText(/@if\b/);
+    await expect(page.locator('.rows-host')).not.toContainText('detail-bar');
+
+    await chip.click();   // one compact chip cycles @if → @else
+
+    await expect(page.locator('.rows-host')).toContainText('detail-bar');
+    await expect(chip).toHaveText(/@else/);
+    await expect(chip).toHaveClass(/active/);
+  });
+
+  test('toggling a branch does not change the source (view-only)', async ({ page }) => {
+    const before = await source(page);
+    await page.locator('.cond-box').first().locator('.branch-chip').click();
+    expect(await source(page)).toBe(before);
+    await expect(page.locator('#srcPane')).not.toHaveClass(/src-dirty/);
+  });
+
+  test('a single @if (no @else) toggles its column visibility', async ({ page }) => {
+    await page.locator('#src').fill(
+      `<div class="row">
+         <div class="col-4">head</div>
+         @if (flag) { <div class="col-8">maybe</div> }
+       </div>`);
+    await page.locator('#applyBtn').click();
+
+    const row = page.locator('.g-row').first();
+    const chip = row.locator('.branch-chip');
+    // shown by default: both columns present
+    await expect(row.locator('.g-col')).toHaveCount(2);
+    await expect(chip).toHaveText(/@if\b/);
+
+    await chip.click();   // toggle the @if off → its column disappears
+    await expect(row.locator('.g-col')).toHaveCount(1);
+    await expect(chip).not.toHaveClass(/active/);
+
+    await chip.click();   // toggle back on
+    await expect(row.locator('.g-col')).toHaveCount(2);
+    await expect(chip).toHaveClass(/active/);
+  });
+});
+
 /* FOLLOW-UPS §2.5. A row nested inside a heading is collected by findRows
    but not emitted by colSequence, so positional pairing in renderCol used
    to misalign the nested rows — wrong element at the wrong path, one row
