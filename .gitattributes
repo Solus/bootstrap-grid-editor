@@ -1,0 +1,4 @@
+# Deterministic line endings across platforms: LF in the repo and in
+# working trees, regardless of each machine's core.autocrlf. The repo
+# already stores LF, so this normalizes checkouts without rewriting history.
+* text=auto eol=lf
