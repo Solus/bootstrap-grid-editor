@@ -1,9 +1,12 @@
 /* Extension host (Node). Activation, the "Open Grid Visualizer" command, the
-   webview panel, and the source-in / reveal-out message bridge.
+   webview panel, and the source-in / edits-out / reveal bridge.
 
-   First slice: send the active document to the webview (on open); reveal a
-   canvas selection back in the editor. Applying canvas edits to the buffer,
-   refreshing on save, and the guard/undo model are the next slice. */
+   Sync model (PLAN.md, decisions §3/§6): the editor document is the source of
+   truth. The canvas renders it; canvas edits apply to the *buffer* as minimal
+   workspace edits (not disk). On save the canvas refreshes from source. If
+   the user edits the document under the canvas, the webview is told it has
+   diverged and holds further canvas edits until a save or a Discard resyncs.
+   Undo is the editor's native undo. */
 
 import * as vscode from 'vscode';
 import type { HostMessage, WebviewMessage } from '../shared/protocol.js';
@@ -21,6 +24,7 @@ function openPanel(context: vscode.ExtensionContext): void {
       'Open an HTML/Angular template first, then run "Open Grid Visualizer".');
     return;
   }
+  const doc = sourceEditor.document;
 
   const panel = vscode.window.createWebviewPanel(
     'bootstrapVisualizer',
@@ -34,22 +38,57 @@ function openPanel(context: vscode.ExtensionContext): void {
   );
   panel.webview.html = getWebviewHtml(panel.webview, context.extensionUri);
 
-  const doc = sourceEditor.document;
+  const disposables: vscode.Disposable[] = [];
+  let applying = false;   // our own buffer edits must not read as user divergence
 
-  panel.webview.onDidReceiveMessage((msg: WebviewMessage) => {
+  const sendSource = () =>
+    post(panel, { type: 'setSource', text: doc.getText(), version: doc.version });
+
+  disposables.push(vscode.workspace.onDidSaveTextDocument(saved => {
+    if (saved === doc) sendSource();          // refresh from source on save
+  }));
+
+  disposables.push(vscode.workspace.onDidChangeTextDocument(ev => {
+    if (ev.document !== doc || applying) return;
+    post(panel, { type: 'diverged' });        // the user edited under the canvas
+  }));
+
+  panel.webview.onDidReceiveMessage(async (msg: WebviewMessage) => {
     switch (msg.type) {
       case 'ready':
-        post(panel, { type: 'setSource', text: doc.getText(), version: doc.version });
+        sendSource();
         break;
       case 'reveal':
         revealInEditor(doc, msg.start, msg.end);
         break;
+      case 'discard':
+        sendSource();                         // reset the canvas to the buffer
+        break;
       case 'applyEdits':
-        // next slice: replay msg.edits onto doc as a minimal WorkspaceEdit,
-        // guarding on msg.baseVersion vs doc.version
+        if (msg.baseVersion !== doc.version) {
+          post(panel, { type: 'diverged' });
+          void vscode.window.showWarningMessage(
+            'The canvas is out of sync with the editor — Resync (or save) first.');
+          return;
+        }
+        applying = true;
+        try {
+          const edit = new vscode.WorkspaceEdit();
+          for (const e of msg.edits) {
+            edit.replace(doc.uri, new vscode.Range(doc.positionAt(e.start), doc.positionAt(e.end)), e.text);
+          }
+          const ok = await vscode.workspace.applyEdit(edit);
+          if (ok) post(panel, { type: 'applied', version: doc.version });
+          else { void vscode.window.showWarningMessage('Could not apply the canvas edit.'); sendSource(); }
+        } finally {
+          applying = false;
+        }
         break;
     }
-  }, undefined, context.subscriptions);
+  }, undefined, disposables);
+
+  panel.onDidDispose(() => disposables.forEach(d => d.dispose()), null, context.subscriptions);
+  context.subscriptions.push(panel);
 }
 
 function post(panel: vscode.WebviewPanel, msg: HostMessage): void {
@@ -73,8 +112,8 @@ function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): stri
   const csp = [
     `default-src 'none'`,
     `img-src ${webview.cspSource} data:`,
-    // element.style.* set by the renderer is allowed; 'unsafe-inline' covers
-    // the inspector's inline style="" attributes. Scripts stay nonce-locked.
+    // element.style.* set by the renderer is fine; 'unsafe-inline' covers the
+    // inspector's inline style="" attributes. Scripts stay nonce-locked.
     `style-src ${webview.cspSource} 'unsafe-inline'`,
     `script-src 'nonce-${nonce}'`,
   ].join('; ');
@@ -94,8 +133,7 @@ function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): stri
     <div class="bp-switch" id="bpSwitch" role="tablist" aria-label="Breakpoint"></div>
     <div class="bp-note" id="bpNote"></div>
     <div class="spacer"></div>
-    <button id="undoBtn" title="Undo (Ctrl+Z)">↶ Undo</button>
-    <button id="redoBtn" title="Redo (Ctrl+Y)">↷ Redo</button>
+    <button id="resyncBtn" title="Reset the canvas to the current editor contents">⟳ Resync</button>
   </header>
 
   <main>

@@ -1,26 +1,42 @@
 /* The extension webview's host adapter — the postMessage end of the pipe.
 
-   First slice: read-only. The canvas renders the active document and a canvas
-   selection reveals the element in the editor (revealSource → post 'reveal').
-   Canvas *edits* are refused for now — applying them to the buffer, plus the
-   undo/redo model, is the next slice (a deliberate decision, FOLLOW-UPS
-   §1.2-adjacent). So canApplyEdit says no and commit never fires. */
+   Source in: `setSource` from the host → apply(fromSource). Edits out: a
+   canvas edit → commit → post `applyEdits`, stamped with the version the
+   canvas is synced to; the host replays it onto the buffer. Reveal out: a
+   selection → post `reveal`. Guard: refuse canvas edits once the buffer has
+   diverged (the user edited the editor) until a save or discard resyncs. */
 
 import type { Edit, El } from '@bootstrap-visualizer/core';
 import type { Host } from '@bootstrap-visualizer/editor';
 import type { WebviewMessage } from '../shared/protocol.js';
 
-const READ_ONLY_REASON = 'Editing from the canvas is coming in the next step.';
+/** Mutable sync state shared with the message loop in main.ts. */
+export interface SyncState {
+  /** Document version the canvas is in sync with. */
+  version: number;
+  /** The editor changed under the canvas; canvas edits are held. */
+  diverged: boolean;
+}
 
-export function createWebviewHost(post: (m: WebviewMessage) => void): Host {
+const DIVERGED_REASON =
+  'The editor changed under the canvas — save it, or Discard, to resync.';
+
+export function createWebviewHost(
+  post: (m: WebviewMessage) => void, sync: SyncState,
+): Host {
   return {
     canApplyEdit() {
-      return { ok: false, reason: READ_ONLY_REASON };
+      return sync.diverged ? { ok: false, reason: DIVERGED_REASON } : { ok: true };
     },
 
-    commit(_newSrc: string, _edits: Edit[] | null) {
-      // Unreachable while canApplyEdit refuses; the edits-out path lands in
-      // the next slice (post { type: 'applyEdits', … }).
+    commit(_newSrc: string, edits: Edit[] | null) {
+      // Only canvas edits (edits != null) leave; a full-document replace comes
+      // from setSource itself, not from the canvas.
+      if (!edits) return;
+      post({ type: 'applyEdits', edits, baseVersion: sync.version });
+      // Optimistically advance: the host applies one buffer change per batch
+      // and confirms via `applied`. Keeps rapid successive edits in step.
+      sync.version++;
     },
 
     revealSource(el: El | null) {

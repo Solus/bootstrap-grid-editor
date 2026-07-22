@@ -117,8 +117,12 @@ export function render(): void {
 }
 
 export function renderHeader(): void {
-  $<HTMLButtonElement>('#undoBtn').disabled = !(state.hIndex > 0);
-  $<HTMLButtonElement>('#redoBtn').disabled = !(state.hIndex < state.history.length - 1);
+  // undo/redo buttons are optional chrome — the extension omits them (native
+  // editor undo). Guard so the shared render works with or without them.
+  const undoBtn = document.querySelector<HTMLButtonElement>('#undoBtn');
+  const redoBtn = document.querySelector<HTMLButtonElement>('#redoBtn');
+  if (undoBtn) undoBtn.disabled = !(state.hIndex > 0);
+  if (redoBtn) redoBtn.disabled = !(state.hIndex < state.history.length - 1);
   $('#bpNote').textContent = BP_LABEL[state.bp];
   document.querySelectorAll<HTMLElement>('#bpSwitch button').forEach(b =>
     b.classList.toggle('active', b.dataset.bp === state.bp));

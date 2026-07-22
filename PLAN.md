@@ -258,22 +258,44 @@ session is checked only when every box under it is.
      method to abort a gesture early — never a private `state.dirty` read.
      Each host defines "not safe" (standalone: textarea dirty; extension:
      buffer diverged since sync).
+  4. **`revealSource(el | null)` is the third host method.** How the current
+     selection is shown in the host's source view — standalone: textarea
+     selection + highlight band; extension: `editor.revealRange`. The band
+     and caret-sync are standalone-only (source-band.ts).
+  5. **Webview built with Vite → nonce'd asset references.** The webview UI
+     builds to fixed-name assets the extension serves via `asWebviewUri`
+     with a per-load CSP nonce; the Node host bundles separately (esbuild).
+  6. **Undo/redo in the extension is the editor's native undo** — the
+     webview does not keep its own history (one source of truth, no
+     competing stacks). `wireKeyboard` split into nav-only vs undo/redo; the
+     extension wires nav-only.
+  7. **Canvas edits apply immediately** to the editor buffer — *not* a
+     staged Apply button (a change from this plan's original wording). Each
+     edit is a minimal `WorkspaceEdit`; persist is the editor's own Ctrl+S.
+     Rationale: a staged "Apply → buffer, then Save" is a confusing two-step
+     persist, and immediate + native undo already gives an
+     experiment-then-discard workflow. Divergence (user edits under the
+     canvas) is guarded; **Resync** pulls the buffer back into the canvas.
 
   *Build order:*
   - [x] Core `Edit` type + `applyEdits(src, edits)` + `classEdit`.
   - [x] Refactor the standalone edit ops to emit `Edit[]` via `applyOps`
         (also simplified move/split/swap — no more length-delta juggling).
-        194 unit + 52 e2e green.
-  - [ ] Extract the shared UI package; define the host-adapter interface;
-        standalone implements it. Verify green.
-  - [ ] Scaffold the extension: activation, webview panel, host adapter over
-        `postMessage`, editor↔canvas sync — canvas refreshes from source on
-        **save**; canvas edits sync via **Apply → editor buffer** (not disk),
-        with **guard-and-warn** on divergence, a **Discard** to reset the
-        canvas, and a post-Apply Save reminder.
-
-  *Decisions still to surface (when reached):* webview bundling/CSP; undo/redo
-  in the extension (native editor undo vs. the app's own history).
+  - [x] Host-adapter seam: `Host` (canApplyEdit, commit, revealSource),
+        `setHost`; standalone implements it over the textarea. Selection
+        split into shared `select`/`clearSelection` vs standalone
+        `source-band`.
+  - [x] Extract the shared `@bootstrap-visualizer/editor` package; standalone
+        becomes a thin host over it. Bundled from source by consumers.
+  - [x] Scaffold the extension — read-only slice: activation, "Open Grid
+        Visualizer", webview panel (nonce'd CSP), source-in on open, canvas
+        selection reveals into the editor. F5 debug env (.vscode).
+  - [x] Edits-out slice: canvas edits → minimal `WorkspaceEdit` on the
+        buffer (immediate, decision 7); refresh-from-source on save;
+        guard-and-warn + **Resync** on divergence; native undo (decision 6).
+  - [ ] Polish / verify: exercise the sync loop in the dev host; a "saved to
+        persist" cue; trim the webview bundle (it ships `@angular/compiler`);
+        reverse caret-sync (editor cursor → canvas selection).
 
 - [ ] **Session 4+ — enrichment (strictly additive, extension-only)**
   - [ ] Resolve i18n keys → real translated labels from locale files.

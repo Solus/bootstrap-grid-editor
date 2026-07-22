@@ -1,14 +1,15 @@
 /* Webview entry: the shared editor running inside the VS Code webview.
 
    Mirrors app-standalone's main, but the "source in / edits out" ends are the
-   postMessage bridge instead of the textarea. No source pane, no file-io —
-   the editor document is the source. */
+   postMessage bridge instead of the textarea, and undo/redo is the editor's
+   native undo (decision §6) — so keyboard is nav-only. */
 
 import '@bootstrap-visualizer/editor/styles.css';
 import {
-  apply, setHost, wireBreakpointSwitch, wireCanvasBackground, wireKeyboard,
+  apply, setHost, toast, wireBreakpointSwitch, wireCanvasBackground,
+  wireKeyboardNav,
 } from '@bootstrap-visualizer/editor';
-import { createWebviewHost } from './webview-host.js';
+import { createWebviewHost, type SyncState } from './webview-host.js';
 import type { HostMessage, WebviewMessage } from '../shared/protocol.js';
 
 interface VsCodeApi {
@@ -18,17 +19,34 @@ declare function acquireVsCodeApi(): VsCodeApi;
 
 const vscode = acquireVsCodeApi();
 const post = (m: WebviewMessage) => vscode.postMessage(m);
+const sync: SyncState = { version: -1, diverged: false };
 
-setHost(createWebviewHost(post));
+setHost(createWebviewHost(post, sync));
 wireBreakpointSwitch();
-wireKeyboard();
+wireKeyboardNav();          // no undo/redo — that's the editor's native undo
 wireCanvasBackground();
+
+document.getElementById('resyncBtn')
+  ?.addEventListener('click', () => post({ type: 'discard' }));
 
 window.addEventListener('message', (e: MessageEvent<HostMessage>) => {
   const msg = e.data;
-  if (msg.type === 'setSource') {
-    // fromSource: this is the document arriving, not a canvas edit
-    apply(msg.text, { keepSel: false, fromSource: true });
+  switch (msg.type) {
+    case 'setSource':
+      sync.version = msg.version;
+      sync.diverged = false;
+      document.body.classList.remove('diverged');
+      // fromSource: this is the document arriving, not a canvas edit
+      apply(msg.text, { keepSel: false, fromSource: true });
+      break;
+    case 'applied':
+      sync.version = msg.version;   // our edit landed; stay in step
+      break;
+    case 'diverged':
+      sync.diverged = true;
+      document.body.classList.add('diverged');
+      toast('Editor changed — Resync to update the canvas', 'warn');
+      break;
   }
 });
 
