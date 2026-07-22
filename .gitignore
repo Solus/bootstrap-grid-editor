@@ -6,3 +6,4 @@ dist-single/
 *.tsbuildinfo
 test-results/
 playwright-report/
+releases/*.vsix

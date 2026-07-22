@@ -1,0 +1,12 @@
+# Ship only the built extension (dist/) + docs (README, CHANGELOG). dist/ is
+# included by default; .vscodeignore uses .gitignore semantics.
+src/**
+examples/**
+releases/**
+node_modules/**
+.vscode/**
+.vscode-test/**
+tsconfig*.json
+vite.config.ts
+**/*.map
+**/*.ts
