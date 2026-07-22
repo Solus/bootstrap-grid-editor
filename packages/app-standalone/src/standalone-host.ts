@@ -5,9 +5,10 @@
    `commit` just syncs the textarea to the applied source and clears the
    dirty state. The guard is "textarea edited but not Applied". */
 
-import type { Edit } from '@bootstrap-visualizer/core';
+import type { Edit, El } from '@bootstrap-visualizer/core';
 import { $, srcTA } from './dom.js';
 import { DIRTY_MSG, state, type Host } from './state.js';
+import { highlightInSource, positionBand } from './source-band.js';
 
 export const standaloneHost: Host = {
   canApplyEdit() {
@@ -21,5 +22,10 @@ export const standaloneHost: Host = {
     state.dirty = false;
     $('#srcPane').classList.remove('src-dirty');
     $<HTMLButtonElement>('#revertBtn').disabled = true;
+  },
+
+  revealSource(el: El | null) {
+    if (el) highlightInSource(el);
+    else { state._bandLines = null; positionBand(); }
   },
 };

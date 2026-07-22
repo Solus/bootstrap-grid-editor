@@ -93,6 +93,10 @@ export interface Host {
       standalone syncs its textarea; the extension replays the batch as
       minimal workspace edits (or replaces the document when null). */
   commit(newSrc: string, edits: Edit[] | null): void;
+  /** Reflect the current selection in the host's source view: `el` to reveal
+      that element's span (standalone: textarea selection + highlight band;
+      extension: editor.revealRange), or null when selection is cleared. */
+  revealSource(el: El | null): void;
 }
 
 let host: Host | null = null;
@@ -100,6 +104,10 @@ export function setHost(h: Host): void { host = h; }
 
 export function canApplyEdit(): { ok: true } | { ok: false; reason: string } {
   return host ? host.canApplyEdit() : { ok: true };
+}
+
+export function revealSource(el: El | null): void {
+  host?.revealSource(el);
 }
 
 /* ── state / history ─────────────────────────────────────────────── */

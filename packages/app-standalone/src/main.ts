@@ -7,7 +7,7 @@ import { $, rowsHost } from './dom.js';
 import { apply, setHost, state } from './state.js';
 import { standaloneHost } from './standalone-host.js';
 import { render } from './render.js';
-import { positionBand } from './selection.js';
+import { clearSelection } from './selection.js';
 import { wireSourcePane } from './source-pane.js';
 import { wireFileIo } from './file-io.js';
 import { wireKeyboard } from './keyboard.js';
@@ -27,12 +27,7 @@ function wireBreakpointSwitch(): void {
 
 /* Clicking the canvas background clears the selection. */
 function wireCanvasBackground(): void {
-  rowsHost.addEventListener('click', () => {
-    state.sel = null;
-    state._bandLines = null;
-    positionBand();
-    render();
-  });
+  rowsHost.addEventListener('click', () => clearSelection());
 }
 
 setHost(standaloneHost);   // the textarea end of the pipe; must precede any apply()
