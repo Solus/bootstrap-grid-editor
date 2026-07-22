@@ -122,17 +122,25 @@ only protection.
 These are all things the prototype does that I ported faithfully. Each
 might be deliberate, or might be a latent bug nobody hit yet.
 
-### 2.1 `nudgeCol` / `nudgeRow` ignore their `node` argument **[decide]**
+### 2.1 `nudgeCol` / `nudgeRow` ignore their `node` argument **[RESOLVED — parameter dropped]**
 
-Both take a node parameter and never read it — they operate on
-`state.sel` instead (`edits.ts:158,169`; the prototype did the same). I
-kept the signature and named the parameter `_node` to make it visible.
+Resolved by **dropping** the parameter — the reverse of this item's
+original lean ("I'd use it"), after looking closer. You can't meaningfully
+*use* a `node` here: `ColNode`/`RowNode` don't carry their own path, and
+the sibling swap needs a path (which index, which parent), not just a
+node. So the honest options were drop it, or switch to a `path` param —
+and a path param adds generality no caller needs (every call site nudges
+the current selection) plus an awkward `state.sel!.path` at the inspector.
 
-They're only ever called when `node` *is* the selection, so it's correct
-today. But it's a trap: any future caller passing a node that isn't
-selected gets a silent no-op or, worse, moves the wrong element. Either
-drop the parameter or make the functions actually use it. I'd use it —
-the state dependency is invisible from the call site.
+Signatures are now `nudgeCol(dir)` / `nudgeRow(dir)`, which say exactly
+what they do: move the *selected* item. That matches how the rest of the
+app is built (`swapSiblings`/`apply` already mutate `state.sel`) and
+removes the trap — there's no longer a misleading argument to pass wrong.
+Callers in `inspector.ts` and `keyboard.ts` updated.
+
+Added an e2e case for the inspector Move buttons (previously the only
+`nudgeCol` caller with no coverage); the keyboard Shift+Arrow path was
+already covered. 50 e2e green.
 
 ### 2.2 `fmtEff` was dead code and is not ported **[verify]**
 
