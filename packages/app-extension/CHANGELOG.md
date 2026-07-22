@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.0.2
+
+- Fixed: clicking a column on the canvas could select its parent row
+  instead — the editor reveal was echoing back as a caret move. The
+  canvas now stays on the clicked column.
+
 ## 0.0.1
 
 - Initial internal release.
