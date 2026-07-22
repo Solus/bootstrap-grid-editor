@@ -3,11 +3,11 @@
    reaches the document. */
 
 import {
-  BPS, buildModel, classTokens, classValue, definingBp, parseTemplate,
-  usesBs3, widthTokenBp,
+  BPS, applyEdits, buildModel, classTokens, classValue, definingBp,
+  parseTemplate, usesBs3, widthTokenBp,
 } from '@bootstrap-visualizer/core';
 import type {
-  Breakpoint, ColNode, El, NodePath, RootEl, RowNode,
+  Breakpoint, ColNode, Edit, El, NodePath, RootEl, RowNode,
 } from '@bootstrap-visualizer/core';
 import { $, srcTA, toast } from './dom.js';
 import { render } from './render.js';
@@ -110,6 +110,17 @@ export function apply(newSrc: string, opts: ApplyOpts = {}): void {
   $('#srcPane').classList.remove('src-dirty');
   $<HTMLButtonElement>('#revertBtn').disabled = true;
   render();
+}
+
+/** Apply a batch of span edits produced by an edit operation. This is the
+    incremental edits-out path (as opposed to `apply`, which replaces the
+    whole document — used by file load, sample, undo/redo). Today it splices
+    the edits into a new source string and funnels through `apply`; the
+    extension host will additionally replay the same batch onto the editor
+    document as minimal workspace edits. */
+export function applyOps(edits: Edit[], opts: ApplyOpts = {}): void {
+  if (!edits.length) return;
+  apply(applyEdits(state.src, edits), opts);
 }
 
 export function undo(): void {
