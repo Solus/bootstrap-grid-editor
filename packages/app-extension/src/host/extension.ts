@@ -40,6 +40,11 @@ function openPanel(context: vscode.ExtensionContext): void {
 
   const disposables: vscode.Disposable[] = [];
   let applying = false;   // our own buffer edits must not read as user divergence
+  // The span the canvas last asked us to reveal. Setting the editor selection
+  // to it fires onDidChangeTextEditorSelection; that echo must not be sent
+  // back as a caret move (it would re-select the parent, since the caret
+  // lands on the element's exclusive end offset).
+  let revealed: { start: number; end: number } | null = null;
 
   const sendSource = () =>
     post(panel, { type: 'setSource', text: doc.getText(), version: doc.version });
@@ -55,9 +60,17 @@ function openPanel(context: vscode.ExtensionContext): void {
 
   disposables.push(vscode.window.onDidChangeTextEditorSelection(ev => {
     if (ev.textEditor.document !== doc) return;
-    // reverse of reveal: editor caret → canvas selection. The webview dedups,
-    // so the echo from a canvas-driven reveal settles without a loop.
-    post(panel, { type: 'selectAt', offset: doc.offsetAt(ev.textEditor.selection.active) });
+    const sel = ev.textEditor.selection;
+    // swallow the echo of our own reveal (same span) — otherwise the caret
+    // sitting on the element's exclusive end re-selects the parent row
+    if (revealed &&
+        doc.offsetAt(sel.start) === revealed.start &&
+        doc.offsetAt(sel.end) === revealed.end) {
+      revealed = null;
+      return;
+    }
+    // a real editor caret move → select the matching canvas block
+    post(panel, { type: 'selectAt', offset: doc.offsetAt(sel.active) });
   }));
 
   panel.webview.onDidReceiveMessage(async (msg: WebviewMessage) => {
@@ -66,6 +79,7 @@ function openPanel(context: vscode.ExtensionContext): void {
         sendSource();
         break;
       case 'reveal':
+        revealed = { start: msg.start, end: msg.end };   // suppress the echo below
         revealInEditor(doc, msg.start, msg.end);
         break;
       case 'discard':
