@@ -9,7 +9,8 @@
    Undo is the editor's native undo. */
 
 import * as vscode from 'vscode';
-import type { HostMessage, WebviewMessage } from '../shared/protocol.js';
+import type { WebviewMessage } from '../shared/protocol.js';
+import { Session } from './session.js';
 
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
@@ -38,82 +39,44 @@ function openPanel(context: vscode.ExtensionContext): void {
   );
   panel.webview.html = getWebviewHtml(panel.webview, context.extensionUri);
 
-  const disposables: vscode.Disposable[] = [];
-  let applying = false;   // our own buffer edits must not read as user divergence
-  // The span the canvas last asked us to reveal. Setting the editor selection
-  // to it fires onDidChangeTextEditorSelection; that echo must not be sent
-  // back as a caret move (it would re-select the parent, since the caret
-  // lands on the element's exclusive end offset).
-  let revealed: { start: number; end: number } | null = null;
+  // All sync state/decisions live in Session; this wires VS Code to its ports.
+  const session = new Session({
+    post: msg => void panel.webview.postMessage(msg),
+    reveal: (start, end) => revealInEditor(doc, start, end),
+    applyEdit: async edits => {
+      const edit = new vscode.WorkspaceEdit();
+      for (const e of edits) {
+        edit.replace(doc.uri, new vscode.Range(doc.positionAt(e.start), doc.positionAt(e.end)), e.text);
+      }
+      return vscode.workspace.applyEdit(edit);
+    },
+    docText: () => doc.getText(),
+    docVersion: () => doc.version,
+    warn: message => void vscode.window.showWarningMessage(message),
+  });
 
-  const sendSource = () =>
-    post(panel, { type: 'setSource', text: doc.getText(), version: doc.version });
+  const disposables: vscode.Disposable[] = [];
 
   disposables.push(vscode.workspace.onDidSaveTextDocument(saved => {
-    if (saved === doc) sendSource();          // refresh from source on save
+    if (saved === doc) session.onSave();
   }));
 
   disposables.push(vscode.workspace.onDidChangeTextDocument(ev => {
-    if (ev.document !== doc || applying) return;
-    post(panel, { type: 'diverged' });        // the user edited under the canvas
+    if (ev.document === doc) session.onDocChange();
   }));
 
   disposables.push(vscode.window.onDidChangeTextEditorSelection(ev => {
     if (ev.textEditor.document !== doc) return;
     const sel = ev.textEditor.selection;
-    // swallow the echo of our own reveal (same span) — otherwise the caret
-    // sitting on the element's exclusive end re-selects the parent row
-    if (revealed &&
-        doc.offsetAt(sel.start) === revealed.start &&
-        doc.offsetAt(sel.end) === revealed.end) {
-      revealed = null;
-      return;
-    }
-    // a real editor caret move → select the matching canvas block
-    post(panel, { type: 'selectAt', offset: doc.offsetAt(sel.active) });
+    session.onEditorSelection(
+      doc.offsetAt(sel.start), doc.offsetAt(sel.end), doc.offsetAt(sel.active));
   }));
 
-  panel.webview.onDidReceiveMessage(async (msg: WebviewMessage) => {
-    switch (msg.type) {
-      case 'ready':
-        sendSource();
-        break;
-      case 'reveal':
-        revealed = { start: msg.start, end: msg.end };   // suppress the echo below
-        revealInEditor(doc, msg.start, msg.end);
-        break;
-      case 'discard':
-        sendSource();                         // reset the canvas to the buffer
-        break;
-      case 'applyEdits':
-        if (msg.baseVersion !== doc.version) {
-          post(panel, { type: 'diverged' });
-          void vscode.window.showWarningMessage(
-            'The canvas is out of sync with the editor — Resync (or save) first.');
-          return;
-        }
-        applying = true;
-        try {
-          const edit = new vscode.WorkspaceEdit();
-          for (const e of msg.edits) {
-            edit.replace(doc.uri, new vscode.Range(doc.positionAt(e.start), doc.positionAt(e.end)), e.text);
-          }
-          const ok = await vscode.workspace.applyEdit(edit);
-          if (ok) post(panel, { type: 'applied', version: doc.version });
-          else { void vscode.window.showWarningMessage('Could not apply the canvas edit.'); sendSource(); }
-        } finally {
-          applying = false;
-        }
-        break;
-    }
-  }, undefined, disposables);
+  panel.webview.onDidReceiveMessage(
+    (msg: WebviewMessage) => void session.onMessage(msg), undefined, disposables);
 
   panel.onDidDispose(() => disposables.forEach(d => d.dispose()), null, context.subscriptions);
   context.subscriptions.push(panel);
-}
-
-function post(panel: vscode.WebviewPanel, msg: HostMessage): void {
-  void panel.webview.postMessage(msg);
 }
 
 function revealInEditor(doc: vscode.TextDocument, start: number, end: number): void {

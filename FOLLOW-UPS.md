@@ -351,11 +351,19 @@ goes dirty; VS Code's dirty dot is the only cue. A gentle one-time hint
 ("canvas edits go to the editor — Ctrl+S to persist") on the first edit of
 a session would help discoverability. Minor.
 
-### 7.3 Extension has no automated tests **[verify]**
+### 7.3 Extension tests — sync logic covered; VS Code wiring still not **[partly done]**
 
-The standalone has jsdom + Playwright suites; the extension host and
-webview are only typecheck- and build-verified, then smoke-tested by hand
-in the Extension Development Host. The sync/version/divergence logic in
-`host/extension.ts` is the fiddliest part and has no regression net.
-`@vscode/test-electron` (or `@vscode/test-cli`) could drive an integration
-test. Worth it once the extension stabilizes.
+The fiddliest part — the host↔webview sync (reveal-echo suppression,
+version guard, divergence, edits-out) — is extracted into a pure `Session`
+controller (`host/session.ts`; `extension.ts` is a thin VS Code adapter)
+and unit-tested (`host/session.test.ts`, 13 cases, mutation-checked). This
+was prompted by shipping exactly such a bug (the row-instead-of-column
+reveal echo, fixed in v0.0.2), now regression-covered. Runs in the normal
+`npm test` (CI included).
+
+Still **not** covered: the VS Code wiring itself — command registration,
+the real webview handshake, an actual `WorkspaceEdit` reaching the buffer.
+That needs an Electron integration harness (`@vscode/test-cli` /
+`-electron`, as l10n-helper uses). Lower value than the controller tests
+(it mostly exercises VS Code, and can't easily drive the webview canvas),
+so deferred.
