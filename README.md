@@ -25,8 +25,8 @@ npm workspaces monorepo:
 ## Develop
 
 ```sh
-npm install                # install all workspaces
-npm run dev -w @bootstrap-visualizer/app-standalone   # Vite dev server
+npm install     # install all workspaces
+npm run dev     # Vite dev server for the standalone app → http://localhost:5173
 ```
 
 ## Test
@@ -44,10 +44,15 @@ separately (it is not part of the test command).
 ## Build
 
 ```sh
-# from packages/app-standalone
-npm run build          # static site        → dist/
-npm run build:single   # one self-contained → dist-single/index.html (double-click to open)
+npm run build:single   # one self-contained HTML → packages/app-standalone/dist-single/index.html
+                       #   (double-click to open, no server needed)
+
+# the plain site build lives in the app workspace:
+npm run build -w @bootstrap-visualizer/app-standalone   # static site → dist/
 ```
+
+(`npm run build` at the root is the TypeScript project build — `tsc -b` —
+not the app's site build.)
 
 Release artifacts are attached to GitHub Releases on a `v*` tag, never
 committed to the repo — see `CLAUDE.md` → "Releasing a version".
