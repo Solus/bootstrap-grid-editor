@@ -50,9 +50,13 @@ mostly shared (the extension webview is a browser).
 Rendering, inspector, fill, search, and edits all talk to **`GridModel`**,
 never to the parser's AST. This is what lets us swap the parser and add
 project-aware enrichment later without rippling changes outward.
-Everything a frontend needs to render (role, title, hint, dynamic
-flags) is **precomputed on the node** by `core` during model-building,
-so frontends stay thin and identical.
+Everything a frontend needs to render (role, title, hint, dynamic flags)
+comes from **`core` functions the frontend calls** — never re-implemented
+in the frontend. Whether those values are precomputed onto the node or
+computed on demand is a `core` implementation detail; today they are
+computed on demand (`colTitle`, `contentHint`, `isContainerCol`, …), and
+the parser swap confirmed this keeps frontends thin without leaking parser
+details.
 
 ---
 
@@ -185,7 +189,7 @@ session is checked only when every box under it is.
   app at parity, plus a Playwright suite for the interactive surface. Open
   questions and deferred decisions are logged in `FOLLOW-UPS.md`.
 
-- [ ] **Session 2 — parser swap (with the green tests as the safety net)**
+- [x] **Session 2 — parser swap (with the green tests as the safety net)**
 
   *Goal.* Replace the hand-rolled `parser.ts` with an adapter over
   `@angular/compiler`'s `parseTemplate()` that walks its AST into the **same
@@ -200,41 +204,30 @@ session is checked only when every box under it is.
   field/label recognition; guaranteed accurate source spans; and acceptance
   of any valid Angular syntax.
 
-  - [ ] **Work**
-    - [ ] Add `@angular/compiler` to `packages/core`; write `parser.ts` (or a
-          new `parser/angular.ts`) exposing the **same surface** the model
-          builder uses today — a tree of `El` nodes with faithful
-          `start/openEnd/end/contentStart/contentEnd` offsets. Map the
-          compiler's spans onto the `El` shape's exact semantics (see risk).
-    - [ ] Keep `buildModel` and the classification/title/hint/edit code
-          as-is; only the tree it consumes changes.
-    - [ ] Run the 157-case suite continuously as a **regression guard**. Do
-          not weaken a test to make the new parser pass — if behavior
-          genuinely changes, discuss it first (per `CLAUDE.md`).
-  - [ ] **Decisions to finalize (deferred from Session 1)**
-    - [ ] **`CondRegion` shape** (`FOLLOW-UPS.md` §1.2). Settle how
-          conditional regions are modeled — and whether the `@if` fill number
-          becomes meaningful (per-branch sums, `max` across branches) or
-          keeps the honest `~unreliable` pill. Finalize against **real** AST
-          output, not a guess; `CondRegion` must be able to appear at the top
-          level and inside a column's sequence, not only inside a row's
-          `items`.
-    - [ ] **The insulation-principle rule** (`FOLLOW-UPS.md` §1.1). Settle
-          whether `core` precomputes `role`/`title`/`hint`/`dynamic` onto the
-          model, or the rule is reworded to "frontends don't *reimplement*
-          core's logic".
-  - [ ] **Guard against the main risk — span fidelity** (`FOLLOW-UPS.md`
-        §1.4). The surgical edits slice source at exact offsets, so the
-        adapter must reproduce the `El` span *semantics* precisely (does
-        `openEnd` include the `>`; do `contentStart/contentEnd` bound exactly
-        the inner text; do void/self-closing elements collapse the content
-        span). TypeScript catches a renamed field but not one present yet
-        semantically off.
-    - [ ] Add core-level span-semantics tests **up front**, so a bad mapping
-          fails fast in `core` rather than only in a browser.
-    - [ ] Gate on `npm run test:all` (unit + e2e), not just `npm test` — the
-          frontend's dependence on span semantics is exercised only by the
-          Playwright suite.
+  - [x] **Work**
+    - [x] Add `@angular/compiler` to `packages/core`; adapter in `parser.ts`
+          walks the AST into `El` nodes with faithful `start/openEnd/end/
+          contentStart/contentEnd` offsets. Attributes re-read from source
+          via the retained `parseOpenTag` for byte-identical names.
+    - [x] `buildModel` and the classification/title/hint/edit code kept
+          as-is; only the tree it consumes changed.
+    - [x] 157-case suite kept green as the regression guard; control flow
+          flattened to preserve behavior (no test weakened).
+  - [x] **Decisions to finalize (deferred from Session 1)**
+    - [x] **`CondRegion` shape** → **deferred** to its own session
+          (`FOLLOW-UPS.md` §1.2). Control flow is flattened for the swap,
+          preserving the `~unreliable` pill; modelling `CondRegion` and the
+          `@if/@else` frontend behavior is a UX decision made deliberately
+          later, not bundled into the parser swap.
+    - [x] **The insulation-principle rule** → **reworded** (`FOLLOW-UPS.md`
+          §1.1): frontends *call* core's pure functions and never
+          re-implement them; the model is not enriched. Updated in
+          `CLAUDE.md` and `PLAN.md`.
+  - [x] **Guarded the main risk — span fidelity** (`FOLLOW-UPS.md` §1.4).
+    - [x] Added core-level span-semantics tests (mutation-checked: a broken
+          `contentEnd` mapping fails 11 tests in `core`).
+    - [x] Gated on `npm run test:all` (177 unit + 51 e2e) — the browser
+          edits validate span fidelity, not just the core suite.
 
   *Done when.* The Angular-backed parser is in place; the 157-case suite and
   the Playwright suite both pass; `CondRegion` and the insulation rule are
@@ -298,7 +291,10 @@ Rough workflow shape (finalize during the CI phase):
 
 - **`core` has no DOM and no VS Code imports.** If a function needs
   either, it belongs in a frontend, not `core`.
-- **Frontends never re-derive** what `core` precomputes on the model.
+- **Frontends never re-implement `core`'s logic.** They call `core`'s
+  pure functions (`colTitle`, `contentHint`, `isContainerCol`, …); they
+  never re-derive role/title/hint/classification themselves. Whether
+  `core` precomputes or computes on demand is `core`'s own choice.
 - **Edits are span-based descriptions** returned by `core`; the frontend
   applies them. No string-scanning or class math in frontend code.
 - **The test suite is the contract.** Port all ~157 cases; a passing
