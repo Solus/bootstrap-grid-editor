@@ -22,6 +22,7 @@ spec.
   sweeps. Land a thing, verify it, move on.
 - **State assumptions.** If you have to assume something to proceed, name
   it in your reply.
+- Give your explanations and summaries in a clear, consise language. No need to write too much, unless the user asks for it.
 
 ## Capture follow-ups in `FOLLOW-UPS.md`
 Whenever implementation or analysis turns up something relevant that
@@ -102,8 +103,5 @@ representation, or the parser AST should be resolved by looking at real
 output and discussing — not by guessing and building on the guess.
 
 ## Current status
-Setting up the repo. First session's scope (per PLAN.md): scaffold the
-workspace, lift `core` into TypeScript **against the existing
-hand-rolled parser** (ported from the prototype), get the Vitest suite
-green, then stand up the standalone app to feature parity. The
-`@angular/compiler` parser swap is a **separate, later** session.
+Session 1 is complete.
+Session 2 is in progress.
