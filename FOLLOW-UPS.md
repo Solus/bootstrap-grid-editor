@@ -334,20 +334,16 @@ for whoever writes them:
 
 ---
 
-## 6. Documentation drift **[chore]**
+## 6. Documentation drift **[RESOLVED]**
 
-- **PLAN.md's `GridModel` block is a draft that no longer matches the
-  code.** It documents `RowNode.items`, `CondRegion`/`CondBranch`, and
-  `ColNode.role`/`title`/`hint`/`sequence`/`dynamic`. None of those exist
-  as model fields in `packages/core/src/types.ts`. Two near-misses worth
-  naming so nobody assumes more overlap than there is: `ColSeqItem`
-  exists as a *type* but is computed on demand by `colSequence()` rather
-  than stored on `ColNode`; and `ContentHint` exists as a return type of
-  `contentHint()`, not as a `hint` field. Either annotate the PLAN.md
-  block as aspirational-for-session-2 or point it at `types.ts`.
-- **PLAN.md says the ~157 tests are "embedded in its development
-  history"**, which wasn't true of this repo — they arrived separately as
-  `prototype/prototype-tests.js`. Worth correcting so the next reader
-  doesn't go looking through git log for them.
-- **`README.md` is two lines** and doesn't mention the workspace layout,
-  how to run either suite, or how to build the single-file app.
+- **PLAN.md's `GridModel` block** now carries a status note marking it as
+  the aspirational session-2 shape, stating the shipped shape
+  (`{kind, el, spec, isCol, nestedRows}`), pointing at
+  `packages/core/src/types.ts`, and naming what doesn't exist yet
+  (`role`, precomputed `title`/`hint`, `CondRegion`, `RowNode.items`).
+- **The "embedded in its development history" line** is corrected — PLAN.md
+  now points at `prototype/prototype-tests.js` /
+  `prototype/prototype-core.js` and notes the port to Vitest.
+- **`README.md`** expanded from two lines to cover the workspace layout,
+  develop/test/build commands (including that `npm test` ≠ typecheck), and
+  the single-file build.

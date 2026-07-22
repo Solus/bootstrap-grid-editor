@@ -11,10 +11,12 @@ Ships as two products from one shared codebase:
 - **VS Code extension** — the active editor is the source; edits apply to the buffer.
 
 A complete, working single-file prototype lives at
-`prototype/grid-draft.html` (~2500 lines, ~157 passing tests embedded
-in its development history). It is the **reference implementation**.
-This project ports it into a proper monorepo — it is a *lift*, not a
-rewrite.
+`prototype/grid-draft.html` (~2500 lines). It is the **reference
+implementation**. Its ~157-case test suite lives alongside it as
+`prototype/prototype-tests.js` (run against `prototype/prototype-core.js`);
+those cases are ported to Vitest in `packages/core` and are the behavioral
+contract. This project ports the prototype into a proper monorepo — it is a
+*lift*, not a rewrite.
 
 ---
 
@@ -55,6 +57,15 @@ so frontends stay thin and identical.
 ---
 
 ## GridModel (draft — finalize against real parser output)
+
+> **Status:** this block is the *aspirational* shape, to be finalized in
+> session 2 against real `@angular/compiler` output. It is **not** what the
+> code ships today. The current model — a faithful lift of the prototype —
+> is `{kind, el, spec, isCol, nestedRows}`; the authoritative definitions
+> are in `packages/core/src/types.ts`. `role`, precomputed `title`/`hint`,
+> `CondRegion`/`CondBranch`, and `RowNode.items` below do **not** exist yet
+> (they are computed on demand by `core` functions, not stored on nodes).
+> See `FOLLOW-UPS.md` §1.1–1.2 for the open decisions.
 
 ```ts
 type Breakpoint = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
