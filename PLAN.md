@@ -243,12 +243,37 @@ session is checked only when every box under it is.
         separate item; deliberately not done.)
 
 - [ ] **Session 3 — extension**
-  - [ ] Activation, webview panel, editor↔canvas sync. Design already agreed:
-        canvas refreshes from source on **save**; canvas edits sync via
-        **Apply → editor buffer** (not disk), with **guard-and-warn** if the
-        source diverged, a **Discard** to reset the canvas, and a post-Apply
-        toast reminding the user to Save. Apply as **minimal workspace edits**
-        (replay ops), not whole-document replacement.
+
+  *Architecture decisions (discussed one at a time):*
+  1. **Shared UI package + host-adapter seam.** A shared package holds the
+     canvas/inspector/edit UI; both frontends inject a small **host adapter**
+     for the two ends that differ — *source in* / *edits out*. Standalone's
+     adapter = textarea + file-io; the extension's = a `postMessage` bridge.
+  2. **Edit ops emit span descriptors.** Ops produce `Edit[]` (a span +
+     text); `core.applyEdits` splices them for the standalone, the extension
+     replays them as minimal workspace edits. Matches the non-negotiable and
+     the "replay ops" design; moves stay genuinely minimal.
+  3. **Adapter owns a single `canApplyEdit` guard** (resolves §1.3). The
+     apply-engine calls it before applying; resize/drag consult the *same*
+     method to abort a gesture early — never a private `state.dirty` read.
+     Each host defines "not safe" (standalone: textarea dirty; extension:
+     buffer diverged since sync).
+
+  *Build order:*
+  - [x] Core `Edit` type + `applyEdits(src, edits)` + `classEdit`.
+  - [x] Refactor the standalone edit ops to emit `Edit[]` via `applyOps`
+        (also simplified move/split/swap — no more length-delta juggling).
+        194 unit + 52 e2e green.
+  - [ ] Extract the shared UI package; define the host-adapter interface;
+        standalone implements it. Verify green.
+  - [ ] Scaffold the extension: activation, webview panel, host adapter over
+        `postMessage`, editor↔canvas sync — canvas refreshes from source on
+        **save**; canvas edits sync via **Apply → editor buffer** (not disk),
+        with **guard-and-warn** on divergence, a **Discard** to reset the
+        canvas, and a post-Apply Save reminder.
+
+  *Decisions still to surface (when reached):* webview bundling/CSP; undo/redo
+  in the extension (native editor undo vs. the app's own history).
 
 - [ ] **Session 4+ — enrichment (strictly additive, extension-only)**
   - [ ] Resolve i18n keys → real translated labels from locale files.

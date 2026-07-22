@@ -1,19 +1,20 @@
 /* Edit operations.
 
-   Every one of these builds a new source string from a core-produced span
-   edit and hands it to `apply`. No grid-class math happens here — the
-   token arithmetic all lives in core. */
+   Every one of these expresses its change as a batch of core `Edit`
+   descriptors (a span + replacement text) and hands it to `applyOps`. No
+   grid-class math happens here — the token arithmetic all lives in core, and
+   the span edits are what the host adapter replays outward. */
 
 import {
-  classTokens, effectiveAt, definingBp, elementCutRange, halveWidthTokenStr,
-  halvedWidthTokens, rowChildIndent, setOffsetToken, setWidthToken, splice,
-  widthTokenBp, writeClass,
+  classEdit, classTokens, effectiveAt, definingBp, elementCutRange,
+  halveWidthTokenStr, halvedWidthTokens, rowChildIndent, setOffsetToken,
+  setWidthToken, widthTokenBp,
 } from '@bootstrap-visualizer/core';
 import type {
-  Breakpoint, ColNode, El, NodePath, RowNode, WidthValue,
+  Breakpoint, ColNode, Edit, El, NodePath, RowNode, WidthValue,
 } from '@bootstrap-visualizer/core';
 import {
-  apply, conventionNewColTokens, fallbackTier, resolvePath, rowOfSel, state,
+  applyOps, conventionNewColTokens, fallbackTier, resolvePath, rowOfSel, state,
 } from './state.js';
 
 /* ── quick edits (the "Effective at …" steppers) ─────────────────── */
@@ -29,7 +30,7 @@ export function quickWidth(node: ColNode, dir: number): void {
   if (next === cur) return;
   const bp = definingBp(node.spec.width, state.bp) || fallbackTier(node, rowOfSel());
   const tokens = setWidthToken(classTokens(node.el), bp, next, state.docBs3);
-  apply(writeClass(state.src, node.el, tokens));
+  applyOps([classEdit(state.src, node.el, tokens)]);
 }
 
 export function quickOffset(node: ColNode, dir: number): void {
@@ -48,7 +49,7 @@ export function quickOffset(node: ColNode, dir: number): void {
   }
   const tokens = setOffsetToken(classTokens(node.el), targetBp,
                                 next === 0 ? 0 : next, state.docBs3, keepZero);
-  apply(writeClass(state.src, node.el, tokens));
+  applyOps([classEdit(state.src, node.el, tokens)]);
 }
 
 /* ── explicit per-breakpoint edits (the "All breakpoints" grids) ──── */
@@ -75,7 +76,7 @@ export function stepWidth(
     next = steps[i]!;
   }
   const tokens = setWidthToken(classTokens(node.el), bp, next, state.docBs3);
-  apply(writeClass(state.src, node.el, tokens));
+  applyOps([classEdit(state.src, node.el, tokens)]);
 }
 
 export function changeOffset(node: ColNode, bp: Breakpoint, dir: number): void {
@@ -89,7 +90,7 @@ export function changeOffset(node: ColNode, bp: Breakpoint, dir: number): void {
   const keepZero = next === 0 && inheritsNonzero;
   const tokens = setOffsetToken(classTokens(node.el), bp,
                                 next === 0 ? 0 : next, state.docBs3, keepZero);
-  apply(writeClass(state.src, node.el, tokens));
+  applyOps([classEdit(state.src, node.el, tokens)]);
 }
 
 /* ── structural edits ────────────────────────────────────────────── */
@@ -107,14 +108,15 @@ export function splitCol(node: ColNode): void {
     firstTokens = tokens;
     secondClasses = conventionNewColTokens(null, rowOfSel());
   }
-  let src2 = hasW ? writeClass(state.src, el, firstTokens) : state.src;
-  const delta = src2.length - state.src.length;
-  const insertAt = el.end + delta;
   const { indent } = elementCutRange(state.src, el);
   const newColHtml = '\n' + indent +
     '<div class="' + secondClasses.join(' ') + '">\n' + indent + '  <!-- new column -->\n' + indent + '</div>';
-  src2 = splice(src2, insertAt, insertAt, newColHtml);
-  apply(src2);
+  // insert the new column after the original, and (if it has widths) halve
+  // the original's classes — both against the original source; applyEdits
+  // orders them, so no length-delta juggling is needed
+  const edits: Edit[] = [{ start: el.end, end: el.end, text: newColHtml }];
+  if (hasW) edits.push(classEdit(state.src, el, firstTokens));
+  applyOps(edits);
 }
 
 export function addColAfter(node: ColNode): void {
@@ -123,7 +125,7 @@ export function addColAfter(node: ColNode): void {
   const cls = conventionNewColTokens(classTokens(el), rowOfSel()).join(' ');
   const html = '\n' + indent +
     '<div class="' + cls + '">\n' + indent + '  <!-- new column -->\n' + indent + '</div>';
-  apply(splice(state.src, el.end, el.end, html));
+  applyOps([{ start: el.end, end: el.end, text: html }]);
 }
 
 export function addColToRow(rowNode: RowNode): void {
@@ -135,7 +137,7 @@ export function addColToRow(rowNode: RowNode): void {
     '<div class="' + cls + '">\n' + indent + '  <!-- new column -->\n' + indent + '</div>';
   const last = rowEl.children[rowEl.children.length - 1];
   const at = last ? last.end : rowEl.contentStart;
-  apply(splice(state.src, at, at, html));
+  applyOps([{ start: at, end: at, text: html }]);
 }
 
 export function addRowAfter(rowNode: RowNode): void {
@@ -144,13 +146,13 @@ export function addRowAfter(rowNode: RowNode): void {
   const html = '\n\n' + indent + '<div class="row">\n' +
     indent + '  <div class="col">\n' + indent + '    <!-- new column -->\n' + indent + '  </div>\n' +
     indent + '</div>';
-  apply(splice(state.src, el.end, el.end, html));
+  applyOps([{ start: el.end, end: el.end, text: html }]);
 }
 
 export function deleteEl(node: RowNode | ColNode): void {
   const { cutStart, cutEnd } = elementCutRange(state.src, node.el);
   state.sel = null;
-  apply(splice(state.src, cutStart, cutEnd, ''));
+  applyOps([{ start: cutStart, end: cutEnd, text: '' }]);
 }
 
 /* ── reordering ──────────────────────────────────────────────────── */
@@ -192,11 +194,13 @@ function swapSiblings(
   const rSecond = elementCutRange(state.src, second);
   const tFirst = state.src.slice(rFirst.textStart, first.end);
   const tSecond = state.src.slice(rSecond.textStart, second.end);
-  let s = state.src;
-  s = splice(s, rSecond.textStart, second.end, tFirst);   // later range first
-  s = splice(s, rFirst.textStart, first.end, tSecond);
   state.sel = { path: selPath.slice(), kind: selKind };
-  apply(s);
+  // swap the two element texts in place — non-overlapping spans, applyEdits
+  // orders them
+  applyOps([
+    { start: rFirst.textStart, end: first.end, text: tSecond },
+    { start: rSecond.textStart, end: second.end, text: tFirst },
+  ]);
 }
 
 export function moveCol(srcPath: NodePath, dstRowPath: NodePath, dstIndex: number): void {
@@ -225,15 +229,13 @@ export function moveCol(srcPath: NodePath, dstRowPath: NodePath, dstIndex: numbe
   // same-row same-position no-op
   if (insertAt >= cutStart && insertAt <= cutEnd) return;
 
-  let s = state.src;
   const insText = '\n' + indent + elText;
-  if (insertAt > cutEnd) {
-    s = splice(s, insertAt, insertAt, insText);      // later position first
-    s = splice(s, cutStart, cutEnd, '');
-  } else {
-    s = splice(s, cutStart, cutEnd, '');
-    s = splice(s, insertAt, insertAt, insText);
-  }
   state.sel = null;
-  apply(s);
+  // remove the element from its old spot and insert it at the new one — two
+  // non-overlapping edits (the no-op guard above ensures insertAt is outside
+  // the cut range); applyEdits orders them
+  applyOps([
+    { start: cutStart, end: cutEnd, text: '' },
+    { start: insertAt, end: insertAt, text: insText },
+  ]);
 }

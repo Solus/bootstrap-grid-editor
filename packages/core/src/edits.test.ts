@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { classTokens, setWidthToken } from './classes.js';
-import { elementCutRange, rowChildIndent, splice, writeClass } from './edits.js';
+import {
+  applyEdits, classEdit, elementCutRange, rowChildIndent, splice, writeClass,
+} from './edits.js';
 import { buildModel } from './model.js';
 import { parseTemplate } from './parser.js';
 
@@ -98,6 +100,42 @@ describe('swapSiblings preserves node kind & carries comments (row reorder)', ()
   it('both comments survive reorder', () =>
     expect(s.includes('FIRST') && s.includes('SECOND')).toBe(true));
   it('row count preserved', () => expect(m2.length).toBe(2));
+});
+
+describe('applyEdits / classEdit (span-edit batch, added Session 3)', () => {
+  it('applies a single replacement', () =>
+    expect(applyEdits('abcdef', [{ start: 2, end: 4, text: 'XY' }])).toBe('abXYef'));
+  it('an insertion has start === end', () =>
+    expect(applyEdits('abc', [{ start: 1, end: 1, text: '-' }])).toBe('a-bc'));
+  it('a deletion has empty text', () =>
+    expect(applyEdits('abc', [{ start: 1, end: 2, text: '' }])).toBe('ac'));
+  it('applies multiple non-overlapping edits regardless of order', () => {
+    const edits = [
+      { start: 0, end: 1, text: 'X' },
+      { start: 4, end: 5, text: 'Z' },
+    ];
+    // order in the array must not matter — applyEdits sorts by offset
+    expect(applyEdits('abcde', edits)).toBe('XbcdZ');
+    expect(applyEdits('abcde', [...edits].reverse())).toBe('XbcdZ');
+  });
+  it('a two-edit swap moves text without disturbing between', () => {
+    // swap "AA" and "BB" in `[AA]--[BB]`
+    const s = '[AA]--[BB]';
+    const edits = [
+      { start: 1, end: 3, text: 'BB' },
+      { start: 7, end: 9, text: 'AA' },
+    ];
+    expect(applyEdits(s, edits)).toBe('[BB]--[AA]');
+  });
+
+  it('classEdit targets the class value span; writeClass is applyEdits of it', () => {
+    const s = `<div class="row"><div class="col-6">x</div></div>`;
+    const el = buildModel(parseTemplate(s))[0]!.cols[0]!.el;
+    const e = classEdit(s, el, ['col-4']);
+    expect(s.slice(e.start, e.end)).toBe('col-6');
+    expect(e.text).toBe('col-4');
+    expect(applyEdits(s, [e])).toBe(writeClass(s, el, ['col-4']));
+  });
 });
 
 describe('cut range respects the blank-line rule', () => {

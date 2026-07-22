@@ -7,29 +7,47 @@
 
 import { getAttr } from './classes.js';
 import { precedingCommentRange } from './titles.js';
-import type { CutRange, El } from './types.js';
+import type { CutRange, Edit, El } from './types.js';
 
 export function splice(src: string, start: number, end: number, text: string): string {
   return src.slice(0, start) + text + src.slice(end);
 }
 
-/** Replace the class attribute's value on `el`, adding the attribute if
-    it's missing. An unquoted value is replaced *with* quotes, since the
-    new value may contain spaces. */
-export function writeClass(src: string, el: El, newTokens: string[]): string {
+/** Apply a batch of non-overlapping edits to `src`. Applied from the highest
+    start offset down, so each edit's offsets stay valid as earlier ones are
+    spliced in. The batch is the currency of the edits-out seam: the
+    standalone splices it into a string, the extension replays it onto the
+    editor document as minimal workspace edits. */
+export function applyEdits(src: string, edits: Edit[]): string {
+  const ordered = [...edits].sort((a, b) => b.start - a.start);
+  let out = src;
+  for (const e of ordered) out = splice(out, e.start, e.end, e.text);
+  return out;
+}
+
+/** The span edit that sets `el`'s class attribute value to `newTokens`,
+    adding the attribute if it's missing. An unquoted value is replaced
+    *with* quotes, since the new value may contain spaces. */
+export function classEdit(src: string, el: El, newTokens: string[]): Edit {
   const val = newTokens.join(' ');
   const a = getAttr(el, 'class');
   if (a && a.valueStart >= 0) {
-    if (a.quote === '') {
-      return splice(src, a.valueStart, a.valueEnd, '"' + val + '"');
-    }
-    return splice(src, a.valueStart, a.valueEnd, val);
+    return a.quote === ''
+      ? { start: a.valueStart, end: a.valueEnd, text: '"' + val + '"' }
+      : { start: a.valueStart, end: a.valueEnd, text: val };
   }
   // no class attribute — insert before '>' (or '/>')
   let pos = el.openEnd - 1;                    // at '>'
   if (src[el.openEnd - 2] === '/') pos = el.openEnd - 2;
   const lead = /\s/.test(src[pos - 1]!) ? '' : ' ';
-  return splice(src, pos, pos, `${lead}class="${val}"`);
+  return { start: pos, end: pos, text: `${lead}class="${val}"` };
+}
+
+/** Replace the class attribute's value on `el` and return the new source.
+    Thin wrapper over classEdit for callers that want the whole string
+    (and the ported test suite). */
+export function writeClass(src: string, el: El, newTokens: string[]): string {
+  return applyEdits(src, [classEdit(src, el, newTokens)]);
 }
 
 /** Range of `el` including its leading indentation and any title comments

@@ -111,6 +111,17 @@ export type ColSeqItem =
 
 /* ── edits ───────────────────────────────────────────────────────── */
 
+/** A span-based edit: replace source [start, end) with `text`. An insertion
+    has start === end; a deletion has text === ''. The unit every edit
+    operation produces — a frontend applies a batch by splicing them into a
+    string (standalone) or replaying them onto a document (extension). Edits
+    in a batch must not overlap; `applyEdits` orders them. */
+export interface Edit {
+  start: number;
+  end: number;
+  text: string;
+}
+
 /** Where to cut an element out of the source, and what to paste back.
     - cutStart..cutEnd  → remove for a delete or the lift half of a move
                           (swallows the preceding newline and indentation)
