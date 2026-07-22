@@ -1,5 +1,19 @@
 # Change Log
 
+## 0.0.3
+
+- Added: `@if`/`@else`/`@else if` are now modeled as conditional regions.
+  The active branch renders inside a labeled bounding box sitting at its
+  grid position; the chip on the box's top edge toggles which branch shows
+  (`⇄` cycles branches; a lone `@if` toggles visibility `◉`/`○`). The fill
+  pill reflects the shown branch's real `N/12` (no more `~unreliable` for
+  modeled `@if`). Toggling is view-only — it never edits the document.
+- Added: `*ngIf` on a column is modeled the same way, as a single-branch
+  show/hide box (`; else tpl` references stay flat).
+- Visual edits (resize/add/split/delete/move) work inside the shown branch;
+  moving a column across a branch boundary is blocked with a hint.
+- `@for`/`@switch` and `*ngFor` remain flattened, as before.
+
 ## 0.0.2
 
 - Fixed: clicking a column on the canvas could select its parent row
