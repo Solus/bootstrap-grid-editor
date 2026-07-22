@@ -12,7 +12,7 @@ import { resolvePath, state } from './state.js';
 import { render } from './render.js';
 import {
   addColAfter, addColToRow, addRowAfter, changeOffset, deleteEl, nudgeCol,
-  quickOffset, quickWidth, splitCol, stepWidth,
+  nudgeRow, quickOffset, quickWidth, splitCol, stepWidth,
 } from './edits.js';
 
 export function renderInspector(): void {
@@ -231,6 +231,9 @@ function renderRowInspector(node: RowNode): void {
   as.appendChild(act);
   actBtn(act, 'Add column', () => addColToRow(node));
   actBtn(act, 'Add row after', () => addRowAfter(node));
+  // rows stack vertically, so they move up/down (columns move left/right)
+  actBtn(act, '▲ Move up', () => nudgeRow(-1));
+  actBtn(act, 'Move down ▼', () => nudgeRow(+1));
   const del = actBtn(act, 'Delete row', () => deleteEl(node));
   del.classList.add('danger');
 }
