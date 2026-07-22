@@ -142,16 +142,31 @@ Added an e2e case for the inspector Move buttons (previously the only
 `nudgeCol` caller with no coverage); the keyboard Shift+Arrow path was
 already covered. 50 e2e green.
 
-### 2.2 `fmtEff` was dead code and is not ported **[verify]**
+### 2.2 `fmtEff` was dead code and is not ported **[RESOLVED — confirmed dead, correctly dropped]**
 
-The prototype defines `fmtEff` (grid-draft.html:1895) and never calls it.
-It formats an effective width for display — `'12/12 (no col class)'`,
-`'equal share'`, `'auto (content width)'` — which is friendlier than what
-the inspector currently shows (`'equal'`, `'auto'`, `'12'`).
+Verified: it is superseded dead code, not a missing feature. Evidence:
 
-I dropped it as dead. But it looks like a half-landed feature rather than
-an accident, so: was it meant to be wired into the inspector? If yes,
-that's a small missing feature, not dead code.
+- `fmtEff` produces prose — `'12/12 (no col class)'`, `'equal share'`,
+  `'auto (content width)'`.
+- The **only** place the inspector shows an effective width is the
+  stepper's `.val` box (`inspector.ts`, `wDisp`): ~52px, centered,
+  wedged between the `+`/`−` buttons. Those prose strings can't fit it.
+- The prototype has exactly one reference to `fmtEff` — its own
+  definition, zero callers — and no prose line for effective values
+  anywhere in its final design.
+
+So it's a leftover from an earlier iteration that the compact-stepper
+design replaced. Wiring it in would either overflow the stepper or add a
+prose line the reference deliberately doesn't have — a divergence from
+the spec for no clear gain. Staying dropped.
+
+**Salvageable, but out of parity — opt-in, not done [decide]:** the
+friendlier *semantics* would make a good accessibility `title` /
+`aria-label` on the stepper value (a screen reader saying "12 out of 12,
+no col class" beats "12"), without changing the visible compact display.
+That's new behavior the prototype never had, so it's a deliberate
+enhancement to request, not a port task — recording the idea here rather
+than slipping it in.
 
 ### 2.3 Two ported assertions are weaker than their names **[chore]**
 
