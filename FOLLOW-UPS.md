@@ -69,6 +69,34 @@ PLAN.md also notes `@if` wraps whole **rows** in real templates, so
 not just inside a row's `items`. That shape can't be settled until
 session 2 has real AST output in hand.
 
+### 1.4 The `El` span shape is part of the parser-swap contract **[verify]**
+
+The parser swap's stated safety net is the 157 core tests. But those are
+not the whole contract. The frontends read raw `El` span fields
+**directly**, not through `GridModel`: `.start`, `.end`, `.openEnd`,
+`.contentStart`, `.contentEnd` (~40 reads across
+`app-standalone/src/edits.ts`, `render.ts`, `selection.ts`), plus
+`.children`, `.attrs`, `.tag`. Every surgical edit, the source-highlight
+band, and the caret→canvas sync depend on those offsets meaning exactly
+what `parseTemplate` makes them mean today.
+
+The session-2 `@angular/compiler` adapter must reproduce that `El` shape
+and offset semantics, or the app breaks even with all 157 core tests
+green. TypeScript catches a *renamed or removed* field (El is shared),
+but not a field that is present yet semantically off — e.g. `contentEnd`
+landing a few chars early on a self-closing tag, or `openEnd` excluding
+the `>`. The 157 tests assert on spans in only ~16 places, all in
+core; the frontend's dependence is covered only by the app-standalone
+Playwright suite.
+
+Concretely for session 2: **run `npm run test:all` (unit + e2e), not just
+`npm test`, as the regression gate.** A green core suite is necessary but
+not sufficient. Better still, add a couple of core-level tests pinning
+the span semantics the frontend leans on (`openEnd` includes the `>`;
+`contentStart`/`contentEnd` bound exactly the inner text; void and
+self-closing elements collapse the content span) so a bad adapter fails
+in `core` rather than only in a browser.
+
 ### 1.3 Dirty-guard responsibility is split between two layers **[decide]**
 
 Resize (`dnd.ts`) and drag-start (`dnd.ts`) check `state.dirty`
@@ -140,15 +168,34 @@ fill sum, so a row's reported total can be off in ways the `~` prefix
 hints at but doesn't quantify. Fine for a schematic; worth revisiting if
 the fill number is ever treated as authoritative.
 
-### 2.5 `colSequence` / `nestedRows` index alignment **[verify]**
+### 2.5 `colSequence` / `nestedRows` index alignment **[RESOLVED — was a real bug]**
 
-`renderCol` walks `colSequence` and pulls from `nestedRows` by an
-incrementing index, assuming the two agree order-for-order. There's a
-test that the *counts* match
-(`titles.test.ts: 'sequence rows match findRows count'`) but nothing
-verifies *alignment* on a structure where they could diverge — e.g. rows
-nested at different depths under mixed wrappers. Probably fine, since
-both walk source order; unproven.
+Verified, and it was *not* fine. `renderCol` paired the two by an
+incrementing counter, which holds only while every row `findRows` collects
+is also emitted by `colSequence`. It isn't: `findRows` recurses into a
+heading (`legend`/`h1-6`), `colSequence` emits the heading as a `sep` and
+stops. So a **row nested inside a heading** lands in `nestedRows` but has
+no `'row'` item in the sequence, and the counter then misaligned every
+following row — wrong element at the wrong path (mis-selection) and one
+row silently dropped. Reachable in practice via an *unclosed* heading,
+which the tolerant parser swallows following rows into. The prototype has
+the same latent bug.
+
+Note the FOLLOW-UP's original guess ("rows nested at different depths
+under mixed wrappers") was **wrong** — the two walkers agree on wrappers.
+The real trigger is headings.
+
+Fix (`render.ts`): pair sequence rows to `nestedRows` by **element
+identity**, not position, and append any nested row the sequence never
+surfaces so none is dropped. Identical output for well-formed templates
+(zero behavior change there); correct paths and no lost rows on the
+malformed edge cases where the old code was already wrong.
+
+Locked by: `core/titles.test.ts` "colSequence vs nestedRows divergence"
+(3 cases pinning that the two do not align, so positional pairing can't be
+reassumed) and `e2e/app.spec.ts` "heading-nested rows" (2 cases; both fail
+on the old positional code, pass on the fix). Not counted in the ported
+157.
 
 ---
 

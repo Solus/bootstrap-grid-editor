@@ -313,12 +313,22 @@ function renderCol(
     nest.className = 'nested';
     const seq = colSequence(state.src, colNode.el);
     const titleFromHeading = title && !elementTitle(state.src, colNode.el);
-    let ri = 0, skippedTitle = false;
+    // Pair sequence rows to nestedRows by identity, not by position. findRows
+    // recurses into headings but colSequence emits a heading as a sep and
+    // stops, so a row nested inside a heading is in nestedRows yet absent from
+    // the sequence. A positional counter would then misalign every following
+    // row (wrong element, wrong path) and drop one — see the divergence test
+    // in core/titles.test.ts. Looking each row up by its element keeps the
+    // path correct for well-formed and malformed input alike.
+    const indexByEl = new Map(colNode.nestedRows.map((r, i) => [r.el, i]));
+    const rendered = new Set<number>();
+    let skippedTitle = false;
     for (const item of seq) {
       if (item.kind === 'row') {
-        if (ri < colNode.nestedRows.length) {
-          nest.appendChild(renderRow(colNode.nestedRows[ri]!, path.concat(ri), true));
-          ri++;
+        const i = indexByEl.get(item.el);
+        if (i !== undefined && !rendered.has(i)) {
+          nest.appendChild(renderRow(colNode.nestedRows[i]!, path.concat(i), true));
+          rendered.add(i);
         }
       } else {
         if (item.direct && titleFromHeading && !skippedTitle) {
@@ -332,6 +342,11 @@ function renderCol(
         nest.appendChild(sep);
       }
     }
+    // Any nested rows the sequence never surfaced (e.g. inside a heading)
+    // still render, at their own path, so none are silently lost.
+    colNode.nestedRows.forEach((r, i) => {
+      if (!rendered.has(i)) nest.appendChild(renderRow(r, path.concat(i), true));
+    });
     inner.appendChild(nest);
   }
 

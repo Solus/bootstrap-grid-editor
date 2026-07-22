@@ -437,6 +437,45 @@ test.describe('view controls', () => {
   });
 });
 
+/* FOLLOW-UPS §2.5. A row nested inside a heading is collected by findRows
+   but not emitted by colSequence, so positional pairing in renderCol used
+   to misalign the nested rows — wrong element at the wrong path, one row
+   dropped. Loading a template that triggers it and checking the nested
+   rows render at correct, clickable paths locks the identity-based fix. */
+test.describe('heading-nested rows (colSequence/nestedRows divergence)', () => {
+  // an unclosed <legend> makes the tolerant parser swallow the first nested
+  // row into the heading; a well-formed sibling row follows it
+  const TEMPLATE = `<div class="row">
+  <div class="col-6">
+    <legend>Section
+    <div class="row"><div class="col-6">INSIDE</div></div>
+    <div class="row"><div class="col-6">SIBLING</div></div>
+  </div>
+</div>`;
+
+  test.beforeEach(async ({ page }) => {
+    await page.locator('#src').fill(TEMPLATE);
+    await page.locator('#applyBtn').click();
+  });
+
+  test('every nested row renders — none is dropped', async ({ page }) => {
+    const nested = page.locator('.g-col .nested > .g-row');
+    await expect(nested).toHaveCount(2);
+    await expect(page.locator('.g-col .nested')).toContainText('INSIDE');
+    await expect(page.locator('.g-col .nested')).toContainText('SIBLING');
+  });
+
+  test('each nested row selects the element under its own path', async ({ page }) => {
+    // click the row whose column reads SIBLING; the inspector must describe
+    // that row, not the heading-nested one — proof the path is not misaligned
+    const sibling = page.locator('.g-col .nested > .g-row')
+      .filter({ hasText: 'SIBLING' });
+    await sibling.click({ position: { x: 5, y: 3 } });
+    await expect(page.locator('.g-row.selected')).toHaveText(/SIBLING/);
+    await expect(page.locator('.g-row.selected')).not.toHaveText(/INSIDE/);
+  });
+});
+
 /* ── file in / out ───────────────────────────────────────────────── */
 
 test.describe('file io', () => {
