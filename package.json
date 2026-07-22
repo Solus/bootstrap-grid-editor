@@ -5,7 +5,9 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "npm run dev -w @bootstrap-visualizer/app-standalone",
     "build": "tsc -b",
+    "build:single": "npm run build:single -w @bootstrap-visualizer/app-standalone",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run test:e2e -w @bootstrap-visualizer/app-standalone",
