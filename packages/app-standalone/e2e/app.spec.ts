@@ -427,6 +427,23 @@ test.describe('inspector', () => {
     await expect(page.locator('.g-col.selected')).toHaveCount(1);
   });
 
+  test('the row Move buttons reorder the selected row', async ({ page }) => {
+    const before = await source(page);
+    expect(before.indexOf('app-page-header'))
+      .toBeLessThan(before.indexOf('formControlName="code"'));
+
+    // select the first top-level row via its padding strip (not a column)
+    await page.locator('.rows-host > .g-row').first().click({ position: { x: 300, y: 3 } });
+    await expect(page.locator('#inspector')).toContainText('Move down');
+    await page.locator('#inspector').getByText('Move down ▼').click();
+
+    const after = await source(page);
+    expect(after.indexOf('app-page-header'))
+      .toBeGreaterThan(after.indexOf('formControlName="code"'));
+    // the moved row stays selected
+    await expect(page.locator('.g-row.selected')).toHaveCount(1);
+  });
+
   test('Delete row removes the row', async ({ page }) => {
     const before = await page.locator('.rows-host > .g-row').count();
     // click the row's own padding strip — clicking its centre would land on a

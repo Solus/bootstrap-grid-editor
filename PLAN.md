@@ -235,6 +235,13 @@ session is checked only when every box under it is.
   is documented with new tests. *Out of scope:* the extension (Session 3)
   and enrichment (Session 4+).
 
+- [x] **Interlude — row reorder affordance (before Session 3)**
+  - [x] Added ▲/▼ **Move** buttons to the row inspector, mirroring the column
+        Move buttons (`nudgeRow` already existed), with a new e2e test. Rows
+        were previously reorderable only by keyboard (`Shift`+`↑`/`↓`), an
+        easily-missed asymmetry. (Full row drag-and-drop remains a larger,
+        separate item; deliberately not done.)
+
 - [ ] **Session 3 — extension**
   - [ ] Activation, webview panel, editor↔canvas sync. Design already agreed:
         canvas refreshes from source on **save**; canvas edits sync via
