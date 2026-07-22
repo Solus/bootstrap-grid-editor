@@ -30,6 +30,9 @@ export interface AppState {
   dirty: boolean;
   /** Row identity keys collapsed via the chevron. */
   collapsed: Set<string>;
+  /** Which branch of each `@if` region is shown (region key → branch index;
+      default 0). View-state, keyed by content so it survives re-parse. */
+  activeBranch: Record<string, number>;
   /** Amber row border on overfull rows (View section). */
   tintOverfull: boolean;
   /** Name of the opened file, used for Download. */
@@ -59,6 +62,7 @@ export const state: AppState = {
   hIndex: -1,
   dirty: false,
   collapsed: new Set(),
+  activeBranch: {},
   tintOverfull: false,
   fileName: null,
   docBs3: false,
@@ -140,13 +144,29 @@ export function apply(newSrc: string, opts: ApplyOpts = {}): void {
   }
   state.src = newSrc;
   state.root = parseTemplate(newSrc);
-  state.model = buildModel(state.root);
+  state.model = buildModel(state.root, state.activeBranch);
   state.docBs3 = computeDocBs3(state.root);
   if (!keepSel) state.sel = null;
   if (state.sel && !resolvePath(state.sel.path)) state.sel = null;
   if (!state.sel) state._bandLines = null;
   host?.commit(newSrc, edits);   // the host owns source-out (textarea / buffer)
   render();
+}
+
+/** Rebuild the model from the current source with the current branch
+    selection, and re-render — WITHOUT touching the document, history, or the
+    host. Used by the `@if` branch toggle (a pure view change). */
+export function rebuildModel(): void {
+  if (!state.root) return;
+  state.model = buildModel(state.root, state.activeBranch);
+  if (state.sel && !resolvePath(state.sel.path)) state.sel = null;
+  render();
+}
+
+/** Show branch `index` of `@if` region `region` (view-state only). */
+export function setActiveBranch(region: string, index: number): void {
+  state.activeBranch[region] = index;
+  rebuildModel();
 }
 
 /** Apply a batch of span edits produced by an edit operation. This is the

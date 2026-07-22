@@ -16,6 +16,17 @@ import type {
 import {
   applyOps, conventionNewColTokens, fallbackTier, resolvePath, rowOfSel, state,
 } from './state.js';
+import { toast } from './dom.js';
+
+/** Which `@if` branch an element belongs to, or null if outside any `@if`.
+    Two columns can only be reordered / a column moved between them when their
+    branch context matches — a plain text swap across an `@if {}` boundary
+    would move a column across the braces. */
+function condKey(el: El): string | null {
+  return el.cond ? `${el.cond.region}:${el.cond.branch}` : null;
+}
+
+const CROSS_BRANCH_MSG = "Can't move a column across an @if branch boundary — switch to that branch first.";
 
 /* ── quick edits (the "Effective at …" steppers) ─────────────────── */
 
@@ -135,8 +146,10 @@ export function addColToRow(rowNode: RowNode): void {
   const cls = conventionNewColTokens(lastCol ? classTokens(lastCol.el) : null, rowNode).join(' ');
   const html = '\n' + indent +
     '<div class="' + cls + '">\n' + indent + '  <!-- new column -->\n' + indent + '</div>';
-  const last = rowEl.children[rowEl.children.length - 1];
-  const at = last ? last.end : rowEl.contentStart;
+  // insert after the last *shown* column so a conditional row adds into the
+  // active branch (rowEl.children is every flattened branch); for a plain row
+  // this is the same as the last child.
+  const at = lastCol ? lastCol.el.end : rowEl.contentStart;
   applyOps([{ start: at, end: at, text: html }]);
 }
 
@@ -168,7 +181,9 @@ export function nudgeCol(dir: number): void {
   const row = resolvePath(parentPath);
   const to = idx + dir;
   if (!row || row.kind !== 'row' || to < 0 || to >= row.cols.length) return;
-  swapSiblings(row.cols[idx]!.el, row.cols[to]!.el, parentPath.concat(to), 'col');
+  const a = row.cols[idx]!.el, b = row.cols[to]!.el;
+  if (condKey(a) !== condKey(b)) { toast(CROSS_BRANCH_MSG, 'warn'); return; }
+  swapSiblings(a, b, parentPath.concat(to), 'col');
 }
 
 /** Swap the selected row with an adjacent sibling row (reorder within its
@@ -213,6 +228,15 @@ export function moveCol(srcPath: NodePath, dstRowPath: NodePath, dstIndex: numbe
   if (inSelf) return;
 
   const el = srcNode.el;
+
+  // Don't move across an @if branch boundary (a plain text splice would land
+  // the column outside/inside the wrong `{}`). Allow moves whose source and
+  // destination share the same branch context (incl. both outside any @if).
+  const dstKey = dstIndex < dstRow.cols.length
+    ? condKey(dstRow.cols[dstIndex]!.el)
+    : condKey(dstRow.cols[dstRow.cols.length - 1]?.el ?? el);
+  if (condKey(el) !== dstKey) { toast(CROSS_BRANCH_MSG, 'warn'); return; }
+
   const { cutStart, cutEnd, textStart } = elementCutRange(state.src, el);
   const elText = state.src.slice(textStart, el.end);
 
@@ -223,8 +247,9 @@ export function moveCol(srcPath: NodePath, dstRowPath: NodePath, dstIndex: numbe
     const target = dstRow.cols[dstIndex]!.el;
     insertAt = elementCutRange(state.src, target).cutStart;
   } else {
-    const last = dstRow.el.children[dstRow.el.children.length - 1];
-    insertAt = last ? last.end : dstRow.el.contentStart;
+    // after the last *shown* column (active branch), not the last flattened one
+    const lastActive = dstRow.cols[dstRow.cols.length - 1];
+    insertAt = lastActive ? lastActive.el.end : dstRow.el.contentStart;
   }
   // same-row same-position no-op
   if (insertAt >= cutStart && insertAt <= cutEnd) return;
