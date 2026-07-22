@@ -294,22 +294,21 @@ too, deterministically, without rewriting history.
 
 ---
 
-## 5. CI (when it gets wired)
+## 5. CI **[RESOLVED — workflows added]**
 
-Per PLAN.md, `test.yml` on push/PR and `release.yml` on `v*` tags. Notes
-for whoever writes them:
+`.github/workflows/test.yml` (push + PR) runs typecheck → unit → e2e;
+`.github/workflows/release.yml` (`v*` tags) verifies the tag matches the
+extension version, runs typecheck + unit, then builds the standalone
+single-file HTML and the extension `.vsix` and attaches both to a GitHub
+Release (softprops/action-gh-release, matching l10n-helper's setup).
+`npm run typecheck` is its own CI step (a green `npm test` does not imply
+the tree typechecks).
 
-- **E2E needs `npx playwright install --with-deps chromium`**, which
-  makes that job substantially slower than the unit run. Suggested split:
-  unit on every push, e2e on PRs and tags only.
-- **`npm run typecheck` is not currently part of any test command.** It
-  covers four projects (core, core specs, app, e2e specs) and should be
-  its own CI step — `npm test` passing does not mean the tree typechecks.
-- **Release versioning** comes from `packages/app-extension/package.json`
-  (CLAUDE.md), which doesn't exist yet — `packages/app-extension/` is
-  still just a `.gitkeep`. Nothing can be tagged until session 3.
-- `app-standalone` is `0.0.0` and private. Decide whether it gets
-  versioned in step with the extension or stays unversioned.
+Two notes left open deliberately:
+- **e2e runs on every push** (not just PRs). Fine for now; if CI minutes
+  bite, gate the Playwright job to `pull_request` + tags.
+- **`app-standalone` stays `0.0.0`/private** — unversioned; only the
+  extension version drives releases.
 
 ---
 
