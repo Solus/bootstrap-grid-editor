@@ -6,8 +6,8 @@
 
 import '@bootstrap-visualizer/editor/styles.css';
 import {
-  apply, setHost, toast, wireBreakpointSwitch, wireCanvasBackground,
-  wireKeyboardNav,
+  apply, selectAtOffset, setHost, toast, wireBreakpointSwitch,
+  wireCanvasBackground, wireKeyboardNav,
 } from '@bootstrap-visualizer/editor';
 import { createWebviewHost, type SyncState } from './webview-host.js';
 import type { HostMessage, WebviewMessage } from '../shared/protocol.js';
@@ -46,6 +46,9 @@ window.addEventListener('message', (e: MessageEvent<HostMessage>) => {
       sync.diverged = true;
       document.body.classList.add('diverged');
       toast('Editor changed — Resync to update the canvas', 'warn');
+      break;
+    case 'selectAt':
+      selectAtOffset(msg.offset);   // editor caret → canvas (no reveal back)
       break;
   }
 });

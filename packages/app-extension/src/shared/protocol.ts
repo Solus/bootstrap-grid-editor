@@ -19,7 +19,10 @@ export type HostMessage =
   | { type: 'applied'; version: number }
   /** The document changed underneath the canvas (the user edited the editor).
       The webview guards further canvas edits until a save or a discard. */
-  | { type: 'diverged' };
+  | { type: 'diverged' }
+  /** The editor caret moved to `offset` — select the matching canvas block
+      (reverse of reveal). */
+  | { type: 'selectAt'; offset: number };
 
 /** Webview → host. */
 export type WebviewMessage =

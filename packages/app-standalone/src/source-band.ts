@@ -2,9 +2,8 @@
    — the textarea-specific "reveal" behind the host's revealSource. None of
    this exists in the extension, where the editor is the source pane. */
 
-import { nodeAtOffset } from '@bootstrap-visualizer/core';
 import type { El } from '@bootstrap-visualizer/core';
-import { $, expandAncestors, render, resolvePath, rowsHost, state } from '@bootstrap-visualizer/editor';
+import { $, resolvePath, selectAtOffset, state } from '@bootstrap-visualizer/editor';
 import { srcTA } from './dom.js';
 
 const LINE_H = 20, PAD_TOP = 10;
@@ -34,24 +33,17 @@ export function positionBand(): void {
   $('#srcWrap').classList.add('src-band-on');
 }
 
-/* Reverse selection sync: caret in the source → canvas block. Sets the
-   selection directly (no select()) so the caret is never moved. */
+/* Reverse selection sync: caret in the source textarea → canvas block. The
+   shared selectAtOffset does the selection (no reveal — the caret stays put);
+   we add the source-band on top. */
 export function syncSelFromCaret(): void {
   if (state.dirty) return;                      // offsets map to canvas state only
-  const hit = nodeAtOffset(state.model, srcTA.selectionStart);
-  if (!hit) return;                             // caret outside any grid element
-  if (state.sel && state.sel.kind === hit.kind &&
-      state.sel.path.join(',') === hit.path.join(',')) return;
-  expandAncestors(hit.path);
-  state.sel = hit;
-  render();                                     // no select(): keep caret untouched
-  const node = resolvePath(hit.path);
+  if (!selectAtOffset(srcTA.selectionStart)) return;
+  const node = state.sel && resolvePath(state.sel.path);
   if (node) {                                   // band only; don't move the caret
     const sl = state.src.slice(0, node.el.start).split('\n').length - 1;
     const el2 = state.src.slice(0, node.el.end).split('\n').length - 1;
     state._bandLines = [sl, el2];
     positionBand();
   }
-  const el = rowsHost.querySelector('[data-path="' + hit.path.join(',') + '"]');
-  if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }

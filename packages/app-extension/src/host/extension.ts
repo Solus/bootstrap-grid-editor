@@ -53,6 +53,13 @@ function openPanel(context: vscode.ExtensionContext): void {
     post(panel, { type: 'diverged' });        // the user edited under the canvas
   }));
 
+  disposables.push(vscode.window.onDidChangeTextEditorSelection(ev => {
+    if (ev.textEditor.document !== doc) return;
+    // reverse of reveal: editor caret → canvas selection. The webview dedups,
+    // so the echo from a canvas-driven reveal settles without a loop.
+    post(panel, { type: 'selectAt', offset: doc.offsetAt(ev.textEditor.selection.active) });
+  }));
+
   panel.webview.onDidReceiveMessage(async (msg: WebviewMessage) => {
     switch (msg.type) {
       case 'ready':
