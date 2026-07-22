@@ -519,3 +519,137 @@ test.describe('file io', () => {
     expect(await source(page)).toContain('container-fluid');
   });
 });
+
+/* ── FOLLOW-UPS §3.2: interactive paths the earlier suites missed ──── */
+
+test.describe('pane resizer', () => {
+  test('dragging the divider resizes the source pane and flags the drag', async ({ page }) => {
+    const pane = page.locator('#srcPane');
+    const before = (await pane.boundingBox())!.width;
+    const rz = page.locator('#paneResizer');
+    const box = (await rz.boundingBox())!;
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 180, box.y + box.height / 2, { steps: 8 });
+    // the drag is in progress — both flags are set
+    await expect(rz).toHaveClass(/active/);
+    await expect(page.locator('body')).toHaveClass(/pane-resizing/);
+    await page.mouse.up();
+
+    await expect(rz).not.toHaveClass(/active/);
+    await expect(page.locator('body')).not.toHaveClass(/pane-resizing/);
+    expect((await pane.boundingBox())!.width).toBeGreaterThan(before + 120);
+  });
+
+  test('the JS clamps the pane width at both ends', async ({ page }) => {
+    // Assert on the inline flexBasis the handler sets, not the rendered
+    // width: .pane-src also has CSS min-width/max-width, which would clamp
+    // the rendered box even if the JS clamp were removed. flexBasis is the
+    // JS output alone.
+    const pane = page.locator('#srcPane');
+    const rz = page.locator('#paneResizer');
+    const main = (await page.locator('main').boundingBox())!;
+    const flexBasis = () => pane.evaluate(el => parseFloat((el as HTMLElement).style.flexBasis));
+
+    const drag = async (toX: number) => {
+      const box = (await rz.boundingBox())!;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(toX, box.y + box.height / 2, { steps: 6 });
+      await page.mouse.up();
+    };
+
+    await drag(main.x - 400);                       // far past the left edge
+    expect(await flexBasis()).toBeGreaterThanOrEqual(260);   // clamped to minW
+
+    await drag(main.x + main.width + 400);           // far past the right edge
+    expect(await flexBasis()).toBeLessThanOrEqual(main.width * 0.7 + 1);   // clamped to maxW
+  });
+});
+
+test.describe('window file drop', () => {
+  /* Native OS file drag can't be simulated, but a DataTransfer carrying a
+     File makes `types` include 'Files' — enough to drive the real handlers.
+     `kind` is which DragEvent to dispatch on <document>. */
+  async function fireFileDrag(page: import('@playwright/test').Page, kind: string, html?: string) {
+    await page.evaluate(({ kind, html }) => {
+      const dt = new DataTransfer();
+      if (html !== undefined) {
+        dt.items.add(new File([html], 'dropped.html', { type: 'text/html' }));
+      } else {
+        // dragenter/leave only need the type present, not a readable file
+        dt.items.add(new File([''], 'x', { type: 'text/html' }));
+      }
+      const ev = new DragEvent(kind, { bubbles: true, cancelable: true });
+      Object.defineProperty(ev, 'dataTransfer', { value: dt });
+      document.dispatchEvent(ev);
+    }, { kind, html });
+  }
+
+  test('the depth counter keeps the overlay up across child enter/leave', async ({ page }) => {
+    const dropHint = page.locator('#dropHint');
+    await expect(dropHint).toBeHidden();
+
+    // enter the window, then enter a child (two enters, one leave) — the
+    // overlay must stay up until the counter actually reaches zero
+    await fireFileDrag(page, 'dragenter');
+    await expect(page.locator('body')).toHaveClass(/filedrag/);
+    await fireFileDrag(page, 'dragenter');
+    await fireFileDrag(page, 'dragleave');
+    await expect(page.locator('body')).toHaveClass(/filedrag/);   // still up: depth 1
+    await fireFileDrag(page, 'dragleave');
+    await expect(page.locator('body')).not.toHaveClass(/filedrag/); // now down: depth 0
+    await expect(dropHint).toBeHidden();
+  });
+
+  test('dropping a file opens it and clears the overlay', async ({ page }) => {
+    await fireFileDrag(page, 'dragenter');
+    await fireFileDrag(page, 'drop', '<div class="row"><div class="col-8">dropped</div></div>');
+    await expect(page.locator('.g-col')).toHaveCount(1);
+    await expect(page.locator('.g-col')).toContainText('dropped');
+    await expect(page.locator('body')).not.toHaveClass(/filedrag/);
+    await expect(page.locator('#fileName')).toContainText('dropped.html');
+  });
+
+  test('a drop is refused when the source is dirty and the user cancels', async ({ page }) => {
+    page.on('dialog', d => d.dismiss());          // "discard edits?" → No
+    const before = await source(page);
+    await page.locator('#src').fill(before + '\n<!-- typing -->');   // make dirty
+
+    await fireFileDrag(page, 'drop', '<div class="row"><div class="col-1">nope</div></div>');
+
+    // the drop was refused: nothing applied, dirty typing preserved
+    const src = await source(page);
+    expect(src).toContain('<!-- typing -->');
+    expect(src).not.toContain('nope');
+    await expect(page.locator('#srcPane')).toHaveClass(/src-dirty/);
+  });
+});
+
+test.describe('toast', () => {
+  test('a toast auto-dismisses', async ({ page }) => {
+    await page.locator('#src').fill(await source(page) + 'x');
+    await page.locator('#revertBtn').click();
+    await expect(page.locator('#toast')).toHaveClass(/show/);
+    await expect(page.locator('#toast')).toContainText('Reverted');
+    // dismiss timer is 2600ms; give it headroom
+    await expect(page.locator('#toast')).not.toHaveClass(/show/, { timeout: 4000 });
+  });
+});
+
+test.describe('scroll into view', () => {
+  test('find scrolls a hit near the bottom into view', async ({ page }) => {
+    // field040 is in the overfull row late in the sample, below the fold
+    await page.locator('#findBox').fill('field040');
+    await page.locator('#findBox').press('Enter');
+    await expect(page.locator('.g-col.find-hit.selected')).toBeInViewport();
+  });
+
+  test('keyboard navigation scrolls the selection into view', async ({ page }) => {
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('ArrowDown');           // select the first row
+    for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowDown');
+    await expect(page.locator('.g-row.selected')).toBeInViewport();
+  });
+});
