@@ -1,0 +1,40 @@
+{
+  "name": "bootstrap-visualizer-extension",
+  "displayName": "Bootstrap Grid Visualizer",
+  "description": "Visual editor for Bootstrap grid layouts in Angular templates.",
+  "version": "0.0.1",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Visualization", "Other"],
+  "main": "./dist/host/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "bootstrapVisualizer.open",
+        "title": "Open Grid Visualizer",
+        "category": "Bootstrap Grid"
+      }
+    ]
+  },
+  "activationEvents": [],
+  "scripts": {
+    "build:webview": "vite build",
+    "watch:webview": "vite build --watch",
+    "build:host": "esbuild src/host/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/host/extension.js --sourcemap",
+    "watch:host": "npm run build:host -- --watch",
+    "build": "npm run build:webview && npm run build:host",
+    "package": "vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "@bootstrap-visualizer/core": "*",
+    "@bootstrap-visualizer/editor": "*"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.24.0",
+    "vite": "^5.4.0",
+    "vite-plugin-singlefile": "^2.0.0"
+  }
+}

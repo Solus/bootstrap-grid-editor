@@ -12,3 +12,4 @@ export * from './edits.js';
 export * from './find.js';
 export * from './selection.js';
 export * from './keyboard.js';
+export * from './chrome.js';
