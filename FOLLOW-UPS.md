@@ -35,7 +35,32 @@ principle", and `PLAN.md` "Non-negotiables": frontends **call** core's
 functions and never re-derive; whether core precomputes or computes on
 demand is core's own choice (today: on demand).
 
-### 1.2 Control flow: flattened for now; `CondRegion` + frontend UX deferred **[DEFERRED — its own session]**
+### 1.2 Control flow: `@if`/`@else` now first-class; `@for`/`@switch` still flattened **[RESOLVED for `@if` — see below]**
+
+**Update (`@if`/`@else` session):** `@if`/`@else`/`@else if` are now modeled
+as **conditional regions**. The parser still flattens branch elements into
+siblings, but **tags** each with `El.cond = { region, branch }` and registers
+the full branch list (incl. empty branches) in `RootEl.condRegions`. The
+region key is content-derived (`hashStr(joined conditions) + ':' + occ`), so
+it survives column edits and only changes when a condition changes — same
+drift class as `collapsed`. `buildModel(root, active)` groups tagged runs and
+emits **only the active branch's** cols (default branch 0), interleaved with
+untagged siblings, plus a `CondRegion` on `RowNode.conds` / `ColNode.conds`.
+
+Frontend: a per-row/per-column **branch bar** (chips of branch labels) toggles
+which branch is shown; `setActiveBranch` rebuilds the model view-only — no
+`apply`, no history, no `host.commit` (so a toggle never dirties the document).
+Fill is now **per-branch** and real (`N/12`), dropping `~unreliable` for
+modeled `@if`. Intra-branch edits (resize/add/split/delete/move) work
+unchanged; cross-branch move/nudge is guarded (`CROSS_BRANCH_MSG`).
+
+**Still deferred (documented, not in v1):** top-level `@if`-of-rows region
+(keeps today's stacked-rows behavior — fill is already correct there, only the
+toggle is missing); branch-aware find (`computeFind` walks active cols only);
+inline (between-columns) toggle placement; cross-branch move/nudge;
+`@for`/`@switch` first-classing.
+
+---
 
 Decision (Session 2): the Angular adapter **flattens** control flow —
 `@if/@for/@switch` lift their branch/case/loop/empty elements into the
