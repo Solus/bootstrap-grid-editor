@@ -2,7 +2,7 @@
   "name": "bootstrap-visualizer-extension",
   "displayName": "Bootstrap Grid Visualizer",
   "description": "Visual editor for Bootstrap grid layouts in Angular templates.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "publisher": "BeroXL",
   "author": {
@@ -16,7 +16,10 @@
   "engines": {
     "vscode": "^1.96.0"
   },
-  "categories": ["Visualization", "Other"],
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
   "main": "./dist/host/extension.js",
   "contributes": {
     "commands": [
