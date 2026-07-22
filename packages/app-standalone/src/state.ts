@@ -9,7 +9,7 @@ import {
 import type {
   Breakpoint, ColNode, Edit, El, NodePath, RootEl, RowNode,
 } from '@bootstrap-visualizer/core';
-import { $, srcTA, toast } from './dom.js';
+import { toast } from './dom.js';
 import { render } from './render.js';
 import { dnd } from './dnd.js';
 
@@ -76,20 +76,52 @@ export const resize = { active: false };
 export const DIRTY_MSG =
   'Source pane has unapplied edits — Apply (Ctrl+Enter) or Revert first';
 
+/* ── host adapter ─────────────────────────────────────────────────── */
+
+/** The two ends of the pipe that differ between frontends (PLAN.md). The
+    shared engine drives everything else; the host owns *source in / edits
+    out* and the "is it safe to edit now?" guard. Standalone's host wraps the
+    textarea; the extension's will bridge to the editor document. */
+export interface Host {
+  /** May a canvas-originated edit be applied right now? The single
+      authoritative guard (resolves FOLLOW-UPS §1.3); resize/drag consult it
+      too, to abort a gesture early. */
+  canApplyEdit(): { ok: true } | { ok: false; reason: string };
+  /** The engine has committed `newSrc`. `edits` is the span batch for an
+      incremental edit (applyOps), or null for a whole-document replace
+      (file load / sample / undo-redo). The host pushes this outward:
+      standalone syncs its textarea; the extension replays the batch as
+      minimal workspace edits (or replaces the document when null). */
+  commit(newSrc: string, edits: Edit[] | null): void;
+}
+
+let host: Host | null = null;
+export function setHost(h: Host): void { host = h; }
+
+export function canApplyEdit(): { ok: true } | { ok: false; reason: string } {
+  return host ? host.canApplyEdit() : { ok: true };
+}
+
 /* ── state / history ─────────────────────────────────────────────── */
 
 export interface ApplyOpts {
   pushHistory?: boolean;
   keepSel?: boolean;
   fromSource?: boolean;
+  /** The span batch that produced this apply (from applyOps), or null for a
+      whole-document replace. Passed through to the host. */
+  edits?: Edit[] | null;
 }
 
 export function apply(newSrc: string, opts: ApplyOpts = {}): void {
-  const { pushHistory = true, keepSel = true, fromSource = false } = opts;
-  if (state.dirty && !fromSource) {
-    toast(DIRTY_MSG, 'warn');
-    render();               // restore any live previews (e.g. resize)
-    return;
+  const { pushHistory = true, keepSel = true, fromSource = false, edits = null } = opts;
+  if (!fromSource) {
+    const guard = canApplyEdit();
+    if (!guard.ok) {
+      toast(guard.reason, 'warn');
+      render();             // restore any live previews (e.g. resize)
+      return;
+    }
   }
   dnd.src = null;
   document.body.classList.remove('dnd');
@@ -105,10 +137,7 @@ export function apply(newSrc: string, opts: ApplyOpts = {}): void {
   if (!keepSel) state.sel = null;
   if (state.sel && !resolvePath(state.sel.path)) state.sel = null;
   if (!state.sel) state._bandLines = null;
-  srcTA.value = newSrc;
-  state.dirty = false;
-  $('#srcPane').classList.remove('src-dirty');
-  $<HTMLButtonElement>('#revertBtn').disabled = true;
+  host?.commit(newSrc, edits);   // the host owns source-out (textarea / buffer)
   render();
 }
 
@@ -120,7 +149,7 @@ export function apply(newSrc: string, opts: ApplyOpts = {}): void {
     document as minimal workspace edits. */
 export function applyOps(edits: Edit[], opts: ApplyOpts = {}): void {
   if (!edits.length) return;
-  apply(applyEdits(state.src, edits), opts);
+  apply(applyEdits(state.src, edits), { ...opts, edits });
 }
 
 export function undo(): void {

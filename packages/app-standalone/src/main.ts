@@ -4,7 +4,8 @@
 import './styles.css';
 import { BPS } from '@bootstrap-visualizer/core';
 import { $, rowsHost } from './dom.js';
-import { apply, state } from './state.js';
+import { apply, setHost, state } from './state.js';
+import { standaloneHost } from './standalone-host.js';
 import { render } from './render.js';
 import { positionBand } from './selection.js';
 import { wireSourcePane } from './source-pane.js';
@@ -34,6 +35,7 @@ function wireCanvasBackground(): void {
   });
 }
 
+setHost(standaloneHost);   // the textarea end of the pipe; must precede any apply()
 wireBreakpointSwitch();
 wireSourcePane();
 wireFileIo();
