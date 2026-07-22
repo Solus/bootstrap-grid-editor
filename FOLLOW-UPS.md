@@ -330,19 +330,37 @@ Two notes left open deliberately:
 
 ## 7. Extension (Session 3) — deferred polish
 
-### 7.1 The webview bundle ships `@angular/compiler` **[decide]**
+### 7.1 The webview bundle ships `@angular/compiler` **[DEFERRED — accepted for now]**
 
-The webview bundle is ~508 kB (141 kB gzipped) because the shared editor
-imports `core`, which imports `@angular/compiler` for the parser. Every
-webview load pays for the whole Angular parser.
+The webview bundle is ~508 kB (141 kB gzipped) because the shared editor's
+`apply()` parses locally (`state.ts` → `parseTemplate`), which pulls in
+`@angular/compiler`.
 
-Options: (a) accept it — it's a one-time load, gzipped it's ~140 kB;
-(b) move parsing to the **extension host** (Node) and send the `GridModel`
-(or the `El` tree) to the webview over `postMessage`, so the webview
-bundles no parser. (b) is the real fix but a meaningful change — it
-crosses the core/host boundary and the model would have to be serializable
-(it currently holds `parent` back-references and live `El` nodes). Worth
-doing before the extension ships for real; not blocking.
+**Decision (deferred):** accept it for now. The cost is a one-time ~140 kB
+gzipped on panel open (retained while the panel stays open — not
+per-interaction), and current load time is fine.
+
+The real fix is a genuine re-architecture, not a config tweak — scoped
+here so it isn't under-estimated later:
+- Move the `parseTemplate` import out of the shared editor into the
+  *standalone* host (the standalone keeps bundling the parser — fine, it's
+  a browser app with no Node side). The editor package becomes parser-free,
+  so the extension webview tree-shakes `@angular/compiler` out.
+- `apply()` stops parsing — the model comes from the host, which for the
+  extension arrives **asynchronously** (a Node-host round-trip). The `Host`
+  interface grows a build-model responsibility.
+- Extension edits can no longer re-render locally (no parser): a canvas
+  edit sends `Edit[]`, the host applies + re-parses + returns the fresh
+  model, *then* the canvas updates — an added round-trip before the canvas
+  reflects the edit.
+- `core` needs `"sideEffects": false` for the tree-shake to actually drop
+  the parser module.
+
+This touches the apply engine and the host↔webview sync (the most delicate
+code, and newly test-covered). Worth it before a wider rollout where load
+time matters; not worth the churn now. A near-zero-risk alternative if only
+*felt* load matters: show the panel instantly and parse the first document
+a tick later — doesn't shrink the bundle.
 
 ### 7.2 No explicit "saved to persist" cue **[chore]**
 
