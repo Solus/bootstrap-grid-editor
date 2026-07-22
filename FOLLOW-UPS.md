@@ -168,20 +168,17 @@ That's new behavior the prototype never had, so it's a deliberate
 enhancement to request, not a port task — recording the idea here rather
 than slipping it in.
 
-### 2.3 Two ported assertions are weaker than their names **[chore]**
-
-Ported as-is rather than silently strengthened, per the rule against
-altering tests to suit a change:
+### 2.3 Two ported assertions are weaker than their names **[RESOLVED]**
 
 - `'blank-line comment not carried in cut range'`
-  (`core/src/edits.test.ts`) is an `A || B` disjunction satisfiable by
-  either branch, so it can't distinguish some failure modes.
-- `'row reorder swaps content'` had an always-true conjunct
-  (`m2[0].cols[0].el.children.length >= 0 &&`). I dropped the dead term
-  and kept the real check.
-
-Strengthening the first is a behavior discussion — decide what it should
-actually assert, then change it deliberately.
+  (`core/src/edits.test.ts`) was an `A || B` disjunction satisfiable by
+  either branch. Replaced with three positive assertions that pin the
+  actual intent directly: `textStart === el.start` (the comment isn't part
+  of the carried text), the moved text excludes the comment, and a delete
+  leaves the comment in place while removing the element. Not a behavior
+  change — the code was already correct; the test now proves it.
+- `'row reorder swaps content'` — the always-true conjunct was already
+  dropped during the port (kept the real check). Nothing left to do.
 
 ### 2.4 Schematic guesses in `computeWidths` **[decide]**
 

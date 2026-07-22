@@ -101,13 +101,26 @@ describe('swapSiblings preserves node kind & carries comments (row reorder)', ()
 });
 
 describe('cut range respects the blank-line rule', () => {
+  // The comment is separated from the element by a blank line, so it
+  // describes a section, not this element — it must be neither carried on a
+  // move nor removed on a delete. (Strengthened while resolving FOLLOW-UPS
+  // §2.3: the ported assertion was an A||B disjunction satisfiable by either
+  // branch; these pin both halves of the intended behavior directly.)
   const ac3 = `<div class="row">
   <!--KEEP-->
 
   <div class="col-6">x</div>
 </div>`;
-  const cr3 = elementCutRange(ac3, buildModel(parseTemplate(ac3))[0]!.cols[0]!.el);
-  it('blank-line comment not carried in cut range', () =>
-    expect(ac3.slice(cr3.textStart).indexOf('KEEP') < 0 ||
-           ac3.slice(cr3.cutStart, cr3.textStart).indexOf('KEEP') < 0).toBe(true));
+  const el = buildModel(parseTemplate(ac3))[0]!.cols[0]!.el;
+  const cr3 = elementCutRange(ac3, el);
+
+  it('move text starts at the element, not the comment', () =>
+    expect(cr3.textStart).toBe(el.start));
+  it('the comment is not carried in the moved text', () =>
+    expect(ac3.slice(cr3.textStart, el.end)).not.toContain('KEEP'));
+  it('a delete leaves the blank-line-separated comment in place', () => {
+    const after = splice(ac3, cr3.cutStart, cr3.cutEnd, '');
+    expect(after).toContain('KEEP');       // comment survives
+    expect(after).not.toContain('col-6');  // element removed
+  });
 });
