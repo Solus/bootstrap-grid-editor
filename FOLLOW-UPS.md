@@ -278,17 +278,22 @@ don't let that stub grow into something load-bearing.
 
 ## 4. Brittleness and maintenance
 
-### 4.1 E2E assertions are coupled to the sample's literal text **[chore]**
+### 4.1 E2E assertions are coupled to the sample's literal text **[RESOLVED — coupling made explicit and fail-fast]**
 
-36 assertions in `e2e/app.spec.ts` reference exact strings from
-`src/sample.ts` (`'col-md-4 col-lg-3'`, `'field020'`,
-`'formControlName="code"'`). Editing the sample — which is a demo asset,
-so it *will* be edited — breaks tests for reasons unrelated to the code.
+~40 of the 50 e2e cases run against the boot sample (`src/sample.ts`) and
+assert on literal strings inside it, so a demo edit can silently break
+unrelated interaction tests.
 
-Options: freeze a dedicated e2e fixture template separate from the demo
-sample, or accept the coupling and treat the sample as a test fixture
-that happens to also be the demo. I lean fixture; the sample's job is to
-show off features, and those two jobs will conflict.
+Chose the *guard* resolution over a full fixture swap, deliberately: a
+swap would migrate 40 tests and entangle with history state (loading a
+fixture via Apply in `beforeEach` pushes an undo entry, breaking the "undo
+disabled at start" test), which is disproportionate and flaky-prone for a
+chore. Instead `e2e/fixture.ts` lists every marker the suite depends on,
+and a guard test asserts the boot sample still contains all of them. If
+the sample drifts, that one guard fails naming exactly what's missing —
+instead of a dozen cryptic failures. A real fixture swap remains possible
+later; the marker list is the head start, and the history wrinkle is
+noted here so it isn't rediscovered.
 
 ### 4.2 `index.html` ↔ `dom.ts` element IDs are coupled by convention only **[decide]**
 

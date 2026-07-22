@@ -9,6 +9,7 @@
  * answerable by reading it. */
 
 import { expect, test, type Page } from '@playwright/test';
+import { SAMPLE_MARKERS } from './fixture.js';
 
 /** The applied source (canvas state), as the textarea shows it. */
 function source(page: Page) {
@@ -27,6 +28,18 @@ function colWithClass(page: Page, cls: string) {
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.g-row').first()).toBeVisible();
+});
+
+/* FOLLOW-UPS §4.1. Most tests below assert on literals inside the default
+   sample (src/sample.ts), a demo asset that will be edited. This guard makes
+   that coupling explicit: if the sample drifts, this one test fails naming
+   exactly what the suite depends on, instead of a dozen cryptic failures
+   elsewhere. Keep e2e/fixture.ts in step with what the specs use. */
+test('the boot sample contains every structure the suite depends on', async ({ page }) => {
+  const src = await source(page);
+  const missing = SAMPLE_MARKERS.filter(m => !src.includes(m));
+  expect(missing, `sample is missing markers the e2e suite relies on: ${missing.join(', ')}`)
+    .toEqual([]);
 });
 
 /* ── edge-drag resize ────────────────────────────────────────────── */
