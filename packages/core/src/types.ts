@@ -36,11 +36,44 @@ export interface El {
   contentEnd: number;
   selfClosing?: boolean;
   parent: El | null;
+  /** Set on the top-level elements of an `@if` branch (the parser flattens
+      the branches into siblings but tags them). `region` keys into
+      `RootEl.condRegions`; `branch` is the branch index. */
+  cond?: { region: string; branch: number };
 }
 
-/** The synthetic document root. Spans the whole source; has no open tag. */
+/** The synthetic document root. Spans the whole source; has no open tag.
+    Carries the `@if` region registry the tags on `El.cond` point into. */
 export interface RootEl extends El {
   tag: '#root';
+  condRegions: Record<string, CondRegionMeta>;
+}
+
+/* ── conditional regions (@if / @else) ───────────────────────────── */
+
+/** One branch of an `@if`: its label (`@if (x)`, `@else if (y)`, `@else`) and
+    condition text (null for the bare `@else`). Empty branches are recorded
+    here even though they contribute no element. */
+export interface CondBranchMeta {
+  index: number;
+  label: string;
+  condition: string | null;
+}
+
+/** Full branch list for one `@if` region — built by the parser (incl. empty
+    branches), so `buildModel` can reconstruct the toggle even when the active
+    branch has no columns. */
+export interface CondRegionMeta {
+  region: string;
+  branches: CondBranchMeta[];
+}
+
+/** A conditional region as the model exposes it: its branches plus which one
+    is currently shown. `buildModel` emits only the active branch's cols. */
+export interface CondRegion {
+  region: string;
+  branches: CondBranchMeta[];
+  activeIndex: number;
 }
 
 /* ── grid classes ────────────────────────────────────────────────── */
@@ -64,6 +97,9 @@ export interface RowNode {
   kind: 'row';
   el: El;
   cols: ColNode[];
+  /** `@if` regions among this row's columns (active branch's cols are already
+      in `cols`; this drives the branch toggle). Absent when there are none. */
+  conds?: CondRegion[];
 }
 
 export interface ColNode {
@@ -73,6 +109,8 @@ export interface ColNode {
   /** False for a row child carrying no col-/offset- class at all. */
   isCol: boolean;
   nestedRows: RowNode[];
+  /** `@if` regions among this column's nested rows (see RowNode.conds). */
+  conds?: CondRegion[];
 }
 
 export type GridNode = RowNode | ColNode;

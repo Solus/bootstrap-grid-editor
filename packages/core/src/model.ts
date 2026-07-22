@@ -3,7 +3,9 @@
    search, edits) talks to this, never to the parse tree directly. */
 
 import { classTokens, colSpec, hasClass, isColTokens } from './classes.js';
-import type { ColNode, El, NodeRef, RowNode } from './types.js';
+import type {
+  ColNode, CondRegion, CondRegionMeta, El, NodeRef, RootEl, RowNode,
+} from './types.js';
 
 export function isRowEl(el: El): boolean {
   return hasClass(el, 'row') || hasClass(el, 'form-row');
@@ -23,32 +25,102 @@ export function subtreeHasRow(el: El): boolean {
 
 /* ── building ────────────────────────────────────────────────────── */
 
-/** Collect rows whose nearest grid ancestor is `el` — recursion stops at
-    each row, so a row's own nested rows belong to its columns, not here. */
-export function findRows(el: El, out: RowNode[] = []): RowNode[] {
+/** Per-build state: which branch is active for each `@if` region, and the
+    region registry (branch labels/conditions) from the parsed root. */
+interface CondCtx {
+  active: Record<string, number>;
+  regions: Record<string, CondRegionMeta>;
+}
+const NO_COND: CondCtx = { active: {}, regions: {} };
+
+/** Build the grid model. `active` maps each `@if` region key to the branch
+    index to show (default 0); only the active branch's columns/rows appear in
+    the model, with the region metadata attached as `conds` for the toggle. */
+export function buildModel(root: El, active: Record<string, number> = {}): RowNode[] {
+  const ctx: CondCtx = { active, regions: (root as RootEl).condRegions ?? {} };
+  return findRows(root, [], ctx);
+}
+
+/** Collect rows whose nearest grid ancestor is `el`. Top-level `@if`-of-rows
+    is NOT grouped here (deferred — its branches stay flattened, each with its
+    own correct fill); the per-column grouping happens in `buildCol`. */
+export function findRows(el: El, out: RowNode[] = [], ctx: CondCtx = NO_COND): RowNode[] {
   for (const c of el.children) {
-    if (isRowEl(c)) out.push(buildRow(c));
-    else findRows(c, out);
+    if (isRowEl(c)) out.push(buildRow(c, ctx));
+    else findRows(c, out, ctx);
   }
   return out;
 }
 
-export function buildRow(el: El): RowNode {
-  return { kind: 'row', el, cols: el.children.map(buildCol) };
+export function buildRow(el: El, ctx: CondCtx = NO_COND): RowNode {
+  const { active, conds } = groupChildren(el.children, ctx);
+  const node: RowNode = { kind: 'row', el, cols: active.map(c => buildCol(c, ctx)) };
+  if (conds.length) node.conds = conds;
+  return node;
 }
 
-export function buildCol(el: El): ColNode {
+export function buildCol(el: El, ctx: CondCtx = NO_COND): ColNode {
   const tokens = classTokens(el);
-  return {
+  const { rows, conds } = collectNestedRows(el, ctx);
+  const node: ColNode = {
     kind: 'col', el,
     spec: colSpec(tokens),
     isCol: isColTokens(tokens),
-    nestedRows: findRows(el, []),
+    nestedRows: rows,
   };
+  if (conds.length) node.conds = conds;
+  return node;
 }
 
-export function buildModel(root: El): RowNode[] {
-  return findRows(root, []);
+/** Split a flat child list into the active-branch children (in source order,
+    interleaved with untagged children) and the `@if` regions found. Each
+    maximal run of consecutive same-region children is one region. */
+function groupChildren(children: El[], ctx: CondCtx): { active: El[]; conds: CondRegion[] } {
+  const active: El[] = [];
+  const conds: CondRegion[] = [];
+  let i = 0;
+  while (i < children.length) {
+    const c = children[i]!;
+    if (!c.cond) { active.push(c); i++; continue; }
+    const region = c.cond.region;
+    const activeIndex = ctx.active[region] ?? 0;
+    conds.push({ region, branches: ctx.regions[region]?.branches ?? [], activeIndex });
+    while (i < children.length && children[i]!.cond?.region === region) {
+      if (children[i]!.cond!.branch === activeIndex) active.push(children[i]!);
+      i++;
+    }
+  }
+  return { active, conds };
+}
+
+/** A column's nested rows, region-aware: `@if`-of-rows inside the column is
+    grouped to the active branch and surfaced as `ColNode.conds`. */
+function collectNestedRows(el: El, ctx: CondCtx): { rows: RowNode[]; conds: CondRegion[] } {
+  const rows: RowNode[] = [];
+  const conds: CondRegion[] = [];
+  let i = 0;
+  const children = el.children;
+  while (i < children.length) {
+    const c = children[i]!;
+    if (c.cond) {
+      const region = c.cond.region;
+      const activeIndex = ctx.active[region] ?? 0;
+      conds.push({ region, branches: ctx.regions[region]?.branches ?? [], activeIndex });
+      while (i < children.length && children[i]!.cond?.region === region) {
+        const rc = children[i]!;
+        if (rc.cond!.branch === activeIndex) {
+          if (isRowEl(rc)) rows.push(buildRow(rc, ctx));
+          else { const sub = collectNestedRows(rc, ctx); rows.push(...sub.rows); conds.push(...sub.conds); }
+        }
+        i++;
+      }
+    } else {
+      if (isRowEl(c)) rows.push(buildRow(c, ctx));
+      else { const sub = collectNestedRows(c, ctx); rows.push(...sub.rows); conds.push(...sub.conds); }
+      i++;
+    }
+  }
+  return { rows, conds };
 }
 
 /* ── classification ──────────────────────────────────────────────── */
@@ -69,6 +141,18 @@ export function looseText(src: string, el: El): string {
     they double-count. Rows like this show `~unreliable`, never a warning. */
 export function rowHasControlFlow(src: string, el: El): boolean {
   return /@(if|else|for|switch)\b/.test(looseText(src, el));
+}
+
+/** `@for`/`@switch` are still flattened (branches double-count) → unreliable
+    fill. `@if` is now modeled (per-branch), so it is handled separately. */
+export function rowHasForOrSwitch(src: string, el: El): boolean {
+  return /@(for|switch)\b/.test(looseText(src, el));
+}
+
+/** The row's own text mentions `@if` (a control-flow `@if`, not modeled into
+    a CondRegion — e.g. all-branches-empty, or the legacy parse fallback). */
+export function rowMentionsIf(src: string, el: El): boolean {
+  return /@if\b/.test(looseText(src, el));
 }
 
 /** A "container" column is structural scaffolding: it leads to nested rows,
