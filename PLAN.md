@@ -168,39 +168,95 @@ is in hand — do not guess now.
 
 ## Build sequence
 
-**Session 1 — scaffold + port core (against the existing hand-rolled parser):**
-1. Root workspace config, `tsconfig.base.json`, per-package configs.
-2. Lift the prototype's `<script id="core">` into `packages/core/src/*`,
-   split by concern (see file map in README / repo structure).
-3. Port the test suite to **Vitest**, co-located `*.test.ts`. Keep the
-   hand-rolled parser for now so tests go **green immediately**.
-4. Stand up `app-standalone` (Vite): port `<script id="app">` into
-   `render/inspector/source-pane/find/file-io/keyboard`, extract inline
-   CSS. Reach feature parity with the prototype.
+Progress is tracked with checkboxes: `[x]` done, `[ ]` outstanding. A
+session is checked only when every box under it is.
 
-**Session 2 — parser swap (separate, with green tests as the safety net):**
-- Replace `parser.ts` with an `@angular/compiler` `parseTemplate()`
-  adapter that walks its AST into `GridModel`. Finalize the `CondRegion`
-  shape here using real output. All existing tests are regression guards.
-- Gains: `@if/@else/@for` as real nodes; correct interpolation/binding
-  edge cases (`{{ a < b }}`); structured bindings improve field/label
-  recognition; guaranteed source spans; accepts any valid Angular syntax.
+- [x] **Session 1 — scaffold + port core (against the existing hand-rolled parser)**
+  - [x] Root workspace config, `tsconfig.base.json`, per-package configs.
+  - [x] Lift the prototype's `<script id="core">` into `packages/core/src/*`,
+        split by concern (see file map in README / repo structure).
+  - [x] Port the test suite to **Vitest**, co-located `*.test.ts`. Keep the
+        hand-rolled parser for now so tests go **green immediately**.
+  - [x] Stand up `app-standalone` (Vite): port `<script id="app">` into
+        `render/inspector/source-pane/find/file-io/keyboard`, extract inline
+        CSS. Reach feature parity with the prototype.
 
-**Session 3 — extension:**
-- Activation, webview panel, editor↔canvas sync. Design already agreed:
-  canvas refreshes from source on **save**; canvas edits sync via
-  **Apply → editor buffer** (not disk), with **guard-and-warn** if the
-  source diverged, a **Discard** to reset the canvas, and a post-Apply
-  toast reminding the user to Save. Apply as **minimal workspace edits**
-  (replay ops), not whole-document replacement.
+  Delivered on `main`: core lifted, 157-case Vitest suite green, standalone
+  app at parity, plus a Playwright suite for the interactive surface. Open
+  questions and deferred decisions are logged in `FOLLOW-UPS.md`.
 
-**Session 4+ — enrichment (strictly additive, extension-only):**
-- Resolve i18n keys → real translated labels from locale files.
-- Resolve component tags → their TS classes / `@Input`s.
-- Cross-check `formControlName` against the backing `FormGroup`.
-- Rule: **read the user's code, never run their toolchain.** `core`
-  stays HTML-only; enrichment lives only in the extension frontend and
-  is always optional (fall back to the key/tag if resolution fails).
+- [ ] **Session 2 — parser swap (with the green tests as the safety net)**
+
+  *Goal.* Replace the hand-rolled `parser.ts` with an adapter over
+  `@angular/compiler`'s `parseTemplate()` that walks its AST into the **same
+  `GridModel`** everything downstream already consumes. Render, inspector,
+  edits, find, and the frontends stay untouched — that insulation is the
+  whole point of Session 1's structure. `core` stays framework-free;
+  `@angular/compiler` is a parsing dependency, nothing more.
+
+  *Why.* The real compiler handles what the tolerant parser only
+  approximates: `@if/@else/@for` as genuine nodes; correct interpolation and
+  binding edge cases (`{{ a < b }}`); structured bindings that sharpen
+  field/label recognition; guaranteed accurate source spans; and acceptance
+  of any valid Angular syntax.
+
+  - [ ] **Work**
+    - [ ] Add `@angular/compiler` to `packages/core`; write `parser.ts` (or a
+          new `parser/angular.ts`) exposing the **same surface** the model
+          builder uses today — a tree of `El` nodes with faithful
+          `start/openEnd/end/contentStart/contentEnd` offsets. Map the
+          compiler's spans onto the `El` shape's exact semantics (see risk).
+    - [ ] Keep `buildModel` and the classification/title/hint/edit code
+          as-is; only the tree it consumes changes.
+    - [ ] Run the 157-case suite continuously as a **regression guard**. Do
+          not weaken a test to make the new parser pass — if behavior
+          genuinely changes, discuss it first (per `CLAUDE.md`).
+  - [ ] **Decisions to finalize (deferred from Session 1)**
+    - [ ] **`CondRegion` shape** (`FOLLOW-UPS.md` §1.2). Settle how
+          conditional regions are modeled — and whether the `@if` fill number
+          becomes meaningful (per-branch sums, `max` across branches) or
+          keeps the honest `~unreliable` pill. Finalize against **real** AST
+          output, not a guess; `CondRegion` must be able to appear at the top
+          level and inside a column's sequence, not only inside a row's
+          `items`.
+    - [ ] **The insulation-principle rule** (`FOLLOW-UPS.md` §1.1). Settle
+          whether `core` precomputes `role`/`title`/`hint`/`dynamic` onto the
+          model, or the rule is reworded to "frontends don't *reimplement*
+          core's logic".
+  - [ ] **Guard against the main risk — span fidelity** (`FOLLOW-UPS.md`
+        §1.4). The surgical edits slice source at exact offsets, so the
+        adapter must reproduce the `El` span *semantics* precisely (does
+        `openEnd` include the `>`; do `contentStart/contentEnd` bound exactly
+        the inner text; do void/self-closing elements collapse the content
+        span). TypeScript catches a renamed field but not one present yet
+        semantically off.
+    - [ ] Add core-level span-semantics tests **up front**, so a bad mapping
+          fails fast in `core` rather than only in a browser.
+    - [ ] Gate on `npm run test:all` (unit + e2e), not just `npm test` — the
+          frontend's dependence on span semantics is exercised only by the
+          Playwright suite.
+
+  *Done when.* The Angular-backed parser is in place; the 157-case suite and
+  the Playwright suite both pass; `CondRegion` and the insulation rule are
+  resolved (in code and in `FOLLOW-UPS.md`); any intentional behavior change
+  is documented with new tests. *Out of scope:* the extension (Session 3)
+  and enrichment (Session 4+).
+
+- [ ] **Session 3 — extension**
+  - [ ] Activation, webview panel, editor↔canvas sync. Design already agreed:
+        canvas refreshes from source on **save**; canvas edits sync via
+        **Apply → editor buffer** (not disk), with **guard-and-warn** if the
+        source diverged, a **Discard** to reset the canvas, and a post-Apply
+        toast reminding the user to Save. Apply as **minimal workspace edits**
+        (replay ops), not whole-document replacement.
+
+- [ ] **Session 4+ — enrichment (strictly additive, extension-only)**
+  - [ ] Resolve i18n keys → real translated labels from locale files.
+  - [ ] Resolve component tags → their TS classes / `@Input`s.
+  - [ ] Cross-check `formControlName` against the backing `FormGroup`.
+  - Rule: **read the user's code, never run their toolchain.** `core`
+    stays HTML-only; enrichment lives only in the extension frontend and
+    is always optional (fall back to the key/tag if resolution fails).
 
 ---
 
