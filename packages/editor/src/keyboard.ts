@@ -4,7 +4,12 @@
    selected block itself. Nothing fires while focus is in a text field. */
 
 import type { NodePath, RowNode } from '@bootstrap-visualizer/core';
-import { $, rowsHost, srcTA } from './dom.js';
+import { $, rowsHost } from './dom.js';
+
+/** Focus is in a text field where we must not hijack keys. */
+function inTextField(t: HTMLElement): boolean {
+  return t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable;
+}
 import { redo, resolvePath, state, undo } from './state.js';
 import { render } from './render.js';
 import { clearSelection, select } from './selection.js';
@@ -16,7 +21,7 @@ export function wireKeyboard(): void {
   $('#redoBtn').addEventListener('click', redo);
 
   document.addEventListener('keydown', e => {
-    if (e.target === srcTA) return;                 // don't hijack textarea undo
+    if (inTextField(e.target as HTMLElement)) return;   // don't hijack native undo in a field
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
       e.preventDefault(); undo();
     }
@@ -48,7 +53,7 @@ function wireFindBox(): void {
   document.addEventListener('keydown', e => {
     if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
       const t = e.target as HTMLElement;
-      if (t !== srcTA && t !== findBox && t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA') {
+      if (!inTextField(t)) {
         e.preventDefault();
         findBox.focus();
         findBox.select();
@@ -59,8 +64,7 @@ function wireFindBox(): void {
 
 function kbNav(e: KeyboardEvent): void {
   const t = e.target as HTMLElement;
-  if (t === srcTA || t.id === 'findBox' || t.tagName === 'INPUT' ||
-      t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) return;
+  if (inTextField(t) || t.tagName === 'SELECT') return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const key = e.key;
   const sel = state.sel;

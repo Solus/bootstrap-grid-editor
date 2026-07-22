@@ -1,16 +1,14 @@
 /* Entry point: build the breakpoint switch, wire the panes, and load the
    sample so the canvas is never empty on first open. */
 
-import './styles.css';
+import '@bootstrap-visualizer/editor/styles.css';
 import { BPS } from '@bootstrap-visualizer/core';
-import { $, rowsHost } from './dom.js';
-import { apply, setHost, state } from './state.js';
+import {
+  $, apply, clearSelection, render, rowsHost, setHost, state, wireKeyboard,
+} from '@bootstrap-visualizer/editor';
 import { standaloneHost } from './standalone-host.js';
-import { render } from './render.js';
-import { clearSelection } from './selection.js';
 import { wireSourcePane } from './source-pane.js';
 import { wireFileIo } from './file-io.js';
-import { wireKeyboard } from './keyboard.js';
 import { SAMPLE } from './sample.js';
 
 function wireBreakpointSwitch(): void {

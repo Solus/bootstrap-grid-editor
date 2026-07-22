@@ -4,10 +4,8 @@
 
 import { nodeAtOffset } from '@bootstrap-visualizer/core';
 import type { El } from '@bootstrap-visualizer/core';
-import { $, rowsHost, srcTA } from './dom.js';
-import { resolvePath, state } from './state.js';
-import { render } from './render.js';
-import { expandAncestors } from './find.js';
+import { $, expandAncestors, render, resolvePath, rowsHost, state } from '@bootstrap-visualizer/editor';
+import { srcTA } from './dom.js';
 
 const LINE_H = 20, PAD_TOP = 10;
 

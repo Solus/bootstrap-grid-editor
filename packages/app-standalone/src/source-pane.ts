@@ -1,8 +1,8 @@
 /* The source pane: the textarea that is the document of record, its
    dirty/apply/revert cycle, and the pane divider. */
 
-import { $, srcTA, toast } from './dom.js';
-import { apply, state } from './state.js';
+import { $, apply, state, toast } from '@bootstrap-visualizer/editor';
+import { srcTA } from './dom.js';
 import { positionBand, syncSelFromCaret } from './source-band.js';
 
 export function wireSourcePane(): void {
