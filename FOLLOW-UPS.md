@@ -306,12 +306,12 @@ first render — but that's incidental, not by design. If this gets
 formalized, the honest version is a single `ids.ts` shared by a generated
 `index.html`, or an explicit assertion pass at boot.
 
-### 4.3 Line endings **[chore]**
+### 4.3 Line endings **[RESOLVED]**
 
-`core.autocrlf` is on, so files check out CRLF. I verified the whole unit
-suite passes under CRLF (several cases compare multi-line strings), so
-this is fine today. A `.gitattributes` pinning `*.ts text eol=lf` would
-make it deterministic rather than verified-once.
+Added `.gitattributes` with `* text=auto eol=lf`. The repo already stored
+LF (only `core.autocrlf` was converting working trees to CRLF), so
+`git add --renormalize .` was a content no-op — this makes checkouts LF
+too, deterministically, without rewriting history.
 
 ---
 
