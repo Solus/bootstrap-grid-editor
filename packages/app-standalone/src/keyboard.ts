@@ -7,7 +7,7 @@ import type { NodePath, RowNode } from '@bootstrap-visualizer/core';
 import { $, rowsHost, srcTA } from './dom.js';
 import { redo, resolvePath, state, undo } from './state.js';
 import { render } from './render.js';
-import { positionBand, select } from './selection.js';
+import { clearSelection, select } from './selection.js';
 import { expandAncestors, findGo } from './find.js';
 import { deleteEl, nudgeCol, nudgeRow, quickWidth } from './edits.js';
 
@@ -75,7 +75,7 @@ function kbNav(e: KeyboardEvent): void {
 
   if (key === 'Escape') {
     if (sel) {
-      state.sel = null; state._bandLines = null; positionBand(); render();
+      clearSelection();
       e.preventDefault();
     }
     return;

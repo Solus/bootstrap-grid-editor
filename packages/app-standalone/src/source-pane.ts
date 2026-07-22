@@ -3,7 +3,7 @@
 
 import { $, srcTA, toast } from './dom.js';
 import { apply, state } from './state.js';
-import { positionBand, syncSelFromCaret } from './selection.js';
+import { positionBand, syncSelFromCaret } from './source-band.js';
 
 export function wireSourcePane(): void {
   $('#applyBtn').addEventListener('click',
