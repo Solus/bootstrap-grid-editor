@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "npm run test:e2e -w @bootstrap-visualizer/app-standalone",
     "test:all": "npm run test && npm run test:e2e",
-    "typecheck": "tsc -b && tsc -p packages/core/tsconfig.spec.json && tsc -p packages/app-standalone/tsconfig.json && tsc -p packages/app-standalone/tsconfig.e2e.json"
+    "typecheck": "tsc -b && tsc -p packages/core/tsconfig.spec.json && tsc -p packages/editor/tsconfig.json && tsc -p packages/app-standalone/tsconfig.json && tsc -p packages/app-standalone/tsconfig.e2e.json"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

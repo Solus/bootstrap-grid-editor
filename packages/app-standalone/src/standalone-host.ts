@@ -6,8 +6,8 @@
    dirty state. The guard is "textarea edited but not Applied". */
 
 import type { Edit, El } from '@bootstrap-visualizer/core';
-import { $, srcTA } from './dom.js';
-import { DIRTY_MSG, state, type Host } from './state.js';
+import { $, DIRTY_MSG, state, type Host } from '@bootstrap-visualizer/editor';
+import { srcTA } from './dom.js';
 import { highlightInSource, positionBand } from './source-band.js';
 
 export const standaloneHost: Host = {

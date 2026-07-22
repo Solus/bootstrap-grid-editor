@@ -12,7 +12,8 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@bootstrap-visualizer/core": "*"
+    "@bootstrap-visualizer/core": "*",
+    "@bootstrap-visualizer/editor": "*"
   },
   "devDependencies": {
     "vite": "^5.4.0",

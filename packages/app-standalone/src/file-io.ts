@@ -2,8 +2,8 @@
    and the sample. In the standalone app these are the "ends of the pipe"
    the extension replaces with the active editor document. */
 
-import { $, srcTA, toast } from './dom.js';
-import { apply, state } from './state.js';
+import { $, apply, state, toast } from '@bootstrap-visualizer/editor';
+import { srcTA } from './dom.js';
 import { SAMPLE } from './sample.js';
 
 function confirmDiscardDirty(): boolean {
