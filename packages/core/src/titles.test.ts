@@ -153,6 +153,37 @@ describe('colSequence: separators interleaved in order', () => {
   });
 });
 
+/* Added while resolving FOLLOW-UPS §2.5 (not part of the ported 157).
+   colSequence and findRows do NOT agree row-for-row in every case:
+   findRows recurses into a heading, colSequence emits it as a sep and
+   stops. So a row nested inside a heading is in nestedRows yet has no
+   'row' item in the sequence. Any consumer pairing the two must do so by
+   element identity, never by position — render.ts learned this the hard
+   way. This test pins the divergence so it can't be silently reassumed. */
+describe('colSequence vs nestedRows divergence (heading-nested rows)', () => {
+  const src = `<div class="row"><div class="col">
+  <legend>Sec <div class="row"><div class="col">INSIDE</div></div> </legend>
+  <div class="row"><div class="col">SIBLING</div></div>
+</div></div>`;
+  // one parse — identity pairing depends on both views sharing element objects
+  const rootCol = buildModel(parseTemplate(src))[0]!.cols[0]!;
+  const seqRows = colSequence(src, rootCol.el).filter(i => i.kind === 'row');
+  const nested = rootCol.nestedRows;
+
+  it('findRows collects the heading-nested row', () => {
+    expect(nested.length).toBe(2);
+  });
+  it('colSequence omits it (emits the heading as a sep instead)', () => {
+    expect(seqRows.length).toBe(1);
+  });
+  it('so positional pairing would misalign — identity pairing does not', () => {
+    // the one sequence row is the SIBLING, which is nested index 1, not 0
+    const seqRowEl = (seqRows[0] as { kind: 'row'; el: unknown }).el;
+    expect(seqRowEl).toBe(nested[1]!.el);
+    expect(seqRowEl).not.toBe(nested[0]!.el);
+  });
+});
+
 describe('colSearchText', () => {
   const fs1 = `<div class="row"><div class="col-sm-3">
   <label app-i18n="demo.editor.field004"></label>
