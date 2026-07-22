@@ -215,6 +215,40 @@ body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-sele
   content:""; height:1px; background:rgba(122,170,255,.25); flex:1;
 }
 
+/* @if region: a labeled bounding box around the active branch's columns, its
+   header being the toggle chip. Mirrors .g-row (full-width flex, border, a
+   header pinned to the top edge) so the branch's columns lay out on the same
+   12-col grid as the rest of the row. */
+.cond-box{
+  position:relative; box-sizing:border-box; display:flex; flex-wrap:wrap; align-items:stretch;
+  border:1px dashed rgba(122,170,255,.32); border-radius:6px;
+  padding:15px 0 5px; margin-top:9px; background:rgba(122,170,255,.035);
+}
+.cond-box:hover{ border-color:rgba(122,170,255,.5); }
+/* a hidden region (no branch shown) shrinks to a compact inline placeholder */
+.cond-box.empty{ flex:0 0 auto; padding:6px 0 4px; }
+.cond-empty{
+  padding:6px 14px; font-family:var(--mono); font-size:11px;
+  font-style:italic; color:var(--faint); white-space:nowrap;
+}
+
+/* the toggle chip: a pill on the box's top edge (like the ROW label), or a
+   flat entry in the nested-column branch bar */
+.branch-bar{ flex:0 0 100%; display:flex; flex-wrap:wrap; gap:6px; margin:2px 4px 8px; }
+.branch-chip{
+  border:1px solid var(--line); background:var(--ink); border-radius:6px;
+  padding:3px 10px; font-family:var(--mono); font-size:11px; color:var(--muted);
+  cursor:pointer; white-space:nowrap; max-width:100%; overflow:hidden;
+  text-overflow:ellipsis;
+}
+.branch-chip:hover{ color:var(--text); background:var(--panel-2); border-color:var(--muted); }
+.branch-chip.active{
+  background:var(--amber); color:#211605; font-weight:700; border-color:var(--amber);
+}
+.branch-chip.active:hover{ background:var(--amber); color:#211605; }
+.branch-chip.off{ color:var(--faint); font-style:italic; }
+.cond-box > .branch-chip{ position:absolute; top:-9px; left:10px; z-index:3; }
+
 .width-label{
   position:absolute; bottom:-6px; right:6px; z-index:2;
   font-family:var(--mono); font-size:9px; color:var(--muted); pointer-events:none;

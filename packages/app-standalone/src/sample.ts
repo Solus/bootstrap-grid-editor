@@ -130,7 +130,7 @@ export const SAMPLE = `<div class="container-fluid">
     </div>
   </div>
 
-  <!-- Angular 17 control flow: unreliable fill pill, no false warning -->
+  <!-- @if / @else: two-branch toggle, per-branch fill (no false warning) -->
   <div class="row">
     @if (compactMode) {
     <div class="col-sm-12">
@@ -144,6 +144,53 @@ export const SAMPLE = `<div class="container-fluid">
       <detail-bar [data]="detail"></detail-bar>
     </div>
     }
+  </div>
+
+  <!-- Bare @if (no @else): a fixed column plus one that toggles on/off -->
+  <div class="row">
+    <div class="col-md-8">
+      <label app-i18n="demo.editor.field050"></label>
+      <text-input formControlName="field050"></text-input>
+    </div>
+    @if (showAdvanced) {
+    <div class="col-md-4">
+      <advanced-panel [config]="advanced"></advanced-panel>
+    </div>
+    }
+  </div>
+
+  <!-- @if / @else if / @else: three-way branch toggle -->
+  <div class="row">
+    @if (layout === 'compact') {
+    <div class="col-sm-12">
+      <summary-bar [data]="summary"></summary-bar>
+    </div>
+    } @else if (layout === 'split') {
+    <div class="col-sm-6">
+      <summary-bar [data]="summary"></summary-bar>
+    </div>
+    <div class="col-sm-6">
+      <detail-bar [data]="detail"></detail-bar>
+    </div>
+    } @else {
+    <div class="col-sm-4">
+      <summary-bar [data]="summary"></summary-bar>
+    </div>
+    <div class="col-sm-8">
+      <detail-bar [data]="detail"></detail-bar>
+    </div>
+    }
+  </div>
+
+  <!-- *ngIf on a column: modeled like a bare @if — a single-branch show/hide box -->
+  <div class="row">
+    <div class="col-md-6">
+      <label app-i18n="demo.editor.field060"></label>
+      <text-input formControlName="field060"></text-input>
+    </div>
+    <div class="col-md-6" *ngIf="hasWarning">
+      <warning-banner [text]="warning"></warning-banner>
+    </div>
   </div>
 
   <div class="row">

@@ -6,11 +6,13 @@
 import {
   BP_LABEL, classIsInterpolated, classValue, colSequence, colTitle, contentHint,
   effectiveAt, elementTitle, hasDynamicClassBinding, hashStr, isContainerCol,
-  rowHasControlFlow,
+  rowHasForOrSwitch, rowMentionsIf,
 } from '@bootstrap-visualizer/core';
-import type { Breakpoint, ColNode, NodePath, RowNode } from '@bootstrap-visualizer/core';
+import type {
+  Breakpoint, ColNode, CondRegion, El, NodePath, RowNode,
+} from '@bootstrap-visualizer/core';
 import { $, mkBadge, mkTypeBadge, rowsHost, sheet } from './dom.js';
-import { SHEET_WIDTH, state, resolvePath, type Selection } from './state.js';
+import { SHEET_WIDTH, setActiveBranch, state, resolvePath, type Selection } from './state.js';
 import { computeFind, updateFindCount } from './find.js';
 import { renderInspector } from './inspector.js';
 import { attachResize, makeDropzone, startColDrag } from './dnd.js';
@@ -51,7 +53,9 @@ export function computeWidths(rowNode: RowNode, bp: Breakpoint): ColWidth[] {
 
 /** Fill sum for a row at the current breakpoint: spans + offsets.
     approx: contains auto/equal columns (their spans are schematic).
-    unreliable: contains @if/@else — branches counted as simultaneous. */
+    unreliable: has @for/@switch (branches double-count), or a bare @if that
+    isn't modeled into a CondRegion. A modeled @if is per-branch: `cols` is
+    already the active branch only, so the sum is real. */
 export function rowFill(rowNode: RowNode) {
   const widths = computeWidths(rowNode, state.bp);
   let sum = 0, approx = false;
@@ -59,7 +63,10 @@ export function rowFill(rowNode: RowNode) {
     sum += (w.span === 'auto' ? 2 : w.span) + (w.offset || 0);
     if (w.span === 'auto' || w.kind === 'equal') approx = true;
   });
-  return { widths, sum, approx, unreliable: rowHasControlFlow(state.src, rowNode.el) };
+  const modeledIf = !!(rowNode.conds && rowNode.conds.length);
+  const unreliable = rowHasForOrSwitch(state.src, rowNode.el) ||
+    (rowMentionsIf(state.src, rowNode.el) && !modeledIf);
+  return { widths, sum, approx, unreliable };
 }
 
 function summarize(colNode: ColNode): { tag?: string; text?: string; styled?: boolean; type?: string } {
@@ -102,6 +109,66 @@ export function computeRowIds(): Map<string, string> {
 
 export function pathEq(sel: Selection | null, path: NodePath, kind: 'row' | 'col'): boolean {
   return !!sel && sel.kind === kind && sel.path.join(',') === path.join(',');
+}
+
+/** The `@if` branch toggle: one compact chip per region showing which branch
+    is currently displayed. Clicking cycles to the next state (a pure view
+    change, not a document edit):
+    - `@if`/`@else[ if]` with a trailing `@else` always shows one branch, so it
+      cycles through the branches.
+    - `@if` with no trailing `@else` can also show *nothing* (Angular renders
+      nothing when false), so a single `@if` toggles show ↔ hide, and an
+      `@else if` chain with no final `@else` cycles branches then hide. */
+function renderBranchBar(conds: CondRegion[]): HTMLElement {
+  const bar = document.createElement('div');
+  bar.className = 'branch-bar';
+  for (const region of conds) bar.appendChild(renderBranchChip(region));
+  return bar;
+}
+
+/** The single cycling toggle chip for one `@if` region — used both as a flat
+    bar entry and as a `.cond-box` header. */
+function renderBranchChip(region: CondRegion): HTMLButtonElement {
+  const n = region.branches.length;
+  const hasElse = n > 0 && region.branches[n - 1]!.condition === null;
+  const shown = region.activeIndex >= 0;
+  const face = region.branches[shown ? region.activeIndex : 0];
+
+  const chip = document.createElement('button');
+  chip.className = 'branch-chip' + (shown ? ' active' : ' off');
+  // a single @if reads as a visibility toggle (◉ shown / ○ hidden); a
+  // multi-branch @if reads as a switch (⇄).
+  const glyph = n <= 1 ? (shown ? '◉' : '○') : '⇄';
+  chip.textContent = glyph + ' ' + keyword(face?.label ?? '@if');
+  chip.title = branchTip(region, shown, hasElse);
+  chip.addEventListener('click', e => {
+    e.stopPropagation();
+    setActiveBranch(region.region, nextBranch(region.activeIndex, n, hasElse));
+  });
+  return chip;
+}
+
+/** Compact form of a branch header: `@if (x)` → `@if`, `@else if (y)` →
+    `@else if`, `@else` → `@else`. The full condition lives in the tooltip. */
+function keyword(label: string): string {
+  return label.replace(/\s*\(.*/s, '').trim() || label;
+}
+
+/** Next state when the chip is clicked. `cur` is -1 (hidden) or a branch index.
+    With a trailing `@else` a branch always shows, so cycle 0…n-1. Without one,
+    the sequence gains a hidden state: 0…n-1 → hidden → 0. */
+function nextBranch(cur: number, n: number, hasElse: boolean): number {
+  if (hasElse) return ((cur < 0 ? 0 : cur) + 1) % n;
+  const next = cur + 1;
+  return next >= n ? -1 : next;   // wrap past the last branch → hidden
+}
+
+function branchTip(region: CondRegion, shown: boolean, hasElse: boolean): string {
+  if (!shown) return 'Hidden (no branch shown) — click to show';
+  const b = region.branches[region.activeIndex]!;   // label e.g. "@if (x)" / "@else"
+  const verb = region.branches.length > 1 ? 'switch branch'
+             : hasElse ? 'switch' : 'hide';
+  return 'Showing ' + b.label + ' — click to ' + verb;
 }
 
 /* ── the render pass ─────────────────────────────────────────────── */
@@ -219,28 +286,87 @@ function renderRow(rowNode: RowNode, path: NodePath, _nested: boolean): HTMLElem
 
   if (isCollapsed) return rowDiv;
 
-  const widths = fill.widths;
-  rowNode.cols.forEach((col, ci) => {
-    rowDiv.appendChild(renderCol(col, widths[ci]!, path.concat(ci), ci,
-                                 ci === rowNode.cols.length - 1));
-  });
-  if (!rowNode.cols.length) {
-    rowDiv.appendChild(makeDropzone(path, 0, 'flexzone'));
-  }
+  renderRowBody(rowDiv, rowNode, fill.widths, path);
   return rowDiv;
+}
+
+/** Lay out a row's columns, wrapping each `@if` region's active branch in a
+    labeled bounding box (`.cond-box`) whose header is the toggle chip. Walks
+    the row's *source* children so a hidden region (activeIndex -1, no columns)
+    still renders its box + chip and can be toggled back on. Untagged columns
+    render directly into the row, exactly as before. */
+function renderRowBody(
+  host: HTMLElement, rowNode: RowNode, widths: ColWidth[], path: NodePath,
+): void {
+  const cols = rowNode.cols;
+  if (!cols.length && !rowNode.conds?.length) {
+    host.appendChild(makeDropzone(path, 0, 'flexzone'));
+    return;
+  }
+  // active/untagged columns keyed by their source element, with their width +
+  // flat index (the index is the model path segment).
+  type Hit = { node: ColNode; w: ColWidth; idx: number };
+  const byEl = new Map<El, Hit>();
+  cols.forEach((c, i) => byEl.set(c.el, { node: c, w: widths[i]!, idx: i }));
+  const regionMeta = new Map((rowNode.conds ?? []).map(c => [c.region, c]));
+  const last = cols.length - 1;
+  const footprint = (w: ColWidth) => Math.min(w.span === 'auto' ? 2 : w.span, 12) + (w.offset || 0);
+
+  const children = rowNode.el.children;
+  let i = 0;
+  while (i < children.length) {
+    const region = children[i]!.cond?.region;
+    if (!region) {
+      const hit = byEl.get(children[i]!);   // plain column (non-col child: skipped)
+      if (hit) host.appendChild(renderCol(hit.node, hit.w, path.concat(hit.idx), hit.idx, hit.idx === last));
+      i++;
+      continue;
+    }
+    // one @if/*ngIf region: gather this run of consecutive branch children that
+    // belong to the active branch (only those are in byEl).
+    const hits: Hit[] = [];
+    while (i < children.length && children[i]!.cond?.region === region) {
+      const hit = byEl.get(children[i]!);
+      if (hit) hits.push(hit);
+      i++;
+    }
+    const box = document.createElement('div');
+    box.className = 'cond-box';
+    const cr = regionMeta.get(region);
+    if (cr) box.appendChild(renderBranchChip(cr));
+    if (hits.length) {
+      // size the box to its branch's combined span so it sits inline where the
+      // content is; its columns are then laid out relative to that span.
+      const span = hits.reduce((s, h) => s + footprint(h.w), 0);
+      box.style.flex = '0 0 ' + (Math.min(span / 12, 1) * 100).toFixed(4) + '%';
+      box.style.maxWidth = (Math.min(span / 12, 1) * 100).toFixed(4) + '%';
+      hits.forEach(h =>
+        box.appendChild(renderCol(h.node, h.w, path.concat(h.idx), h.idx, h.idx === last, span)));
+    } else {
+      box.classList.add('empty');
+      const empty = document.createElement('div');
+      empty.className = 'cond-empty';
+      empty.textContent = 'hidden';
+      box.appendChild(empty);
+    }
+    host.appendChild(box);
+  }
 }
 
 function renderCol(
   colNode: ColNode, w: ColWidth, path: NodePath, index: number, isLast: boolean,
+  denom = 12,
 ): HTMLElement {
   const colDiv = document.createElement('div');
   colDiv.className = 'g-col';
   colDiv.dataset.path = path.join(',');
   const spanNum = w.span === 'auto' ? 2 : w.span;
-  const pct = (v: number) => (v / 12 * 100).toFixed(4) + '%';
-  colDiv.style.flex = '0 0 ' + pct(Math.min(spanNum, 12));
-  colDiv.style.maxWidth = pct(Math.min(spanNum, 12));
-  if (w.offset) colDiv.style.marginLeft = pct(w.offset);
+  // widths are relative to `denom` — 12 for a row, or a region box's own span
+  // sum so a boxed branch's columns keep their true proportions inline.
+  const pct = (v: number) => (Math.min(v / denom, 1) * 100).toFixed(4) + '%';
+  colDiv.style.flex = '0 0 ' + pct(spanNum);
+  colDiv.style.maxWidth = pct(spanNum);
+  if (w.offset) colDiv.style.marginLeft = (w.offset / denom * 100).toFixed(4) + '%';
 
   const editable = !classIsInterpolated(colNode.el);
   if (!editable || hasDynamicClassBinding(colNode.el)) colDiv.classList.add('dynamic');
@@ -302,7 +428,9 @@ function renderCol(
   if (colNode.el.attrs.find(a => a.name.toLowerCase() === '*ngfor')) {
     badges.appendChild(mkBadge('×n *ngFor', ''));
   }
-  if (colNode.el.attrs.find(a => a.name.toLowerCase() === '*ngif')) {
+  // a modeled *ngIf column is already framed by its region box + toggle chip,
+  // so the badge would be redundant; show it only when it isn't modeled.
+  if (colNode.el.attrs.find(a => a.name.toLowerCase() === '*ngif') && !colNode.el.cond) {
     badges.appendChild(mkBadge('*ngIf', ''));
   }
   if (hasDynamicClassBinding(colNode.el) || !editable) {
@@ -312,9 +440,10 @@ function renderCol(
 
   // nested rows, interleaved with section separators (mid-column legends,
   // titled wrapper components) in source order
-  if (colNode.nestedRows.length) {
+  if (colNode.nestedRows.length || colNode.conds?.length) {
     const nest = document.createElement('div');
     nest.className = 'nested';
+    if (colNode.conds?.length) nest.appendChild(renderBranchBar(colNode.conds));
     const seq = colSequence(state.src, colNode.el);
     const titleFromHeading = title && !elementTitle(state.src, colNode.el);
     // Pair sequence rows to nestedRows by identity, not by position. findRows
