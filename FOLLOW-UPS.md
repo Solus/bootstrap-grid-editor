@@ -16,86 +16,65 @@ Status key: **[decide]** needs a call from the maintainer ·
 
 ## 1. Design decisions that shape session 2
 
-### 1.1 `core` doesn't precompute what PLAN.md says frontends must not re-derive **[decide]**
+### 1.1 The insulation rule, reworded **[RESOLVED — rule reworded, model not enriched]**
 
-PLAN.md's "Non-negotiables" say frontends never re-derive what `core`
-precomputes on the model — role, title, hint, dynamic flags. Today
-`core` precomputes **none** of that onto `GridModel`. The model is
-`{kind, el, spec, isCol, nestedRows}`, and the app calls `colTitle`,
-`contentHint`, `isContainerCol`, `elementTitle`, `colSequence` and
-`rowHasControlFlow` **per node, per render pass**
-(`packages/app-standalone/src/render.ts:62,66,177,243,255,314`).
+Resolved by **rewording the rule**, not enriching the model. The parser
+swap was the deciding evidence: `buildModel` and every classifier
+(`colTitle`, `contentHint`, `isContainerCol`, …) were untouched through a
+total parser replacement, and the app kept working — so "frontends call
+pure `core` functions at render" demonstrably does not leak parser
+details. The protection that actually matters is "don't *re-implement*
+core's logic in a frontend", which the current design already satisfies.
 
-This is a faithful port — the prototype did exactly this — so it isn't a
-regression. But the rule as written is currently unenforceable, and the
-second frontend (the extension webview) will have to make the same calls,
-which is precisely the duplication the rule exists to prevent.
+Enriching the model (precomputing `role`/`title`/`hint`/`dynamic` onto
+nodes) was rejected: it's eager work nobody needs — the model is rebuilt
+on every edit, and the extension webview can call the same pure functions
+the standalone app does rather than read fields. Reworded in
+`CLAUDE.md` "Non-negotiable boundaries", `PLAN.md` "The insulation
+principle", and `PLAN.md` "Non-negotiables": frontends **call** core's
+functions and never re-derive; whether core precomputes or computes on
+demand is core's own choice (today: on demand).
 
-Two ways out, and they pull in different directions:
+### 1.2 Control flow: flattened for now; `CondRegion` + frontend UX deferred **[DEFERRED — its own session]**
 
-- **Enrich the model** during `buildModel` so `role`/`title`/`hint`/
-  `dynamic` are fields. Matches PLAN.md; makes the extension trivially
-  thin. Costs: model building gets more expensive, and every field is
-  computed whether or not a frontend uses it.
-- **Relax the rule** to "frontends don't reimplement core's logic" —
-  calling a core function at render time is fine, reimplementing
-  `isContainerCol` in the webview is not. Cheaper, and arguably what the
-  rule was really protecting.
+Decision (Session 2): the Angular adapter **flattens** control flow —
+`@if/@for/@switch` lift their branch/case/loop/empty elements into the
+parent, and `Template` wrappers (`*ngIf/*ngFor`) are unwrapped. The model
+stays shape-identical to the hand-rolled parser's, so behavior is
+unchanged: `rowHasControlFlow` still flags the row (via `looseText`) and
+fill still counts branches as simultaneous columns → the `~unreliable`
+pill. All ported tests stay green; new tests lock the flattening
+(`parser.test.ts`).
 
-My lean: the second, with the rule reworded. The first is the kind of
-eager computation that gets regretted once a large template is open. But
-this is a PLAN.md-level call, not mine.
+**Still open, deliberately deferred to a dedicated session** — two coupled
+questions that are a UX/product decision, not a parser one, and shouldn't
+ride along with the swap:
+- **`CondRegion` as a first-class node.** The real AST now makes it
+  possible (draft shape in `PLAN.md` GridModel). It must be able to appear
+  at the top level and inside a column's sequence, not only inside a row's
+  `items` — `@if` wraps whole rows in real templates.
+- **`@if/@else` frontend behavior.** Per-branch fill (`max` across
+  branches) vs. the `~unreliable` pill; how the canvas/inspector present
+  and edit branches. Decide with real examples in front of us.
 
-**Where:** `PLAN.md` "The insulation principle" / "Non-negotiables";
-`packages/core/src/model.ts`.
+Flattening now forecloses nothing: the control-flow nodes exist in the
+AST, so this can be built deliberately later.
 
-### 1.2 `CondRegion` is unimplemented and `@if` fill is knowingly wrong **[decide]**
+### 1.4 The `El` span shape is part of the parser-swap contract **[RESOLVED]**
 
-PLAN.md drafts `CondRegion` / `CondBranch` and flags them as
-"finalize against real parser output". Nothing in `core` models them.
-Today a row containing `@if/@else` parses all branches as simultaneous
-columns, so its fill sum double-counts; the UI compensates by showing an
-italic `~unreliable` pill instead of a false "wraps" warning
-(`model.ts:rowHasControlFlow`, `render.ts:rowFill`).
+The frontends read raw `El` span fields (`.start/.end/.openEnd/
+.contentStart/.contentEnd`) directly to make surgical edits, so the swap's
+real contract is span *semantics*, not just the 157 core tests.
 
-That's a deliberate, tested workaround, not a bug — but it means the fill
-number shown for those rows is meaningless rather than merely
-approximate. Once `@angular/compiler` gives real control-flow nodes, decide
-whether to compute per-branch sums (`max` across branches is probably the
-useful answer) or keep the pill.
-
-PLAN.md also notes `@if` wraps whole **rows** in real templates, so
-`CondRegion` needs to appear at top level and inside a column's sequence,
-not just inside a row's `items`. That shape can't be settled until
-session 2 has real AST output in hand.
-
-### 1.4 The `El` span shape is part of the parser-swap contract **[verify]**
-
-The parser swap's stated safety net is the 157 core tests. But those are
-not the whole contract. The frontends read raw `El` span fields
-**directly**, not through `GridModel`: `.start`, `.end`, `.openEnd`,
-`.contentStart`, `.contentEnd` (~40 reads across
-`app-standalone/src/edits.ts`, `render.ts`, `selection.ts`), plus
-`.children`, `.attrs`, `.tag`. Every surgical edit, the source-highlight
-band, and the caret→canvas sync depend on those offsets meaning exactly
-what `parseTemplate` makes them mean today.
-
-The session-2 `@angular/compiler` adapter must reproduce that `El` shape
-and offset semantics, or the app breaks even with all 157 core tests
-green. TypeScript catches a *renamed or removed* field (El is shared),
-but not a field that is present yet semantically off — e.g. `contentEnd`
-landing a few chars early on a self-closing tag, or `openEnd` excluding
-the `>`. The 157 tests assert on spans in only ~16 places, all in
-core; the frontend's dependence is covered only by the app-standalone
-Playwright suite.
-
-Concretely for session 2: **run `npm run test:all` (unit + e2e), not just
-`npm test`, as the regression gate.** A green core suite is necessary but
-not sufficient. Better still, add a couple of core-level tests pinning
-the span semantics the frontend leans on (`openEnd` includes the `>`;
-`contentStart`/`contentEnd` bound exactly the inner text; void and
-self-closing elements collapse the content span) so a bad adapter fails
-in `core` rather than only in a browser.
+Handled in the Session 2 swap:
+- Added a **span-semantics test suite** (`parser.test.ts`) pinning the
+  mapping directly — `openEnd` just past `>`, `contentStart/contentEnd`
+  bounding exactly the inner text, void and self-closing elements
+  collapsing the content span, nesting containment. Mutation-checked:
+  breaking the `contentEnd` mapping fails 11 tests in `core`.
+- Gated on **`npm run test:all`** (177 unit + 51 e2e). The e2e edits slice
+  source at exact offsets, so their passing validated span fidelity in the
+  browser, not just in isolation.
 
 ### 1.3 Dirty-guard responsibility is split between two layers **[decide]**
 

@@ -44,8 +44,10 @@ file is the durable record we review and implement from later.
 ## Non-negotiable boundaries (see PLAN.md "Non-negotiables")
 - `packages/core` imports **no DOM and no VS Code** APIs. Ever. If a
   function needs the DOM or `vscode`, it lives in a frontend.
-- Frontends **don't re-derive** what `core` precomputes on the
-  `GridModel` (role, title, hint, dynamic flags).
+- Frontends **call `core`'s functions; they never re-implement its
+  logic** (role, title, hint, classification). Whether `core` precomputes
+  those onto the model or computes them on demand is `core`'s choice —
+  today it's on demand (`colTitle`, `contentHint`, `isContainerCol`, …).
 - Edits are **span-based descriptions** produced by `core` and applied
   by the frontend. No grid-class math or string-scanning in frontend
   code.
@@ -103,5 +105,6 @@ representation, or the parser AST should be resolved by looking at real
 output and discussing — not by guessing and building on the guess.
 
 ## Current status
-Session 1 is complete.
-Session 2 is in progress.
+Sessions 1 and 2 are complete (parser swapped to `@angular/compiler`).
+`CondRegion` / `@if`-`@else` frontend behavior is deferred to its own
+session; Session 3 (the extension) is next.
