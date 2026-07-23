@@ -54,11 +54,16 @@ Fill is now **per-branch** and real (`N/12`), dropping `~unreliable` for
 modeled `@if`. Intra-branch edits (resize/add/split/delete/move) work
 unchanged; cross-branch move/nudge is guarded (`CROSS_BRANCH_MSG`).
 
-**Still deferred (documented, not in v1):** top-level `@if`-of-rows region
-(keeps today's stacked-rows behavior — fill is already correct there, only the
-toggle is missing); branch-aware find (`computeFind` walks active cols only);
-inline (between-columns) toggle placement; cross-branch move/nudge;
-`@for`/`@switch` first-classing.
+**Update 2:** top-level `@if`-of-rows (and row-level `*ngIf`) is now
+first-class too — `findRows` groups branch runs to the active branch, the
+canvas walks the tagged source tree to box them (`renderTopRows`), hidden
+regions collapse to the thin chip strip in place, and `nudgeRow` guards
+cross-boundary moves. Every conditional position (in-row, in-column,
+top-level) now shares one look and one toggle model.
+
+**Still deferred (documented, not in v1):** branch-aware find (`computeFind`
+walks active cols only); inline (between-columns) toggle placement;
+cross-branch move/nudge; `@for`/`@switch` first-classing.
 
 ---
 

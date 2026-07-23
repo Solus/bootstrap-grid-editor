@@ -41,13 +41,32 @@ export function buildModel(root: El, active: Record<string, number> = {}): RowNo
   return findRows(root, [], ctx);
 }
 
-/** Collect rows whose nearest grid ancestor is `el`. Top-level `@if`-of-rows
-    is NOT grouped here (deferred — its branches stay flattened, each with its
-    own correct fill); the per-column grouping happens in `buildCol`. */
+/** Collect rows whose nearest grid ancestor is `el`, region-aware: a run of
+    `@if`-branch children (whole conditional rows, or wrappers of rows) emits
+    only the active branch's rows — same rule as columns and nested rows. The
+    renderer reconstructs box positions from the tagged source tree, so no
+    extra metadata is returned here. */
 export function findRows(el: El, out: RowNode[] = [], ctx: CondCtx = NO_COND): RowNode[] {
-  for (const c of el.children) {
-    if (isRowEl(c)) out.push(buildRow(c, ctx));
-    else findRows(c, out, ctx);
+  const children = el.children;
+  let i = 0;
+  while (i < children.length) {
+    const c = children[i]!;
+    if (c.cond) {
+      const region = c.cond.region;
+      const activeIndex = ctx.active[region] ?? 0;
+      while (i < children.length && children[i]!.cond?.region === region) {
+        const rc = children[i]!;
+        if (rc.cond!.branch === activeIndex) {
+          if (isRowEl(rc)) out.push(buildRow(rc, ctx));
+          else findRows(rc, out, ctx);
+        }
+        i++;
+      }
+    } else {
+      if (isRowEl(c)) out.push(buildRow(c, ctx));
+      else findRows(c, out, ctx);
+      i++;
+    }
   }
   return out;
 }

@@ -189,6 +189,37 @@ describe('@if grouping into active-branch cols', () => {
     expect(cr.branches.map(b => b.condition)).toEqual(['a', null]);
   });
 
+  it('a top-level @if-of-rows emits only the active branch, interleaved', () => {
+    const s = `<div class="container">
+      <div class="row"><div class="col-2">head</div></div>
+      @if (a) { <div class="row"><div class="col-3">A</div></div> }
+      @else {
+        <div class="row"><div class="col-4">B1</div></div>
+        <div class="row"><div class="col-5">B2</div></div>
+      }
+      <div class="row"><div class="col-6">tail</div></div>
+    </div>`;
+    const root2 = parseTemplate(s);
+    const reg2 = Object.keys(root2.condRegions)[0]!;
+    const colOf = (r: { cols: { el: { start: number; openEnd: number } }[] }) =>
+      /col-\d+/.exec(s.slice(r.cols[0]!.el.start, r.cols[0]!.el.openEnd))?.[0];
+    expect(buildModel(root2).map(colOf)).toEqual(['col-2', 'col-3', 'col-6']);
+    expect(buildModel(root2, { [reg2]: 1 }).map(colOf))
+      .toEqual(['col-2', 'col-4', 'col-5', 'col-6']);
+    expect(buildModel(root2, { [reg2]: -1 }).map(colOf)).toEqual(['col-2', 'col-6']);
+  });
+
+  it('a branch wrapping rows in a plain container still yields its rows', () => {
+    // the branch element is a wrapper, not a row — findRows must descend
+    const s = `<div>
+      @if (a) { <section><div class="row"><div class="col-7">IN</div></div></section> }
+    </div>`;
+    const root2 = parseTemplate(s);
+    const reg2 = Object.keys(root2.condRegions)[0]!;
+    expect(buildModel(root2).length).toBe(1);
+    expect(buildModel(root2, { [reg2]: -1 }).length).toBe(0);
+  });
+
   it('an @if wrapping nested rows in a container column toggles per-column', () => {
     const s = `<div class="row"><div class="col-6">
       @if (a) { <div class="row"><div class="col-3">A</div></div> }

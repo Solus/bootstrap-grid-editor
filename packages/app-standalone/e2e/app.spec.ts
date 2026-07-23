@@ -546,6 +546,55 @@ test.describe('@if branch toggle', () => {
     await expect(page.locator('.g-col.container').first()).toBeVisible();
   });
 
+  test('a top-level @if-of-rows boxes whole rows and toggles branches', async ({ page }) => {
+    await page.locator('#src').fill(
+      `<div class="container">
+         <div class="row"><div class="col-2">head</div></div>
+         @if (compact) { <div class="row"><div class="col-12">COMPACT</div></div> }
+         @else {
+           <div class="row"><div class="col-6">WIDE-A</div></div>
+           <div class="row"><div class="col-6">WIDE-B</div></div>
+         }
+       </div>`);
+    await page.locator('#applyBtn').click();
+
+    // the conditional rows sit inside a box; the plain row outside it
+    const box = page.locator('.rows-host > .cond-box');
+    await expect(box).toHaveCount(1);
+    await expect(box.locator('.g-row')).toHaveCount(1);
+    await expect(box).toContainText('COMPACT');
+    await expect(page.locator('.rows-host > .g-row')).toHaveCount(1);
+
+    await box.locator('.branch-chip').first().click();   // @if → @else
+    await expect(box.locator('.g-row')).toHaveCount(2);
+    await expect(box).toContainText('WIDE-A');
+    await expect(box).not.toContainText('COMPACT');
+  });
+
+  test('a hidden top-level @if collapses to a strip and blocks row moves through it', async ({ page }) => {
+    await page.locator('#src').fill(
+      `<div class="container">
+         <div class="row"><div class="col-2">first</div></div>
+         @if (extra) { <div class="row"><div class="col-12">OPTIONAL</div></div> }
+         <div class="row"><div class="col-6">last</div></div>
+       </div>`);
+    await page.locator('#applyBtn').click();
+
+    await page.locator('.rows-host .cond-box .branch-chip').click();   // hide
+    // rows-level strip in place, no box, both plain rows still there
+    await expect(page.locator('.rows-host > .cond-strip')).toHaveCount(1);
+    await expect(page.locator('.rows-host > .cond-box')).toHaveCount(0);
+    await expect(page.locator('.rows-host > .g-row')).toHaveCount(2);
+
+    // show it again; moving "first" down would cross the @if brace → blocked
+    await page.locator('.rows-host .cond-strip .branch-chip').click();
+    await page.locator('.rows-host > .g-row').first().click({ position: { x: 300, y: 3 } });
+    await page.locator('#inspector').getByText('Move down ▼').click();
+    await expect(page.locator('#toast')).toContainText('branch boundary');
+    const src = await source(page);
+    expect(src.indexOf('first')).toBeLessThan(src.indexOf('OPTIONAL'));
+  });
+
   test('a single @if (no @else) toggles its column visibility', async ({ page }) => {
     await page.locator('#src').fill(
       `<div class="row">
