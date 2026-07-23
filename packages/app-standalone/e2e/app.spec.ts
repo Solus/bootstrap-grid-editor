@@ -542,17 +542,47 @@ test.describe('@if branch toggle', () => {
 
     const row = page.locator('.g-row').first();
     const chip = row.locator('.branch-chip');
-    // shown by default: both columns present
+    // shown by default: both columns present, region boxed in place
     await expect(row.locator('.g-col')).toHaveCount(2);
     await expect(chip).toHaveText(/@if\b/);
+    await expect(row.locator('.cond-box')).toHaveCount(1);
 
     await chip.click();   // toggle the @if off → its column disappears
     await expect(row.locator('.g-col')).toHaveCount(1);
     await expect(chip).not.toHaveClass(/active/);
+    // hidden = zero grid footprint: no box left in the flow, the chip has
+    // relocated to the row's top-edge strip
+    await expect(row.locator('.cond-box')).toHaveCount(0);
+    await expect(row.locator('.row-flags .branch-chip')).toHaveCount(1);
 
     await chip.click();   // toggle back on
     await expect(row.locator('.g-col')).toHaveCount(2);
     await expect(chip).toHaveClass(/active/);
+    await expect(row.locator('.cond-box')).toHaveCount(1);
+  });
+
+  test('a hidden @if frees its width for the remaining columns', async ({ page }) => {
+    // reality check: with the @if off, Angular renders only the col-12 —
+    // it must be free to span the full row on the canvas too
+    await page.locator('#src').fill(
+      `<div class="row">
+         @if (flag) { <div class="col-4">maybe</div> }
+         <div class="col-12">main</div>
+       </div>`);
+    await page.locator('#applyBtn').click();
+
+    const row = page.locator('.g-row').first();
+    const main = row.locator('.g-col', { hasText: 'main' });
+    const rowWidth = (await row.boundingBox())!.width;
+
+    // shown: col-4 (boxed) + col-12 → the col-12 wraps, still ~full width
+    await expect(row.locator('.cond-box')).toHaveCount(1);
+
+    await row.locator('.branch-chip').click();   // hide the @if
+    await expect(row.locator('.cond-box')).toHaveCount(0);
+    // the remaining column now spans essentially the whole row
+    const w = (await main.boundingBox())!.width;
+    expect(w).toBeGreaterThan(rowWidth * 0.95);
   });
 });
 

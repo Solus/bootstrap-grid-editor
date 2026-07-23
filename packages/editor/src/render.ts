@@ -12,7 +12,7 @@ import type {
   Breakpoint, ColNode, CondRegion, El, NodePath, RowNode,
 } from '@bootstrap-visualizer/core';
 import { $, mkBadge, mkTypeBadge, rowsHost, sheet } from './dom.js';
-import { SHEET_WIDTH, setActiveBranch, state, resolvePath, type Selection } from './state.js';
+import { SHEET_WIDTH, setActiveBranch, state, type Selection } from './state.js';
 import { computeFind, updateFindCount } from './find.js';
 import { renderInspector } from './inspector.js';
 import { attachResize, makeDropzone, startColDrag } from './dnd.js';
@@ -132,7 +132,15 @@ function renderBranchChip(region: CondRegion): HTMLButtonElement {
   // a single @if reads as a visibility toggle (◉ shown / ○ hidden); a
   // multi-branch @if reads as a switch (⇄).
   const glyph = n <= 1 ? (shown ? '◉' : '○') : '⇄';
-  chip.textContent = glyph + ' ' + keyword(face?.label ?? '@if');
+  let text = glyph + ' ' + keyword(face?.label ?? '@if');
+  // a hidden chip sits detached from its content (row strip / thin line), so
+  // a short condition snippet identifies which @if it is; the full text stays
+  // in the tooltip. Shown chips ride their box and stay compact.
+  if (!shown && face?.condition) {
+    const cond = face.condition;
+    text += ' (' + (cond.length > 24 ? cond.slice(0, 23) + '…' : cond) + ')';
+  }
+  chip.textContent = text;
   chip.title = branchTip(region, shown, hasElse);
   chip.addEventListener('click', e => {
     e.stopPropagation();
@@ -157,7 +165,10 @@ function nextBranch(cur: number, n: number, hasElse: boolean): number {
 }
 
 function branchTip(region: CondRegion, shown: boolean, hasElse: boolean): string {
-  if (!shown) return 'Hidden (no branch shown) — click to show';
+  if (!shown) {
+    const full = region.branches[0]?.label ?? '@if';
+    return 'Hidden: ' + full + ' renders nothing — click to show';
+  }
   const b = region.branches[region.activeIndex]!;   // label e.g. "@if (x)" / "@else"
   const verb = region.branches.length > 1 ? 'switch branch'
              : hasElse ? 'switch' : 'hide';
@@ -270,7 +281,12 @@ function renderRow(rowNode: RowNode, path: NodePath, _nested: boolean): HTMLElem
     pill.textContent = (fill.approx ? '~' : '') + fill.sum + '/12';
     if (fill.approx) pill.title = 'Contains auto/equal columns — approximate';
   }
-  rowDiv.appendChild(pill);
+  // the row's top-edge strip: hidden-region chips (prepended by
+  // renderRowBody) followed by the fill pill
+  const flags = document.createElement('div');
+  flags.className = 'row-flags';
+  flags.appendChild(pill);
+  rowDiv.appendChild(flags);
 
   rowDiv.addEventListener('click', e => {
     e.stopPropagation();
@@ -279,7 +295,7 @@ function renderRow(rowNode: RowNode, path: NodePath, _nested: boolean): HTMLElem
 
   if (isCollapsed) return rowDiv;
 
-  renderRowBody(rowDiv, rowNode, fill.widths, path);
+  renderRowBody(rowDiv, rowNode, fill.widths, path, flags);
   return rowDiv;
 }
 
@@ -290,6 +306,7 @@ function renderRow(rowNode: RowNode, path: NodePath, _nested: boolean): HTMLElem
     render directly into the row, exactly as before. */
 function renderRowBody(
   host: HTMLElement, rowNode: RowNode, widths: ColWidth[], path: NodePath,
+  flags: HTMLElement,
 ): void {
   const cols = rowNode.cols;
   if (!cols.length && !rowNode.conds?.length) {
@@ -323,25 +340,27 @@ function renderRowBody(
       if (hit) hits.push(hit);
       i++;
     }
+    const cr = regionMeta.get(region);
+    if (!cr) continue;
+    if (!hits.length) {
+      // hidden region: zero grid footprint, so the remaining columns lay out
+      // exactly as Angular would render them. The toggle chip relocates to
+      // the row's top-edge strip, chips in source order, fill pill last.
+      // has-flags caps the row label's width so the two never overlap.
+      flags.insertBefore(renderBranchChip(cr), flags.lastChild);
+      host.classList.add('has-flags');
+      continue;
+    }
+    // size the box to its branch's combined span so it sits inline where the
+    // content is; its columns are then laid out relative to that span.
     const box = document.createElement('div');
     box.className = 'cond-box';
-    const cr = regionMeta.get(region);
-    if (cr) box.appendChild(renderBranchChip(cr));
-    if (hits.length) {
-      // size the box to its branch's combined span so it sits inline where the
-      // content is; its columns are then laid out relative to that span.
-      const span = hits.reduce((s, h) => s + footprint(h.w), 0);
-      box.style.flex = '0 0 ' + (Math.min(span / 12, 1) * 100).toFixed(4) + '%';
-      box.style.maxWidth = (Math.min(span / 12, 1) * 100).toFixed(4) + '%';
-      hits.forEach(h =>
-        box.appendChild(renderCol(h.node, h.w, path.concat(h.idx), h.idx, h.idx === last, span)));
-    } else {
-      box.classList.add('empty');
-      const empty = document.createElement('div');
-      empty.className = 'cond-empty';
-      empty.textContent = 'hidden';
-      box.appendChild(empty);
-    }
+    box.appendChild(renderBranchChip(cr));
+    const span = hits.reduce((s, h) => s + footprint(h.w), 0);
+    box.style.flex = '0 0 ' + (Math.min(span / 12, 1) * 100).toFixed(4) + '%';
+    box.style.maxWidth = (Math.min(span / 12, 1) * 100).toFixed(4) + '%';
+    hits.forEach(h =>
+      box.appendChild(renderCol(h.node, h.w, path.concat(h.idx), h.idx, h.idx === last, span)));
     host.appendChild(box);
   }
 }
@@ -478,8 +497,8 @@ function renderCol(
       }
       // an @if-of-rows region: box the run of consecutive same-region rows
       // (the sequence carries every branch's rows; only the active branch's
-      // are in nestedRows). A run with nothing shown keeps a placeholder box
-      // in place so the region can be toggled back on.
+      // are in nestedRows). A run with nothing shown collapses to a thin
+      // chip-only strip — near-zero footprint, still toggleable in place.
       const box = document.createElement('div');
       box.className = 'cond-box rows';
       box.appendChild(renderBranchChip(cr));
@@ -496,11 +515,11 @@ function renderCol(
         s++;
       }
       if (!shown) {
-        box.classList.add('empty');
-        const empty = document.createElement('div');
-        empty.className = 'cond-empty';
-        empty.textContent = 'hidden';
-        box.appendChild(empty);
+        const strip = document.createElement('div');
+        strip.className = 'cond-strip';
+        strip.appendChild(box.firstChild!);   // just the chip, no box
+        nest.appendChild(strip);
+        continue;
       }
       nest.appendChild(box);
     }
