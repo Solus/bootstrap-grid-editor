@@ -404,7 +404,21 @@ to save" — on the first canvas edit of a session (`webview/main.ts`, on the
 first `applied` message). Gentle and where the user is looking (the panel),
 rather than a VS Code modal.
 
-### 7.3 Extension tests — sync logic covered; VS Code wiring still not **[partly done]**
+### 7.3 Extension tests — sync logic covered; VS Code wiring still not **[RESOLVED — wiring covered with a mocked `vscode`]**
+
+**Update:** `host/extension.test.ts` (13 cases, mutation-checked) now covers
+the adapter itself against a `vi.mock`ed `vscode` module: command
+registration, the no-editor path, panel options, the webview HTML contract
+(nonce-locked CSP **and the element ids `dom.ts` resolves at boot — the
+extension-side answer to §4.2**), event routing filtered to the panel's
+document, `applyEdits` → `WorkspaceEdit` span building, reveal, and that
+disposal detaches every listener. What remains genuinely uncovered is only
+the real-Electron layer (an actual `WorkspaceEdit` reaching a real buffer),
+which mostly exercises VS Code itself — still deferred, as below.
+
+---
+
+*(original entry, kept for context)*
 
 The fiddliest part — the host↔webview sync (reveal-echo suppression,
 version guard, divergence, edits-out) — is extracted into a pure `Session`
