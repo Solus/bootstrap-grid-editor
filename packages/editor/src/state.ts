@@ -35,6 +35,10 @@ export interface AppState {
   activeBranch: Record<string, number>;
   /** Amber row border on overfull rows (View section). */
   tintOverfull: boolean;
+  /** Let the sheet use the full canvas panel instead of the breakpoint's
+      representative width (View section). Purely presentational — all grid
+      semantics are 12-col span math, so proportions are unchanged. */
+  stretchSheet: boolean;
   /** Name of the opened file, used for Download. */
   fileName: string | null;
   /** Any BS3-style grid class anywhere in the document. */
@@ -64,6 +68,7 @@ export const state: AppState = {
   collapsed: new Set(),
   activeBranch: {},
   tintOverfull: false,
+  stretchSheet: false,
   fileName: null,
   docBs3: false,
   find: '',
