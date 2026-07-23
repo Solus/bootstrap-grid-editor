@@ -31,19 +31,27 @@ export function renderInspector(): void {
 
 function renderViewSection(): void {
   const vs = sec('View');
+  vs.appendChild(viewOpt('Tint overfull rows',
+    'Amber border on rows whose columns exceed 12 — off by default since wrapping can be intentional',
+    () => state.tintOverfull, v => { state.tintOverfull = v; }));
+  vs.appendChild(viewOpt('Stretch to fit',
+    'Let the sheet use the whole canvas panel instead of the breakpoint\'s representative width — proportions are unchanged',
+    () => state.stretchSheet, v => { state.stretchSheet = v; }));
+}
+
+function viewOpt(
+  text: string, title: string, get: () => boolean, set: (v: boolean) => void,
+): HTMLElement {
   const lab = document.createElement('label');
   lab.className = 'view-opt';
   const cb = document.createElement('input');
   cb.type = 'checkbox';
-  cb.checked = state.tintOverfull;
-  cb.addEventListener('change', () => {
-    state.tintOverfull = cb.checked;
-    render();
-  });
+  cb.checked = get();
+  cb.addEventListener('change', () => { set(cb.checked); render(); });
   lab.appendChild(cb);
-  lab.appendChild(document.createTextNode(' Tint overfull rows'));
-  lab.title = 'Amber border on rows whose columns exceed 12 — off by default since wrapping can be intentional';
-  vs.appendChild(lab);
+  lab.appendChild(document.createTextNode(' ' + text));
+  lab.title = title;
+  return lab;
 }
 
 function sec(title: string | null): HTMLElement {

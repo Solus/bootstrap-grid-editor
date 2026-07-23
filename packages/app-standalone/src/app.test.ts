@@ -110,6 +110,23 @@ describe('sample exercises the interesting paths', () => {
   });
 });
 
+describe('view options', () => {
+  it('Stretch to fit lifts the sheet cap to the full panel and back', () => {
+    const sheet = document.querySelector<HTMLElement>('#sheet')!;
+    expect(sheet.style.maxWidth).toMatch(/px$/);           // bp cap by default
+    const stretch = [...document.querySelectorAll<HTMLLabelElement>('.view-opt')]
+      .find(l => l.textContent!.includes('Stretch to fit'))!
+      .querySelector('input')!;
+    stretch.click();
+    expect(sheet.style.maxWidth).toBe('100%');
+    // re-query: render() rebuilt the inspector
+    [...document.querySelectorAll<HTMLLabelElement>('.view-opt')]
+      .find(l => l.textContent!.includes('Stretch to fit'))!
+      .querySelector('input')!.click();
+    expect(sheet.style.maxWidth).toMatch(/px$/);
+  });
+});
+
 describe('selection drives the inspector', () => {
   it('selecting a column shows its class and actions', () => {
     const col = document.querySelector<HTMLElement>('.g-col')!;

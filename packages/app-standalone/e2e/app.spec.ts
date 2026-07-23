@@ -456,8 +456,22 @@ test.describe('inspector', () => {
 
   test('tint overfull rows toggles the row border', async ({ page }) => {
     await expect(page.locator('.g-row.overfull')).toHaveCount(0);
-    await page.locator('.view-opt input[type="checkbox"]').check();
+    await page.locator('.view-opt', { hasText: 'Tint overfull rows' })
+      .locator('input[type="checkbox"]').check();
     await expect(page.locator('.g-row.overfull')).not.toHaveCount(0);
+  });
+
+  test('stretch to fit widens the sheet beyond the breakpoint cap', async ({ page }) => {
+    // at xs the 400px cap is well below the panel width, so the effect is
+    // unambiguous regardless of viewport. The sheet animates max-width
+    // (.18s), so poll past the transition rather than reading instantly.
+    await page.locator('#bpSwitch button[data-bp="xs"]').click();
+    const sheet = page.locator('#sheet');
+    const width = async () => (await sheet.boundingBox())!.width;
+    await expect.poll(width).toBeLessThanOrEqual(401);
+    await page.locator('.view-opt', { hasText: 'Stretch to fit' })
+      .locator('input[type="checkbox"]').check();
+    await expect.poll(width).toBeGreaterThan(401 * 1.2);
   });
 });
 

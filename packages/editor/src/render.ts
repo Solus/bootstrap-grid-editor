@@ -197,7 +197,9 @@ export function renderHeader(): void {
   $('#bpNote').textContent = BP_LABEL[state.bp];
   document.querySelectorAll<HTMLElement>('#bpSwitch button').forEach(b =>
     b.classList.toggle('active', b.dataset.bp === state.bp));
-  sheet.style.maxWidth = SHEET_WIDTH[state.bp] + 'px';
+  // the bp width is a proportion cue, not a semantic constraint — stretch
+  // lets the sheet use however much panel the user has given the canvas
+  sheet.style.maxWidth = state.stretchSheet ? '100%' : SHEET_WIDTH[state.bp] + 'px';
 }
 
 function renderRuler(): void {
