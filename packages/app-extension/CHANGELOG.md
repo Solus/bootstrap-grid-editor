@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.0.4
+
+- Added: an `@if` wrapping nested rows inside a container column now gets
+  the same bounding box + toggle chip as in-row regions (was a flat chip
+  bar), with an in-place placeholder when hidden.
+- Fixed: a column wrapping its rows in `@if` no longer loses its container
+  (⊞) status — the `@if (…) { … }` scaffolding is treated as structure,
+  not loose content text.
+
 ## 0.0.3
 
 - Added: `@if`/`@else`/`@else if` are now modeled as conditional regions.
