@@ -621,7 +621,11 @@ test.describe('file io', () => {
     expect(download.suggestedFilename()).toBe('sheet.html');
   });
 
-  test('Copy puts the applied source on the clipboard', async ({ page, context }) => {
+  test('Copy puts the applied source on the clipboard', async ({ page, context, browserName }) => {
+    // Playwright can only grant clipboard permissions on Chromium; the app's
+    // copy works in real browsers (user gesture), it's the readback that the
+    // harness can't do elsewhere. Verify on Chromium only.
+    test.skip(browserName !== 'chromium', 'clipboard permission grants are Chromium-only');
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.locator('#copyBtn').click();
     await expect(page.locator('#toast')).toContainText('Copied');
@@ -769,6 +773,8 @@ test.describe('scroll into view', () => {
     await page.locator('body').click({ position: { x: 5, y: 5 } });
     await page.keyboard.press('ArrowDown');           // select the first row
     for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowDown');
-    await expect(page.locator('.g-row.selected')).toBeInViewport();
+    // each press restarts a smooth scroll; under parallel-engine load (esp.
+    // Firefox) the final animation can outlive the default expect window
+    await expect(page.locator('.g-row.selected')).toBeInViewport({ timeout: 10_000 });
   });
 });

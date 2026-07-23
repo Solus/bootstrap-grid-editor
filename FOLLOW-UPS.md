@@ -101,23 +101,23 @@ Handled in the Session 2 swap:
   source at exact offsets, so their passing validated span fidelity in the
   browser, not just in isolation.
 
-### 1.3 Dirty-guard responsibility is split between two layers **[decide]**
+### 1.3 Dirty-guard responsibility is split between two layers **[RESOLVED — apply() is authoritative; early checks are documented redundancy]**
 
-Resize (`dnd.ts`) and drag-start (`dnd.ts`) check `state.dirty`
-themselves and toast early. Every other edit path — steppers, keyboard
-width, split, add, delete, nudge, move — has no local check and relies
-entirely on the guard inside `apply()` (`state.ts`).
+Decision: the guard inside `apply()` (via the host's `canApplyEdit()`) is
+the single authority. Early checks exist only where an interaction must
+be refused *before* it changes state, and every one of them now calls the
+same `canApplyEdit()` — never `state.dirty` directly — and carries a
+comment naming it deliberate redundancy:
+- `dnd.ts` drag-start and resize pointerdown (abort a doomed gesture);
+- `state.ts` `undo()`/`redo()` (the pre-check must run before `hIndex`
+  moves, or a refusal inside `apply()` would desync history — this was
+  the one remaining direct `state.dirty` read, now routed through the
+  guard).
 
-Both layers work, and there are now tests for both (see §3.1 for how that
-gap was found). But the asymmetry is accidental rather than designed: the
-two early checks exist because those paths need to *abort an interaction*
-before it starts, not because the `apply()` guard is insufficient.
-
-Worth a deliberate decision, because the extension will add a third entry
-point (editor buffer sync) with the same question. Suggested: keep
-`apply()` as the single authoritative guard, and document the two early
-checks as UX affordances that must stay redundant with it — never as the
-only protection.
+The Session 3 host-adapter work had already put `dnd.ts` on
+`canApplyEdit()`; this entry lagged the code. Any future entry point
+follows the same rule: rely on `apply()`, add an early call to the same
+guard only when ordering/UX demands it.
 
 ---
 
@@ -262,13 +262,18 @@ Still genuinely untested, but lower-risk and left for later: `pointercancel`
 paths on resize/pane-drag (aborted gestures), and the clipboard *fallback*
 branch in Copy (`execCommand` path when `navigator.clipboard` throws).
 
-### 3.3 Chromium only **[decide]**
+### 3.3 Chromium only **[RESOLVED — Firefox + WebKit projects added]**
 
-`playwright.config.ts` defines one project. HTML5 drag & drop and pointer
-capture are the two things most likely to differ across engines, and both
-are load-bearing here. Adding Firefox and WebKit projects is a two-line
-change plus browser downloads; worth it before the extension ships, since
-the VS Code webview is Chromium but a browser-hosted standalone app isn't.
+`playwright.config.ts` now runs all three engines locally and in CI
+(`test.yml` installs chromium, firefox, webkit). Everything passed on
+first cross-engine run except two harness limits, both handled:
+- the clipboard-readback test is Chromium-only (`test.skip` with reason)
+  — Playwright cannot grant clipboard permissions elsewhere; the app's
+  copy itself works under a real user gesture;
+- three-engine parallel runs contend enough that smooth-scroll/synthetic-
+  event timing occasionally slips on Firefox — one local retry added
+  (CI already had two) and the keyboard-scroll assertion got a longer
+  window. Real regressions still fail every retry.
 
 ### 3.4 The jsdom boot test stubs layout **[verify]**
 
