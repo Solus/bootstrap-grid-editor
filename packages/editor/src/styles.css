@@ -225,16 +225,28 @@ body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-sele
   padding:15px 0 5px; margin-top:9px; background:rgba(122,170,255,.035);
 }
 .cond-box:hover{ border-color:rgba(122,170,255,.5); }
-/* a hidden region (no branch shown) shrinks to a compact inline placeholder */
-.cond-box.empty{ flex:0 0 auto; padding:6px 0 4px; }
-.cond-empty{
-  padding:6px 14px; font-family:var(--mono); font-size:11px;
-  font-style:italic; color:var(--faint); white-space:nowrap;
-}
 /* the in-column variant: wraps a run of conditional *nested rows*, which
    stack vertically at full column width (no span sizing) */
 .cond-box.rows{ display:block; padding:14px 6px 4px; margin:12px 0 8px; }
-.cond-box.rows.empty{ padding:8px 6px 4px; }
+
+/* a hidden region occupies no grid space. In a row, its chip relocates to
+   the .row-flags strip; between nested rows it collapses to this thin
+   chip-only line, still at its source position. */
+.cond-strip{ margin:6px 0; line-height:1; }
+
+/* the row's top-edge strip: hidden-region chips + the fill pill, sharing
+   the border line the ROW label sits on. Capped so it cannot run over the
+   ROW label; when crowded, chips shrink and ellipsize (full condition in
+   the tooltip) while the pill keeps its size. */
+.row-flags{
+  position:absolute; top:-8px; right:8px; z-index:2;
+  /* 38% label + this + the two 8px edge offsets always fits inside 100% */
+  display:flex; gap:6px; align-items:center; max-width:calc(60% - 16px);
+}
+.row-flags > .fill-pill{ position:static; flex:0 0 auto; }
+.row-flags > .branch-chip{ padding:1px 8px; font-size:10px; flex:0 1 auto; min-width:2.5em; }
+/* rows carrying hidden-region chips give the label less room (38% + 60% ≤ row) */
+.g-row.has-flags > .row-label{ max-width:38%; }
 
 /* the toggle chip: a pill on the box's top edge (like the ROW label) */
 .branch-chip{
