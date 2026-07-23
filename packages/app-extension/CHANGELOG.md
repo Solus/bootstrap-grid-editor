@@ -1,5 +1,17 @@
 # Change Log
 
+## 0.0.5
+
+- Changed: a hidden `@if`/`*ngIf` region no longer occupies any grid
+  width — the remaining columns lay out exactly as Angular would render
+  them (a lone `col-12` spans the full row). Its toggle chip relocates
+  to the row's top edge next to the fill pill, labeled with a short
+  condition snippet; chips shrink and ellipsize when several stack up.
+  In-column hidden regions collapse to a thin chip-only line.
+- Added: a "Stretch to fit" View option lets the sheet use the whole
+  canvas panel instead of the breakpoint's representative width —
+  proportions are unchanged; useful for crowded nested layouts.
+
 ## 0.0.4
 
 - Added: an `@if` wrapping nested rows inside a container column now gets
