@@ -24,8 +24,10 @@ jobs:
       - name: Unit tests (Vitest + jsdom)
         run: npm test
 
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Playwright browsers
+        # all three engines (FOLLOW-UPS §3.3) — drag & drop and pointer
+        # capture are the interactions most likely to differ across engines
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: End-to-end tests (Playwright)
         run: npm run test:e2e
