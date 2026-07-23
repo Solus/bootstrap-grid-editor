@@ -160,12 +160,18 @@ export function rowMentionsIf(src: string, el: El): boolean {
     a spacer (br/hr), or a wrapper whose subtree contains rows (panel
     sections, fieldsets, ng-container…), and it has no loose content text.
     Anything else is a *content* column. */
+/** Angular control-flow scaffolding as it appears in loose text: a block
+    header (`@if (x) {`, `@else {`, `@for (…) {`, `@case ('x') {`, …) or a
+    closing `}`. Amended container rule: this text is structure, not content —
+    an `@if` wrapping a column's rows must not demote it to a content col. */
+const CTRL_FLOW_SYNTAX = /@[a-z]+\b[^{}]*\{|\}/gi;
+
 export function isContainerCol(src: string, el: El): boolean {
   if (!el.children.length) return false;
   if (!el.children.some(c => isRowEl(c) || subtreeHasRow(c))) return false;
   if (!el.children.every(c =>
       isRowEl(c) || isHeadingEl(c) || isSpacerEl(c) || subtreeHasRow(c))) return false;
-  return looseText(src, el).trim() === '';
+  return looseText(src, el).replace(CTRL_FLOW_SYNTAX, '').trim() === '';
 }
 
 /* ── lookup ──────────────────────────────────────────────────────── */
