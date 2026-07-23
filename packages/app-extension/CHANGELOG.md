@@ -1,5 +1,18 @@
 # Change Log
 
+## 0.0.6
+
+- Added: a top-level `@if`/`@else` wrapping whole rows (and a row-level
+  `*ngIf`) is now a first-class conditional region — the active branch's
+  rows render inside the same bounding box + toggle chip as in-row and
+  in-column regions, and a hidden region collapses to a thin chip strip
+  in place. Every conditional position now shares one look and one
+  toggle model.
+- Moving a row across an `@if` branch boundary is blocked with a hint,
+  matching columns.
+- Internal: the extension's VS Code wiring (activation, panel, event
+  routing, edit replay, disposal) is now covered by tests.
+
 ## 0.0.5
 
 - Changed: a hidden `@if`/`*ngIf` region no longer occupies any grid
