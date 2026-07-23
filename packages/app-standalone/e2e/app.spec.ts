@@ -486,7 +486,8 @@ test.describe('view controls', () => {
    branch's columns show, and switching is a pure view change. */
 test.describe('@if branch toggle', () => {
   test('switching branch changes which columns show', async ({ page }) => {
-    const box = page.locator('.cond-box').first();
+    // the @if/@else region (the sample also has an earlier single-branch box)
+    const box = page.locator('.cond-box', { hasText: 'summary-bar' }).first();
     await expect(box).toBeVisible();
     const chip = box.locator('.branch-chip');
     // default = @if branch; the @else branch's <detail-bar> is hidden
@@ -505,6 +506,30 @@ test.describe('@if branch toggle', () => {
     await page.locator('.cond-box').first().locator('.branch-chip').click();
     expect(await source(page)).toBe(before);
     await expect(page.locator('#srcPane')).not.toHaveClass(/src-dirty/);
+  });
+
+  test('an @if wrapping nested rows in a container column gets its own box', async ({ page }) => {
+    await page.locator('#src').fill(
+      `<div class="row"><div class="col-6">
+         <div class="row"><div class="col-12">ALWAYS</div></div>
+         @if (flag) { <div class="row"><div class="col-3">MAYBE-A</div></div> }
+         @else { <div class="row"><div class="col-9">MAYBE-B</div></div> }
+       </div></div>`);
+    await page.locator('#applyBtn').click();
+
+    const nest = page.locator('.g-col .nested').first();
+    const box = nest.locator('.cond-box');
+    await expect(box).toBeVisible();
+    // the unconditional row sits outside the box; the active branch inside it
+    await expect(nest).toContainText('ALWAYS');
+    await expect(box).toContainText('MAYBE-A');
+    await expect(box).not.toContainText('MAYBE-B');
+
+    await box.locator('.branch-chip').click();   // @if → @else
+    await expect(box).toContainText('MAYBE-B');
+    await expect(box).not.toContainText('MAYBE-A');
+    // the surrounding column keeps its container classification
+    await expect(page.locator('.g-col.container').first()).toBeVisible();
   });
 
   test('a single @if (no @else) toggles its column visibility', async ({ page }) => {

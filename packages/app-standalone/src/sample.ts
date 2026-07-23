@@ -68,11 +68,13 @@ export const SAMPLE = `<div class="container-fluid">
         </div>
       </div>
       <legend class="group-title" app-i18n="demo.editor.sectionContact"></legend>
+      @if (showContact) {
       <div class="row">
         <div class="col-12">
           <text-input formControlName="email"></text-input>
         </div>
       </div>
+      }
     </div>
     <div class="col-md-6" [ngClass]="{'has-error': addressInvalid}">
       <!-- HDR:Address -->
