@@ -58,6 +58,19 @@ describe('container column detection', () => {
   const cs6 = `<div class="row"><div class="col-md-6"><input></div></div>`;
   it('plain content col not container', () => expect(isContainerCol(cs6, col(cs6))).toBe(false));
 
+  // amended rule: @if scaffolding around rows is structure, not loose text
+  const cs8 = `<div class="row"><div class="col-md-6">
+  @if (a) { <div class="row"><div class="col">x</div></div> }
+  @else { <div class="row"><div class="col">y</div></div> }
+</div></div>`;
+  it('@if wrapping rows still container', () => expect(isContainerCol(cs8, col(cs8))).toBe(true));
+
+  const cs9 = `<div class="row"><div class="col-md-6">note:
+  @if (a) { <div class="row"><div class="col">x</div></div> }
+</div></div>`;
+  it('real loose text beside an @if still content', () =>
+    expect(isContainerCol(cs9, col(cs9))).toBe(false));
+
   const cs7 = `<div class="row"><div class="col"></div></div>`;
   it('empty col not container', () => expect(isContainerCol(cs7, col(cs7))).toBe(false));
 });
