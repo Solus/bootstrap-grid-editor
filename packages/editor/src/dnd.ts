@@ -37,6 +37,8 @@ export function startColDrag(colDiv: HTMLElement, path: NodePath): void {
   colDiv.draggable = true;
   colDiv.addEventListener('dragstart', e => {
     if (resize.active) { e.preventDefault(); return; }
+    // Early abort so a doomed gesture never starts — deliberately redundant
+    // with the authoritative guard inside apply() (FOLLOW-UPS §1.3).
     const guard = canApplyEdit();
     if (!guard.ok) {
       e.preventDefault();
@@ -91,6 +93,8 @@ export function attachResize(
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
+    // Early abort so a doomed gesture never starts — deliberately redundant
+    // with the authoritative guard inside apply() (FOLLOW-UPS §1.3).
     const guard = canApplyEdit();
     if (!guard.ok) {
       toast(guard.reason, 'warn');

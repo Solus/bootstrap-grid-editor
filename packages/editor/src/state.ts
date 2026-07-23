@@ -180,8 +180,16 @@ export function applyOps(edits: Edit[], opts: ApplyOpts = {}): void {
   apply(applyEdits(state.src, edits), { ...opts, edits });
 }
 
+/* undo/redo pre-check: `apply()` holds the authoritative guard, but it runs
+   *after* we move `hIndex` — a refusal there would desync history from the
+   document. Ask the same guard first so the index only moves when the apply
+   will be accepted. (FOLLOW-UPS §1.3: early checks like this and the two in
+   dnd.ts are deliberate redundancy for ordering/UX, never the only
+   protection.) */
+
 export function undo(): void {
-  if (state.dirty) { toast(DIRTY_MSG, 'warn'); return; }
+  const guard = canApplyEdit();
+  if (!guard.ok) { toast(guard.reason, 'warn'); return; }
   if (state.hIndex > 0) {
     state.hIndex--;
     apply(state.history[state.hIndex]!, { pushHistory: false });
@@ -189,7 +197,8 @@ export function undo(): void {
 }
 
 export function redo(): void {
-  if (state.dirty) { toast(DIRTY_MSG, 'warn'); return; }
+  const guard = canApplyEdit();
+  if (!guard.ok) { toast(guard.reason, 'warn'); return; }
   if (state.hIndex < state.history.length - 1) {
     state.hIndex++;
     apply(state.history[state.hIndex]!, { pushHistory: false });
