@@ -80,8 +80,10 @@ describe('sample exercises the interesting paths', () => {
   it('toggling a branch re-renders view-only (source untouched)', () => {
     const srcBefore = document.querySelector<HTMLTextAreaElement>('#src')!.value;
     const colsBefore = document.querySelectorAll('.g-col').length;
+    // the first multi-branch (⇄) chip = the sample's @if/@else region;
     // re-query after each click — render() rebuilds the DOM
-    const chip = () => document.querySelector<HTMLButtonElement>('.cond-box .branch-chip')!;
+    const chip = () => [...document.querySelectorAll<HTMLButtonElement>('.cond-box .branch-chip')]
+      .find(c => c.textContent!.startsWith('⇄'))!;
     chip().click();   // @if → @else (the sample's region has a trailing @else)
     // the shown branch changed...
     expect(chip().textContent).toContain('@else');

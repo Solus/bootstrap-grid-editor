@@ -119,15 +119,8 @@ export function pathEq(sel: Selection | null, path: NodePath, kind: 'row' | 'col
     - `@if` with no trailing `@else` can also show *nothing* (Angular renders
       nothing when false), so a single `@if` toggles show ↔ hide, and an
       `@else if` chain with no final `@else` cycles branches then hide. */
-function renderBranchBar(conds: CondRegion[]): HTMLElement {
-  const bar = document.createElement('div');
-  bar.className = 'branch-bar';
-  for (const region of conds) bar.appendChild(renderBranchChip(region));
-  return bar;
-}
-
-/** The single cycling toggle chip for one `@if` region — used both as a flat
-    bar entry and as a `.cond-box` header. */
+/** The single cycling toggle chip for one `@if` region — the `.cond-box`
+    header, for both in-row column regions and in-column row regions. */
 function renderBranchChip(region: CondRegion): HTMLButtonElement {
   const n = region.branches.length;
   const hasElse = n > 0 && region.branches[n - 1]!.condition === null;
@@ -443,7 +436,6 @@ function renderCol(
   if (colNode.nestedRows.length || colNode.conds?.length) {
     const nest = document.createElement('div');
     nest.className = 'nested';
-    if (colNode.conds?.length) nest.appendChild(renderBranchBar(colNode.conds));
     const seq = colSequence(state.src, colNode.el);
     const titleFromHeading = title && !elementTitle(state.src, colNode.el);
     // Pair sequence rows to nestedRows by identity, not by position. findRows
@@ -454,18 +446,16 @@ function renderCol(
     // in core/titles.test.ts. Looking each row up by its element keeps the
     // path correct for well-formed and malformed input alike.
     const indexByEl = new Map(colNode.nestedRows.map((r, i) => [r.el, i]));
+    const regionMeta = new Map((colNode.conds ?? []).map(c => [c.region, c]));
     const rendered = new Set<number>();
     let skippedTitle = false;
-    for (const item of seq) {
-      if (item.kind === 'row') {
-        const i = indexByEl.get(item.el);
-        if (i !== undefined && !rendered.has(i)) {
-          nest.appendChild(renderRow(colNode.nestedRows[i]!, path.concat(i), true));
-          rendered.add(i);
-        }
-      } else {
+    let s = 0;
+    while (s < seq.length) {
+      const item = seq[s]!;
+      if (item.kind !== 'row') {
         if (item.direct && titleFromHeading && !skippedTitle) {
           skippedTitle = true;          // this heading is already the block title
+          s++;
           continue;
         }
         const sep = document.createElement('div');
@@ -473,7 +463,46 @@ function renderCol(
         sep.textContent = item.text;
         sep.title = item.full;
         nest.appendChild(sep);
+        s++;
+        continue;
       }
+      const cr = item.el.cond ? regionMeta.get(item.el.cond.region) : undefined;
+      if (!cr) {
+        const i = indexByEl.get(item.el);
+        if (i !== undefined && !rendered.has(i)) {
+          nest.appendChild(renderRow(colNode.nestedRows[i]!, path.concat(i), true));
+          rendered.add(i);
+        }
+        s++;
+        continue;
+      }
+      // an @if-of-rows region: box the run of consecutive same-region rows
+      // (the sequence carries every branch's rows; only the active branch's
+      // are in nestedRows). A run with nothing shown keeps a placeholder box
+      // in place so the region can be toggled back on.
+      const box = document.createElement('div');
+      box.className = 'cond-box rows';
+      box.appendChild(renderBranchChip(cr));
+      let shown = 0;
+      while (s < seq.length) {
+        const it = seq[s]!;
+        if (it.kind !== 'row' || it.el.cond?.region !== cr.region) break;
+        const i = indexByEl.get(it.el);
+        if (i !== undefined && !rendered.has(i)) {
+          box.appendChild(renderRow(colNode.nestedRows[i]!, path.concat(i), true));
+          rendered.add(i);
+          shown++;
+        }
+        s++;
+      }
+      if (!shown) {
+        box.classList.add('empty');
+        const empty = document.createElement('div');
+        empty.className = 'cond-empty';
+        empty.textContent = 'hidden';
+        box.appendChild(empty);
+      }
+      nest.appendChild(box);
     }
     // Any nested rows the sequence never surfaced (e.g. inside a heading)
     // still render, at their own path, so none are silently lost.
