@@ -198,7 +198,10 @@ export function nudgeRow(dir: number): void {
     : state.model;
   const to = idx + dir;
   if (to < 0 || to >= siblings.length) return;
-  swapSiblings(siblings[idx]!.el, siblings[to]!.el, parent.concat(to), 'row');
+  const a = siblings[idx]!.el, b = siblings[to]!.el;
+  // don't drag a row through an @if brace (same rule as columns)
+  if (condKey(a) !== condKey(b)) { toast(CROSS_BRANCH_MSG, 'warn'); return; }
+  swapSiblings(a, b, parent.concat(to), 'row');
 }
 
 function swapSiblings(

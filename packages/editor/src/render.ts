@@ -6,10 +6,10 @@
 import {
   BP_LABEL, classIsInterpolated, classValue, colSequence, colTitle, contentHint,
   effectiveAt, elementTitle, hasDynamicClassBinding, hashStr, isContainerCol,
-  rowHasForOrSwitch, rowMentionsIf,
+  isRowEl, rowHasForOrSwitch, rowMentionsIf,
 } from '@bootstrap-visualizer/core';
 import type {
-  Breakpoint, ColNode, CondRegion, El, NodePath, RowNode,
+  Breakpoint, ColNode, CondRegion, El, NodePath, RootEl, RowNode,
 } from '@bootstrap-visualizer/core';
 import { $, mkBadge, mkTypeBadge, rowsHost, sheet } from './dom.js';
 import { SHEET_WIDTH, setActiveBranch, state, type Selection } from './state.js';
@@ -214,16 +214,79 @@ function renderRuler(): void {
 
 function renderCanvas(): void {
   rowsHost.innerHTML = '';
-  if (!state.model.length) {
+  if (state.root) {
+    const byEl = new Map(state.model.map((r, i) => [r.el, i]));
+    renderTopRows(rowsHost, state.root, byEl);
+  }
+  if (!rowsHost.children.length) {
     const d = document.createElement('div');
     d.className = 'empty-canvas';
     d.innerHTML = 'No <code>.row</code> elements found.<br>' +
       'Paste an Angular/Bootstrap template on the left and press <b>Apply changes</b>,<br>' +
       'or hit <b>Load sample</b> in the header.';
     rowsHost.appendChild(d);
-    return;
   }
-  state.model.forEach((row, i) => rowsHost.appendChild(renderRow(row, [i], false)));
+}
+
+/** Render the top-level rows, mirroring findRows' walk over the source tree
+    so `@if`-of-rows regions group into a bounding box: a run of same-region
+    branch children renders as a `.cond-box.rows` with the toggle chip (only
+    the active branch's rows are in the model); a run with nothing shown
+    collapses to the thin chip-only strip at its source position. */
+function renderTopRows(host: HTMLElement, el: El, byEl: Map<El, number>): number {
+  const children = el.children;
+  let emitted = 0;
+  let i = 0;
+  while (i < children.length) {
+    const c = children[i]!;
+    const region = c.cond?.region;
+    const cr = region ? topCondRegion(region) : null;
+    if (!cr) {
+      emitted += renderRowOrDescend(host, c, byEl);
+      i++;
+      continue;
+    }
+    const box = document.createElement('div');
+    box.className = 'cond-box rows';
+    box.appendChild(renderBranchChip(cr));
+    let shown = 0;
+    while (i < children.length && children[i]!.cond?.region === cr.region) {
+      shown += renderRowOrDescend(box, children[i]!, byEl);
+      i++;
+    }
+    if (shown) {
+      host.appendChild(box);
+      emitted += shown;
+    } else {
+      const strip = document.createElement('div');
+      strip.className = 'cond-strip';
+      strip.appendChild(box.firstChild!);   // just the chip
+      host.appendChild(strip);
+    }
+  }
+  return emitted;
+}
+
+/** A model row renders; an inactive branch row is skipped (its columns must
+    not leak in); any other element may wrap rows deeper down — descend with
+    the same grouping walk. */
+function renderRowOrDescend(into: HTMLElement, c: El, byEl: Map<El, number>): number {
+  const idx = byEl.get(c);
+  if (idx !== undefined) {
+    into.appendChild(renderRow(state.model[idx]!, [idx], false));
+    return 1;
+  }
+  if (isRowEl(c)) return 0;               // hidden/inactive branch row
+  if (!c.children.length) return 0;
+  return renderTopRows(into, c, byEl);
+}
+
+/** Region metadata for a top-level run, straight from the parse registry —
+    top-level regions hang on no RowNode/ColNode, unlike in-row/in-column. */
+function topCondRegion(region: string): CondRegion | null {
+  const meta = (state.root as RootEl | null)?.condRegions?.[region];
+  if (!meta) return null;
+  return { region, branches: meta.branches, activeIndex: state.activeBranch[region] ?? 0 };
 }
 
 function renderRow(rowNode: RowNode, path: NodePath, _nested: boolean): HTMLElement {
