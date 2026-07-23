@@ -561,6 +561,35 @@ test.describe('@if branch toggle', () => {
     await expect(row.locator('.cond-box')).toHaveCount(1);
   });
 
+  test('many hidden @ifs share the row strip without overlapping the label', async ({ page }) => {
+    // worst case: four hideable @ifs with long conditions on a titled row —
+    // chips must shrink into the capped strip, never covering the ROW label
+    // (this geometry caught two real bugs: an unbounded strip and an edge-
+    // offset miscalculation)
+    await page.locator('#src').fill(
+      `<!-- Dashboard widgets row with many optional panels -->
+       <div class="row">
+         @if (user.prefs.showFilterPanel) { <div class="col-2">filters</div> }
+         @if (featureFlags.enableStatsWidget) { <div class="col-2">stats</div> }
+         <div class="col-12">main content</div>
+         @if (user.prefs.sidebarVisibleOnDesktop) { <div class="col-3">sidebar</div> }
+         @if (session.isAdminUser) { <div class="col-2">admin</div> }
+       </div>`);
+    await page.locator('#applyBtn').click();
+
+    const row = page.locator('.g-row').first();
+    while (await row.locator('.cond-box .branch-chip').count()) {
+      await row.locator('.cond-box .branch-chip').first().click();
+    }
+    await expect(row.locator('.row-flags .branch-chip')).toHaveCount(4);
+
+    const label = (await row.locator('.row-label').boundingBox())!;
+    const strip = (await row.locator('.row-flags').boundingBox())!;
+    expect(label.x + label.width).toBeLessThanOrEqual(strip.x + 1);
+    const rowBox = (await row.boundingBox())!;
+    expect(strip.x + strip.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
+  });
+
   test('a hidden @if frees its width for the remaining columns', async ({ page }) => {
     // reality check: with the @if off, Angular renders only the col-12 —
     // it must be free to span the full row on the canvas too
