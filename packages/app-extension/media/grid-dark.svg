@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#C5C5C5">
+  <!-- top row: three equal columns -->
+  <rect x="2"    y="3" width="3.4" height="4" rx="0.8"/>
+  <rect x="6.3"  y="3" width="3.4" height="4" rx="0.8"/>
+  <rect x="10.6" y="3" width="3.4" height="4" rx="0.8"/>
+  <!-- bottom row: a wide + a narrow column (responsive) -->
+  <rect x="2"    y="9" width="7.7" height="4" rx="0.8"/>
+  <rect x="10.6" y="9" width="3.4" height="4" rx="0.8"/>
+</svg>
