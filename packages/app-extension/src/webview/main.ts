@@ -6,8 +6,8 @@
 
 import '@bootstrap-visualizer/editor/styles.css';
 import {
-  apply, assertRequiredIds, REQUIRED_EDITOR_IDS, selectAtOffset, setHost, toast,
-  wireBreakpointSwitch, wireCanvasBackground, wireKeyboardNav,
+  apply, applyOpenConfig, assertRequiredIds, REQUIRED_EDITOR_IDS, selectAtOffset,
+  setHost, toast, wireBreakpointSwitch, wireCanvasBackground, wireKeyboardNav,
 } from '@bootstrap-visualizer/editor';
 import { createWebviewHost, type SyncState } from './webview-host.js';
 import type { HostMessage, WebviewMessage } from '../shared/protocol.js';
@@ -36,6 +36,10 @@ document.getElementById('resyncBtn')
 window.addEventListener('message', (e: MessageEvent<HostMessage>) => {
   const msg = e.data;
   switch (msg.type) {
+    case 'config':
+      // arrives once, before the first setSource → seeds the canvas defaults
+      applyOpenConfig(msg.config);
+      break;
     case 'setSource':
       sync.version = msg.version;
       sync.diverged = false;

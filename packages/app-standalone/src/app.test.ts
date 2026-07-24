@@ -156,6 +156,42 @@ describe('host HTML id contract (FOLLOW-UPS §4.2)', () => {
   });
 });
 
+describe('open config + sticky view prefs', () => {
+  it('applyOpenConfig seeds breakpoint / stretch / tint', async () => {
+    const ed = await editor();
+    const before = { bp: ed.state.bp, s: ed.state.stretchSheet, t: ed.state.tintOverfull };
+    ed.applyOpenConfig({ breakpoint: 'lg', stretchSheet: true, tintOverfull: true });
+    expect(ed.state.bp).toBe('lg');
+    expect(ed.state.stretchSheet).toBe(true);
+    expect(ed.state.tintOverfull).toBe(true);
+    ed.applyOpenConfig({ breakpoint: before.bp, stretchSheet: before.s, tintOverfull: before.t });
+  });
+
+  it('the dialect setting only breaks ties on a file with no grid classes', async () => {
+    const ed = await editor();
+    const { parseTemplate } = await import('@bootstrap-visualizer/core');
+    ed.applyOpenConfig({ dialect: 'bootstrap3' });
+    // no grid classes → the setting decides
+    expect(ed.detectDialect(parseTemplate('<div class="row"><div>x</div></div>'))).toBe(true);
+    // a file that already picked a dialect always wins over the setting
+    expect(ed.detectDialect(parseTemplate('<div class="col-md-6">x</div>'))).toBe(false);
+    expect(ed.detectDialect(parseTemplate('<div class="col-xs-6">x</div>'))).toBe(true);
+    ed.applyOpenConfig({ dialect: 'bootstrap5' });   // restore default
+  });
+
+  it('flipping a sticky pref asks the host to persist it', async () => {
+    const ed = await editor();
+    const { standaloneHost } = await import('./standalone-host.js');
+    const writes: Array<[string, boolean]> = [];
+    ed.setHost({ ...standaloneHost, persistViewPref: (p, v) => writes.push([p, v]) });
+    ed.persistViewPref('stretchSheet', true);
+    expect(writes).toEqual([['stretchSheet', true]]);
+    expect(ed.state.stretchSheet).toBe(true);
+    ed.setHost(standaloneHost);          // restore the real host
+    ed.state.stretchSheet = false;       // and the mutated state
+  });
+});
+
 describe('selection drives the inspector', () => {
   it('selecting a column shows its class and actions', () => {
     const col = document.querySelector<HTMLElement>('.g-col')!;

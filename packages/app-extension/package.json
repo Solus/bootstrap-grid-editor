@@ -30,6 +30,41 @@
         "icon": "$(layout)"
       }
     ],
+    "configuration": {
+      "title": "Bootstrap Grid Visualizer",
+      "properties": {
+        "bootstrapVisualizer.defaultBreakpoint": {
+          "type": "string",
+          "enum": ["xs", "sm", "md", "lg", "xl", "xxl"],
+          "default": "md",
+          "scope": "application",
+          "markdownDescription": "Breakpoint the canvas opens at. Switching breakpoints in the canvas is temporary and does not change this."
+        },
+        "bootstrapVisualizer.stretchToFit": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "markdownDescription": "Open with the sheet stretched to the full canvas panel instead of the breakpoint's representative width. The **Stretch to fit** checkbox in the canvas updates this."
+        },
+        "bootstrapVisualizer.tintOverfullRows": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "markdownDescription": "Open with overfull rows tinted amber. The **Tint overfull rows** checkbox in the canvas updates this."
+        },
+        "bootstrapVisualizer.dialect": {
+          "type": "string",
+          "enum": ["bootstrap5", "bootstrap3"],
+          "enumDescriptions": [
+            "New columns use col-*/col-md-* and offset-* (Bootstrap 4/5)",
+            "New columns use col-xs-*/col-sm-* and col-sm-offset-* (Bootstrap 3)"
+          ],
+          "default": "bootstrap5",
+          "scope": "application",
+          "markdownDescription": "Class style for **new** columns when a file has no grid classes to detect from. A file that already uses one dialect always keeps it."
+        }
+      }
+    },
     "menus": {
       "editor/title": [
         {

@@ -4,7 +4,7 @@
 
 import {
   BPS, applyEdits, buildModel, classTokens, classValue, definingBp,
-  parseTemplate, usesBs3, widthTokenBp,
+  isColTokens, parseTemplate, usesBs3, widthTokenBp,
 } from '@bootstrap-visualizer/core';
 import type {
   Breakpoint, ColNode, Edit, El, NodePath, RootEl, RowNode,
@@ -106,10 +106,47 @@ export interface Host {
       that element's span (standalone: textarea selection + highlight band;
       extension: editor.revealRange), or null when selection is cleared. */
   revealSource(el: El | null): void;
+  /** Persist a sticky view preference the user toggled in the canvas
+      (stretch/tint), so it's remembered next open. Optional: the standalone
+      has nowhere to persist to and omits it; the extension writes it to the
+      user's VS Code settings. */
+  persistViewPref?(pref: ViewPref, value: boolean): void;
+}
+
+/** The view toggles that double as remembered settings. */
+export type ViewPref = 'stretchSheet' | 'tintOverfull';
+
+/** Settings the host seeds the canvas with at open (extension only). All
+    optional — an absent field keeps the built-in default. */
+export interface OpenConfig {
+  breakpoint?: Breakpoint;
+  stretchSheet?: boolean;
+  tintOverfull?: boolean;
+  /** Dialect for *new* classes when a file has none to detect from. */
+  dialect?: 'bootstrap5' | 'bootstrap3';
+}
+
+/** Default dialect for a file with no grid classes (set by config; BS5 unless
+    the host says otherwise). A file that *does* declare grid classes always
+    wins over this — see `detectDialect`. */
+let dialectDefault = false;   // false = Bootstrap 4/5
+
+/** Seed the canvas from the host's settings, once, before the first render. */
+export function applyOpenConfig(cfg: OpenConfig): void {
+  if (cfg.breakpoint) state.bp = cfg.breakpoint;
+  if (cfg.stretchSheet != null) state.stretchSheet = cfg.stretchSheet;
+  if (cfg.tintOverfull != null) state.tintOverfull = cfg.tintOverfull;
+  if (cfg.dialect) dialectDefault = cfg.dialect === 'bootstrap3';
 }
 
 let host: Host | null = null;
 export function setHost(h: Host): void { host = h; }
+
+/** Set a sticky view preference and tell the host to remember it. */
+export function persistViewPref(pref: ViewPref, value: boolean): void {
+  state[pref] = value;
+  host?.persistViewPref?.(pref, value);
+}
 
 export function canApplyEdit(): { ok: true } | { ok: false; reason: string } {
   return host ? host.canApplyEdit() : { ok: true };
@@ -150,7 +187,7 @@ export function apply(newSrc: string, opts: ApplyOpts = {}): void {
   state.src = newSrc;
   state.root = parseTemplate(newSrc);
   state.model = buildModel(state.root, state.activeBranch);
-  state.docBs3 = computeDocBs3(state.root);
+  state.docBs3 = detectDialect(state.root);
   if (!keepSel) state.sel = null;
   if (state.sel && !resolvePath(state.sel.path)) state.sel = null;
   if (!state.sel) state._bandLines = null;
@@ -241,6 +278,25 @@ export function computeDocBs3(root: El): boolean {
     }
   })(root);
   return found;
+}
+
+/** Whether new classes should be BS3-style. A file that already declares grid
+    classes decides for itself — BS3 evidence → BS3, any other grid class →
+    BS4/5. Only a file with *no* grid classes falls back to the configured
+    `dialectDefault`, so the setting breaks ties without ever overriding a
+    document that has clearly picked a dialect. */
+export function detectDialect(root: El): boolean {
+  let hasGrid = false;
+  const bs3 = (function walk(e: El): boolean {
+    for (const c of e.children) {
+      const toks = classTokens(c);
+      if (usesBs3(toks)) return true;
+      if (!hasGrid && isColTokens(toks)) hasGrid = true;
+      if (walk(c)) return true;
+    }
+    return false;
+  })(root);
+  return bs3 ? true : (hasGrid ? false : dialectDefault);
 }
 
 /* ── tier conventions for newly created tokens ───────────────────── */

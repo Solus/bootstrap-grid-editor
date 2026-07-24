@@ -34,6 +34,8 @@ vi.mock('vscode', () => {
   const warnMsgs: string[] = [];
   const panels: unknown[] = [];
   const applied: { ops: { uri: unknown; range: unknown; text: string }[] }[] = [];
+  const config = new Map<string, unknown>();
+  const configWrites: { key: string; value: unknown; target: unknown }[] = [];
   const state = {
     activeTextEditor: undefined as unknown,
     visibleTextEditors: [] as unknown[],
@@ -116,17 +118,28 @@ vi.mock('vscode', () => {
         if (state.applyResult) state.applyHook?.();
         return Promise.resolve(state.applyResult);
       },
+      getConfiguration: (_section: string) => ({
+        get: (key: string) => config.get(key),
+        update: (key: string, value: unknown, target: unknown) => {
+          configWrites.push({ key, value, target });
+          config.set(key, value);
+          return Promise.resolve();
+        },
+      }),
     },
     ViewColumn: { Beside: 2 },
     TextEditorRevealType: { InCenterIfOutsideViewport: 2 },
+    ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
     Range, Selection, WorkspaceEdit, Uri,
     __mock: {
       state, saves, changes, selections, commands, infoMsgs, warnMsgs, panels, applied,
+      config, configWrites,
       reset() {
         saves.clear(); changes.clear(); selections.clear();
         commands.clear();
         infoMsgs.length = 0; warnMsgs.length = 0;
         panels.length = 0; applied.length = 0;
+        config.clear(); configWrites.length = 0;
         state.activeTextEditor = undefined;
         state.visibleTextEditors = [];
         state.applyHook = null;
@@ -151,6 +164,8 @@ interface MockApi {
   commands: Map<string, (...a: unknown[]) => unknown>;
   infoMsgs: string[]; warnMsgs: string[];
   panels: FakePanel[]; applied: { ops: { range: unknown; text: string }[] }[];
+  config: Map<string, unknown>;
+  configWrites: { key: string; value: unknown; target: unknown }[];
   reset(): void;
 }
 interface FakePanel {
@@ -326,6 +341,32 @@ describe('edits out and reveal', () => {
     const { panel } = openWith(doc);
     M.state.visibleTextEditors = [];
     expect(() => panel.receive({ type: 'reveal', start: 0, end: 1 })).not.toThrow();
+  });
+});
+
+/* ── settings ────────────────────────────────────────────────────── */
+
+describe('user settings', () => {
+  it('seeds the webview from workspace config, before the source', async () => {
+    M.config.set('defaultBreakpoint', 'lg');
+    M.config.set('stretchToFit', true);
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    panel.receive({ type: 'ready' });
+    await vi.waitFor(() => expect(panel.posts.some(p => p.type === 'config')).toBe(true));
+    const cfgIdx = panel.posts.findIndex(p => p.type === 'config');
+    const srcIdx = panel.posts.findIndex(p => p.type === 'setSource');
+    expect(cfgIdx).toBeGreaterThanOrEqual(0);
+    expect(cfgIdx).toBeLessThan(srcIdx);   // config must arrive before the source
+    expect((panel.posts[cfgIdx] as { config: unknown }).config)
+      .toMatchObject({ breakpoint: 'lg', stretchSheet: true });
+  });
+
+  it('a canvas view-toggle writes back to global user settings', () => {
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    panel.receive({ type: 'setConfig', pref: 'tintOverfull', value: true });
+    expect(M.configWrites).toContainEqual(
+      { key: 'tintOverfullRows', value: true, target: 1 });   // 1 = ConfigurationTarget.Global
+    expect(M.config.get('tintOverfullRows')).toBe(true);
   });
 });
 

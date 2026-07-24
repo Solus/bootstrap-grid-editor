@@ -9,6 +9,7 @@ function harness(opts: { text?: string; version?: number } = {}) {
   const posts: HostMessage[] = [];
   const reveals: Array<[number, number]> = [];
   const warns: string[] = [];
+  const configWrites: Array<[string, boolean]> = [];
   let version = opts.version ?? 1;
   let text = opts.text ?? '<div class="row"><div class="col">x</div></div>';
   let applyOk = true;
@@ -24,10 +25,12 @@ function harness(opts: { text?: string; version?: number } = {}) {
     docText: () => text,
     docVersion: () => version,
     warn: m => warns.push(m),
+    config: () => ({ breakpoint: 'lg', tintOverfull: true }),
+    setConfig: (pref, value) => configWrites.push([pref, value]),
   });
 
   return {
-    session, posts, reveals, warns,
+    session, posts, reveals, warns, configWrites,
     setVersion: (v: number) => { version = v; },
     failNextApply: () => { applyOk = false; },
     duringApply: (fn: () => void) => { onApply = fn; },
@@ -37,10 +40,20 @@ function harness(opts: { text?: string; version?: number } = {}) {
 }
 
 describe('Session — source in', () => {
-  it('ready sends the current document', async () => {
+  it('ready sends config first, then the current document', async () => {
     const h = harness({ text: '<p>hi</p>', version: 4 });
     await h.session.onMessage({ type: 'ready' });
-    expect(h.posts).toEqual([{ type: 'setSource', text: '<p>hi</p>', version: 4 }]);
+    // config must precede setSource so the canvas seeds before its first render
+    expect(h.posts).toEqual([
+      { type: 'config', config: { breakpoint: 'lg', tintOverfull: true } },
+      { type: 'setSource', text: '<p>hi</p>', version: 4 },
+    ]);
+  });
+
+  it('setConfig routes a canvas view-toggle back to the host', () => {
+    const h = harness();
+    h.session.onMessage({ type: 'setConfig', pref: 'stretchSheet', value: true });
+    expect(h.configWrites).toEqual([['stretchSheet', true]]);
   });
 
   it('save refreshes from source', () => {
