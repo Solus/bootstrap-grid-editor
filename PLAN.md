@@ -242,7 +242,7 @@ session is checked only when every box under it is.
         easily-missed asymmetry. (Full row drag-and-drop remains a larger,
         separate item; deliberately not done.)
 
-- [ ] **Session 3 — extension**
+- [x] **Session 3 — extension** *(shipped; released v0.0.1 → v0.0.6)*
 
   *Architecture decisions (discussed one at a time):*
   1. **Shared UI package + host-adapter seam.** A shared package holds the
@@ -293,9 +293,16 @@ session is checked only when every box under it is.
   - [x] Edits-out slice: canvas edits → minimal `WorkspaceEdit` on the
         buffer (immediate, decision 7); refresh-from-source on save;
         guard-and-warn + **Resync** on divergence; native undo (decision 6).
-  - [ ] Polish / verify: exercise the sync loop in the dev host; a "saved to
-        persist" cue; trim the webview bundle (it ships `@angular/compiler`);
-        reverse caret-sync (editor cursor → canvas selection).
+  - [x] Polish / verify: sync loop exercised in the dev host; "saved to
+        persist" cue (the "press Ctrl+S to save" toast); reverse caret-sync
+        (editor cursor → canvas selection). **Not done, deliberately
+        deferred:** trimming the webview bundle (it still ships
+        `@angular/compiler` — load time is acceptable; FOLLOW-UPS §7.1).
+  - Post-Session-3 hardening (FOLLOW-UPS, all resolved): `@if`/`@else`/
+        `@else if`/`*ngIf` modeled as toggleable conditional regions
+        (in-row, in-column, top-level); cross-engine e2e (Firefox/WebKit);
+        VS Code wiring tests; boot-time element-id contract (§4.2); fill
+        estimate honesty (§2.4).
 
 - [ ] **Session 4+ — enrichment (strictly additive, extension-only)**
   - [ ] Resolve i18n keys → real translated labels from locale files.
@@ -307,11 +314,13 @@ session is checked only when every box under it is.
 
 ---
 
-## CI / CD (GitHub Actions — later phase, once there's something to build)
+## CI / CD (GitHub Actions) — **DONE, built as specified below**
 
-Cannot be wired until sessions 1–3 create the build scripts and the
-extension package. Add the test-on-push part as soon as session 1's
-Vitest suite exists; add build-and-publish once the extension exists.
+Implemented: `.github/workflows/test.yml` (push/PR → typecheck + Vitest +
+Playwright across Chromium/Firefox/WebKit) and `.github/workflows/
+release.yml` (tag `v*` → test, build the single HTML + the `.vsix`,
+publish both to a GitHub Release with notes pulled from the CHANGELOG).
+The rest of this section is the original spec it was built to.
 
 **Two triggers, deliberately different:**
 - **On every push / PR** → run the **Vitest suite only**. Fast feedback;
