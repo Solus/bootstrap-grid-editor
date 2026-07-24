@@ -4,6 +4,7 @@
   "description": "Visual editor for Bootstrap grid layouts in Angular templates.",
   "version": "0.0.6",
   "private": true,
+  "icon": "media/icon.png",
   "publisher": "BeroXL",
   "author": {
     "name": "BeroXL"
