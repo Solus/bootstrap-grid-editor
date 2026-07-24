@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- canvas-dark rounded tile with the app's border colour -->
+  <rect x="1" y="1" width="126" height="126" rx="26" fill="#10161f"/>
+  <rect x="2" y="2" width="124" height="124" rx="25" fill="none" stroke="#26324a" stroke-width="2"/>
+
+  <!-- top row: three columns, the middle one amber (a "selected" column) -->
+  <rect x="22" y="34" width="24" height="26" rx="5" fill="rgba(61,123,255,0.15)" stroke="#3d7bff" stroke-width="2"/>
+  <rect x="52" y="34" width="24" height="26" rx="5" fill="rgba(255,180,84,0.18)" stroke="#ffb454" stroke-width="2"/>
+  <rect x="82" y="34" width="24" height="26" rx="5" fill="rgba(61,123,255,0.15)" stroke="#3d7bff" stroke-width="2"/>
+
+  <!-- bottom row: a wide + a narrow column (responsive) -->
+  <rect x="22" y="68" width="54" height="26" rx="5" fill="rgba(61,123,255,0.15)" stroke="#3d7bff" stroke-width="2"/>
+  <rect x="82" y="68" width="24" height="26" rx="5" fill="rgba(61,123,255,0.15)" stroke="#3d7bff" stroke-width="2"/>
+</svg>
