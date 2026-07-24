@@ -66,9 +66,12 @@ vi.mock('vscode', () => {
     const posts: unknown[] = [];
     let msgCb: ((m: unknown) => void) | null = null;
     const disposeCbs: (() => void)[] = [];
+    let reveals = 0;
     const panel = {
       viewType, title, options,
       posts,
+      reveal: () => { reveals++; },
+      revealCount: () => reveals,
       webview: {
         html: '',
         cspSource: 'vscode-webview:',
@@ -135,6 +138,10 @@ vi.mock('vscode', () => {
       state, saves, changes, selections, commands, infoMsgs, warnMsgs, panels, applied,
       config, configWrites,
       reset() {
+        // dispose any live panel first so extension.ts's module-level `active`
+        // canvas clears (its onDidDispose sets active = null) — otherwise the
+        // next test would reuse a stale panel instead of creating one
+        (panels as FakePanel[]).forEach(p => p.dispose());
         saves.clear(); changes.clear(); selections.clear();
         commands.clear();
         infoMsgs.length = 0; warnMsgs.length = 0;
@@ -175,6 +182,8 @@ interface FakePanel {
   webview: { html: string };
   receive(m: unknown): void;
   hasMessageListener(): boolean;
+  reveal(): void;
+  revealCount(): number;
   dispose(): void;
 }
 
@@ -367,6 +376,50 @@ describe('user settings', () => {
     expect(M.configWrites).toContainEqual(
       { key: 'tintOverfullRows', value: true, target: 1 });   // 1 = ConfigurationTarget.Global
     expect(M.config.get('tintOverfullRows')).toBe(true);
+  });
+});
+
+/* ── single reusable panel ───────────────────────────────────────── */
+
+/** Invoke the open command with `doc` as the active editor (a second+ open). */
+function runOpenOn(doc: ReturnType<typeof makeDoc>) {
+  const editor = makeEditor(doc);
+  M.state.activeTextEditor = editor;
+  M.state.visibleTextEditors = [editor];
+  M.commands.get('bootstrapVisualizer.open')!();
+  return editor;
+}
+
+describe('one reusable panel', () => {
+  it('opening again re-points the single panel at the new file', () => {
+    const docA = makeDoc('<p>A</p>');
+    const { panel } = openWith(docA);
+    panel.receive({ type: 'ready' });
+    expect(M.panels.length).toBe(1);
+
+    const docB = makeDoc('<div class="row">B</div>');
+    runOpenOn(docB);
+
+    expect(M.panels.length).toBe(1);          // no second panel spawned
+    expect(panel.revealCount()).toBe(1);      // the canvas is brought to front
+    // the canvas now shows docB
+    expect(panel.posts).toContainEqual(
+      { type: 'setSource', text: '<div class="row">B</div>', version: 1 });
+
+    // routing now follows docB and no longer docA
+    const n = panel.posts.filter(p => p.type === 'setSource').length;
+    M.saves.fire(docA);
+    expect(panel.posts.filter(p => p.type === 'setSource').length).toBe(n);       // old file: ignored
+    M.saves.fire(docB);
+    expect(panel.posts.filter(p => p.type === 'setSource').length).toBe(n + 1);   // new file: refreshes
+  });
+
+  it('after the panel is closed, opening builds a fresh one', () => {
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    expect(M.panels.length).toBe(1);
+    panel.dispose();
+    runOpenOn(makeDoc('<p>y</p>'));
+    expect(M.panels.length).toBe(2);          // a new canvas, not a reuse of the disposed one
   });
 });
 

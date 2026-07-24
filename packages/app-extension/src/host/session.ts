@@ -54,6 +54,15 @@ export class Session {
     this.sendSource();
   }
 
+  /** Re-point at the bound document (which a reused panel may have just
+      swapped for a different one): drop transient sync state and resend the
+      source, so the canvas shows the new file cleanly. */
+  reload(): void {
+    this.applying = false;
+    this.revealed = null;
+    this.sendSource();
+  }
+
   /** The editor selection moved to these offsets (start/end of the range and
       the active caret). */
   onEditorSelection(start: number, end: number, active: number): void {

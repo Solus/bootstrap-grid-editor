@@ -18,14 +18,35 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 }
 
+/** The one live canvas, if any. A single reusable panel: re-pointed at the
+    current document rather than spawning another (FOLLOW-UPS §9.2). */
+interface Canvas {
+  panel: vscode.WebviewPanel;
+  /** Re-point at a different editor's document and show the canvas. */
+  bind(editor: vscode.TextEditor): void;
+}
+let active: Canvas | null = null;
+
 function openPanel(context: vscode.ExtensionContext): void {
-  const sourceEditor = vscode.window.activeTextEditor;
-  if (!sourceEditor) {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
     void vscode.window.showInformationMessage(
       'Open an HTML/Angular template first, then run "Open Grid Visualizer".');
     return;
   }
-  const doc = sourceEditor.document;
+  // reuse the existing canvas — re-point it at this file — rather than making
+  // a second one that would go out of sync
+  if (active) {
+    active.bind(editor);
+    return;
+  }
+  active = createCanvas(context, editor);
+}
+
+function createCanvas(context: vscode.ExtensionContext, initial: vscode.TextEditor): Canvas {
+  // The bound document is mutable so one panel can serve any file: every port
+  // and listener below reads `doc`, so reassigning it re-points them all.
+  let doc = initial.document;
 
   const panel = vscode.window.createWebviewPanel(
     'bootstrapVisualizer',
@@ -81,8 +102,20 @@ function openPanel(context: vscode.ExtensionContext): void {
   panel.webview.onDidReceiveMessage(
     (msg: WebviewMessage) => void session.onMessage(msg), undefined, disposables);
 
-  panel.onDidDispose(() => disposables.forEach(d => d.dispose()), null, context.subscriptions);
+  panel.onDidDispose(() => {
+    disposables.forEach(d => d.dispose());
+    active = null;                 // let the next open build a fresh canvas
+  }, null, context.subscriptions);
   context.subscriptions.push(panel);
+
+  return {
+    panel,
+    bind(editor) {
+      doc = editor.document;       // re-point every port/listener at once
+      session.reload();            // resend the new file's source, reset sync
+      panel.reveal();              // bring the canvas to front, focused
+    },
+  };
 }
 
 /** The user's settings, read fresh at panel open. Defaults here mirror the
