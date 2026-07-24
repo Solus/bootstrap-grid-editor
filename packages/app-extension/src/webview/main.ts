@@ -6,11 +6,14 @@
 
 import '@bootstrap-visualizer/editor/styles.css';
 import {
-  apply, selectAtOffset, setHost, toast, wireBreakpointSwitch,
-  wireCanvasBackground, wireKeyboardNav,
+  apply, assertRequiredIds, REQUIRED_EDITOR_IDS, selectAtOffset, setHost, toast,
+  wireBreakpointSwitch, wireCanvasBackground, wireKeyboardNav,
 } from '@bootstrap-visualizer/editor';
 import { createWebviewHost, type SyncState } from './webview-host.js';
 import type { HostMessage, WebviewMessage } from '../shared/protocol.js';
+
+// #resyncBtn is the webview's only extra element beyond the shared editor set
+assertRequiredIds([...REQUIRED_EDITOR_IDS, 'resyncBtn']);
 
 interface VsCodeApi {
   postMessage(msg: WebviewMessage): void;

@@ -9,6 +9,26 @@
 export const $ = <T extends Element = HTMLElement>(s: string): T =>
   document.querySelector(s) as T;
 
+/** Element ids the shared editor resolves from the host HTML. Both frontends
+    must provide every one. Optional chrome (`#undoBtn`/`#redoBtn`, guarded in
+    renderHeader because the extension omits them) is deliberately excluded. */
+export const REQUIRED_EDITOR_IDS = [
+  'sheet', 'rowsHost', 'inspector', 'ruler', 'toast',
+  'bpSwitch', 'bpNote', 'findBox', 'findCount',
+] as const;
+
+/** Fail loud and early if the host HTML is missing an element the code will
+    later look up by id. Without this a `$()` silently returns null and blows
+    up cryptically on first use; here you get one message naming exactly what's
+    missing (FOLLOW-UPS §4.2). Call once at boot, before the first render. */
+export function assertRequiredIds(ids: readonly string[]): void {
+  const missing = ids.filter(id => !document.getElementById(id));
+  if (missing.length) {
+    throw new Error(
+      'Host HTML is missing required element(s): ' + missing.map(id => '#' + id).join(', '));
+  }
+}
+
 export const rowsHost = $('#rowsHost');
 export const inspector = $('#inspector');
 export const sheet = $('#sheet');

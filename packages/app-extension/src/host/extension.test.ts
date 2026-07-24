@@ -237,11 +237,13 @@ describe('the webview HTML contract', () => {
   });
 
   it('contains every element id the shared editor resolves at boot', () => {
-    // dom.ts looks these up by string at module load — a missing one is a
-    // runtime crash in the webview (FOLLOW-UPS §4.2)
+    // dom.ts looks these up by string; the webview also asserts them at boot
+    // (assertRequiredIds in webview/main.ts). This mirrors that contract —
+    // editor's REQUIRED_EDITOR_IDS plus the webview's own #resyncBtn — from
+    // the HTML side. Keep in sync with editor/dom.ts (FOLLOW-UPS §4.2).
     const { panel } = openWith(makeDoc('<p>x</p>'));
     for (const id of ['sheet', 'rowsHost', 'inspector', 'bpSwitch', 'bpNote',
-                      'resyncBtn', 'findBox', 'findCount', 'ruler', 'toast']) {
+                      'findBox', 'findCount', 'ruler', 'toast', 'resyncBtn']) {
       expect(panel.webview.html).toContain(`id="${id}"`);
     }
   });

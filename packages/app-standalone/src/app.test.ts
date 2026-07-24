@@ -13,6 +13,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import indexHtml from '../index.html?raw';
 
+// Imported dynamically inside tests, NOT statically: the editor's dom.ts
+// resolves #rowsHost/#sheet/#inspector at module-load time, so it must not
+// evaluate until beforeAll has populated document.body (the very coupling
+// §4.2 is about). main.js triggers that evaluation; these re-import the
+// already-cached module.
+type EditorApi = typeof import('@bootstrap-visualizer/editor');
+const editor = () => import('@bootstrap-visualizer/editor') as Promise<EditorApi>;
+
 beforeAll(async () => {
   const body = /<body>([\s\S]*)<\/body>/.exec(indexHtml)![1]!;
   document.body.innerHTML = body.replace(/<script[\s\S]*?<\/script>/g, '');
@@ -124,6 +132,23 @@ describe('view options', () => {
       .find(l => l.textContent!.includes('Stretch to fit'))!
       .querySelector('input')!.click();
     expect(sheet.style.maxWidth).toMatch(/px$/);
+  });
+});
+
+describe('host HTML id contract (FOLLOW-UPS §4.2)', () => {
+  it('index.html provides every element the shared editor requires', async () => {
+    const { assertRequiredIds, REQUIRED_EDITOR_IDS } = await editor();
+    // the booted body is the real index.html — the assertion must pass
+    expect(() => assertRequiredIds([...REQUIRED_EDITOR_IDS])).not.toThrow();
+  });
+
+  it('a missing element throws, naming exactly what is absent', async () => {
+    const { assertRequiredIds } = await editor();
+    expect(() => assertRequiredIds(['sheet', 'notARealId']))
+      .toThrowError(/#notARealId/);
+    // and does not blame the elements that are present
+    expect(() => assertRequiredIds(['sheet', 'notARealId']))
+      .not.toThrowError(/#sheet/);
   });
 });
 
