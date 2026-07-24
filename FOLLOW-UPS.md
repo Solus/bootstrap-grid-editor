@@ -309,16 +309,22 @@ instead of a dozen cryptic failures. A real fixture swap remains possible
 later; the marker list is the head start, and the history wrinkle is
 noted here so it isn't rediscovered.
 
-### 4.2 `index.html` ↔ `dom.ts` element IDs are coupled by convention only **[decide]**
+### 4.2 `index.html` ↔ `dom.ts` element IDs are coupled by convention only **[RESOLVED — boot-time assertion + a shared contract]**
 
-`dom.ts` resolves `#src`, `#rowsHost`, `#inspector`, `#sheet` and a dozen
-more by string at module load. Nothing checks the markup still contains
-them. A typo in either file is a runtime failure, not a compile error.
+Took the "explicit assertion pass at boot" option. `dom.ts` now exports
+`REQUIRED_EDITOR_IDS` (the shared-editor ids, minus the optional
+`#undoBtn`/`#redoBtn` that the extension omits) and `assertRequiredIds(ids)`,
+which throws one message naming every missing element. Each frontend calls it
+first thing at boot with the editor ids plus its own extras (standalone: the
+source pane + header buttons; webview: `#resyncBtn`). A renamed/absent id now
+fails loudly and specifically instead of a cryptic null-deref on first use.
 
-The jsdom boot test catches it *today* — a missing element throws during
-first render — but that's incidental, not by design. If this gets
-formalized, the honest version is a single `ids.ts` shared by a generated
-`index.html`, or an explicit assertion pass at boot.
+Tests: `app.test.ts` asserts `index.html` satisfies the contract and that a
+missing id is named (mutation-checked by renaming `#sheet`); `extension.test.ts`
+already asserts the webview HTML carries the same ids. Not covered: `dom.ts`
+still *reads* `#rowsHost`/`#inspector`/`#sheet` at module-load — the assertion
+runs after, so it catches the miss before first render but the const holds
+null in between. Making those lazy is a larger refactor, deliberately not done.
 
 ### 4.3 Line endings **[RESOLVED]**
 
