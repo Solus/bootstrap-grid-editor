@@ -69,9 +69,13 @@ describe('sample exercises the interesting paths', () => {
   });
 
   it('flags the overfull row', () => {
-    const pills = [...document.querySelectorAll('.fill-pill.over')];
+    const pills = [...document.querySelectorAll('.fill-pill.over')]
+      .map(p => p.textContent ?? '');
     expect(pills.length).toBeGreaterThan(0);
-    expect(pills[0]!.textContent).toContain('wraps');
+    // the intended overfull row (all fixed widths) is a definitive "→ wraps"
+    expect(pills.some(t => /\/12 → wraps$/.test(t))).toBe(true);
+    // and every over-pill announces the overflow one way or another
+    expect(pills.every(t => /→ (wraps|may wrap)$/.test(t))).toBe(true);
   });
 
   it('models the @if row as a branch toggle (not the unreliable pill)', () => {
