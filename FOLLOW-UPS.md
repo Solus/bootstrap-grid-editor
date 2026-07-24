@@ -514,13 +514,14 @@ one-time `config` message before the first `setSource` → webview applies it
 via a small `applyOpenConfig(cfg)` in the editor package (jsdom-testable).
 Standalone never receives it; keeps its own defaults.
 
-### 9.2 "Open Grid Visualizer" spawns a new panel every time **[decide]**
+### 9.2 "Open Grid Visualizer" spawns a new panel every time **[RESOLVED — single reusable panel]**
 
-`openPanel` (`host/extension.ts`) calls `createWebviewPanel`
-unconditionally — no check for an existing one. So opening the command on
-file A then file B gives two canvases, and re-running it by habit gives two
-of the *same* file, out of sync. The useful fix is **reuse a single panel**:
-re-point the existing canvas at the current document (swap the bound doc,
-re-wire the listeners, re-post its source) instead of spawning another. A
-behaviour fix, not a setting (no meaningful "off"), so kept separate from
-§9.1. Slightly more work — tracking the panel and rebinding its document.
+Fixed: `openPanel` keeps one `active` canvas. If it exists, `bind(editor)`
+re-points it at the current document and reveals it (focused) instead of
+spawning another. The bound document is a mutable `doc` every port and
+listener reads, so reassigning it re-points them all at once — no re-wiring;
+`Session.reload()` resends the new file's source and resets transient sync
+state. `onDidDispose` clears `active` so the next open builds fresh. Covered
+by extension-wiring tests (one panel on re-open, routing follows the new
+file, reveal called, fresh panel after close). Focus jumps to the canvas on
+reuse, per the maintainer's call.
