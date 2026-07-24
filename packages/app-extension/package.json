@@ -25,9 +25,12 @@
     "commands": [
       {
         "command": "bootstrapVisualizer.open",
-        "title": "$(layout) Open Grid Visualizer",
+        "title": "Open Grid Visualizer",
         "category": "Bootstrap Grid",
-        "icon": "$(layout)"
+        "icon": {
+          "light": "media/grid-light.svg",
+          "dark": "media/grid-dark.svg"
+        }
       }
     ],
     "configuration": {
