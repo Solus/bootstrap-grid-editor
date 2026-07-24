@@ -105,6 +105,11 @@ representation, or the parser AST should be resolved by looking at real
 output and discussing — not by guessing and building on the guess.
 
 ## Current status
-Sessions 1 and 2 are complete (parser swapped to `@angular/compiler`).
-`CondRegion` / `@if`-`@else` frontend behavior is deferred to its own
-session; Session 3 (the extension) is next.
+Sessions 1–3 are complete and released (v0.0.1 → v0.0.6): shared-core
+library, parser on `@angular/compiler`, and the VS Code extension with
+CI/CD. `@if`/`@else`/`@else if` and `*ngIf` are now first-class
+toggleable conditional regions (in-row, in-column, and top-level). The
+FOLLOW-UPS `[decide]`/`[verify]` backlog is cleared. Next up (not
+started): Session 4 enrichment — resolving i18n keys, component tags,
+and `formControlName` from the user's project — deferred by choice for
+now in favour of HTML-only work.
