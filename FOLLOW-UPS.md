@@ -487,3 +487,40 @@ breakpoints, auto/equal, nesting, containers) is fully modeled; these are the
 grid-relevant gaps toward "full fidelity". Bootstrap the *framework*
 (components, JS, utilities at large) is explicitly out of scope — this is a
 grid drafting board.
+
+## 9. Extension behaviour & settings
+
+### 9.1 Tier-1 settings (user-scoped) **[planned — building next]**
+
+Four `contributes.configuration` settings, defaults matching today's
+behaviour so no one is surprised:
+- **default breakpoint** (seed for `state.bp`, today `md`) — *one-way*:
+  the in-canvas breakpoint switch is inspection, flipping it must not
+  persist ("looked at xs once" ≠ "always open at xs").
+- **stretch to fit** and **tint overfull** — *two-way*: the canvas
+  checkbox **is** the setting. Flipping it writes to user settings
+  (`config.update(..., Global)`) via a host message, and is remembered
+  on next open, any project.
+- **dialect for new classes** (BS5 vs BS3) — seeds `docBs3` only when a
+  file has no grid classes to detect from; existing `col-md-*` / `col-xs-*`
+  still win.
+
+Scope: `application` (user-only, not settable in a repo `.vscode`), per the
+maintainer's call — including dialect, even though it's the one that could
+plausibly vary per project (per-file auto-detection covers most real cases).
+Read at panel open, not live (`onDidChangeConfiguration` easy to add later).
+Mechanism: host reads config → hands it to `Session` → `Session` posts a
+one-time `config` message before the first `setSource` → webview applies it
+via a small `applyOpenConfig(cfg)` in the editor package (jsdom-testable).
+Standalone never receives it; keeps its own defaults.
+
+### 9.2 "Open Grid Visualizer" spawns a new panel every time **[decide]**
+
+`openPanel` (`host/extension.ts`) calls `createWebviewPanel`
+unconditionally — no check for an existing one. So opening the command on
+file A then file B gives two canvases, and re-running it by habit gives two
+of the *same* file, out of sync. The useful fix is **reuse a single panel**:
+re-point the existing canvas at the current document (swap the bound doc,
+re-wire the listeners, re-post its source) instead of spawning another. A
+behaviour fix, not a setting (no meaningful "off"), so kept separate from
+§9.1. Slightly more work — tracking the panel and rebinding its document.
