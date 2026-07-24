@@ -1,5 +1,19 @@
 # Change Log
 
+## 0.0.7
+
+- Added: four settings (Bootstrap Grid Visualizer section) — default
+  breakpoint, start stretched to fit, start with overfull rows tinted, and
+  the class dialect (Bootstrap 4/5 vs 3) for new columns on a blank file. The
+  Stretch and Tint checkboxes in the canvas write themselves back, so they're
+  remembered next open.
+- Added: a proper extension icon, and a distinctive grid icon for the "Open
+  Grid Visualizer" button (was a generic layout icon easily confused with
+  VS Code's own editor-layout controls).
+- Changed: the fill pill now marks *every* estimated width with `~`, and a row
+  that only overflows because of a guessed width reads "→ may wrap" instead of
+  a definitive "→ wraps".
+
 ## 0.0.6
 
 - Added: a top-level `@if`/`@else` wrapping whole rows (and a row-level
