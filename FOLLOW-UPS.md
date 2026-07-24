@@ -444,3 +444,46 @@ That needs an Electron integration harness (`@vscode/test-cli` /
 `-electron`, as l10n-helper uses). Lower value than the controller tests
 (it mostly exercises VS Code, and can't easily drive the webview canvas),
 so deferred.
+
+## 8. Grid-fidelity gaps (deferred features)
+
+### 8.1 `d-*` responsive show/hide utilities **[deferred — planned, not urgent]**
+
+Bootstrap's display utilities (`d-none`, `d-md-block`, `d-lg-none`, …)
+hide/show an element per breakpoint, mobile-first — e.g. `d-none d-lg-block`
+is a desktop-only column (the sample uses exactly that on a `col-lg-3`).
+The tool doesn't model this: a column hidden at the current breakpoint is
+still drawn and still counted in `N/12`, so at that size the picture is
+wrong and a row can read as a false "overfull → wraps".
+
+**Not a big overhaul** — the mobile-first cascade (`effectiveAt`) already
+exists and is generic, so it's reusable for a visibility map. Sketched MVP:
+1. Parse `d-*` into a `ColSpec.display` map (like `width`/`offset`); add
+   `isHiddenAt(spec, bp)` over `effectiveAt`.
+2. Fill math: a column hidden at the current bp contributes 0 (fixes the
+   false overfull).
+3. Render: keep it on the canvas but **dimmed** with a `hidden <md`-style
+   badge; already reactive to the breakpoint switch.
+4. Tests: the cascade + the sample's `d-none d-lg-block`; e2e that a hidden
+   column is dimmed and excluded from the sum at that bp.
+
+Deliberately out of the MVP: **faithful collapse** (hidden column takes zero
+canvas width, like the `@if`-hidden strip — needs a render path); **editing
+visibility** (a button to add/remove `d-none` — new edit op); non-column
+`d-*` (hiding whole rows/content).
+
+### 8.2 Other unmodeled grid features **[deferred — lower priority]**
+
+- **`order-*`** (`order-md-2`, `order-last`): flexbox reorders columns, but
+  the canvas always draws source order — real layout can differ.
+- **`row-cols-*`** (`row-cols-3`): row-driven equal-column count, set on the
+  row instead of each column; not parsed.
+- **Alignment / gutters** (`justify-content-*`, `align-items-*`, `g-*`):
+  affect spacing/position, not the 12-col span math — lowest priority for a
+  schematic.
+
+The core 12-column grid (widths, offsets, both BS3 and BS4/5 dialects, all
+breakpoints, auto/equal, nesting, containers) is fully modeled; these are the
+grid-relevant gaps toward "full fidelity". Bootstrap the *framework*
+(components, JS, utilities at large) is explicitly out of scope — this is a
+grid drafting board.
