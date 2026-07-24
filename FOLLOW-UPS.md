@@ -189,13 +189,17 @@ than slipping it in.
 - `'row reorder swaps content'` — the always-true conjunct was already
   dropped during the port (kept the real check). Nothing left to do.
 
-### 2.4 Schematic guesses in `computeWidths` **[decide]**
+### 2.4 Schematic guesses in `computeWidths` **[RESOLVED — every guess now shows the `~`]**
 
-`col-auto` is drawn as 2 units and a non-col child as 12
-(`render.ts:computeWidths`). Both are eyeballed constants that feed the
-fill sum, so a row's reported total can be off in ways the `~` prefix
-hints at but doesn't quantify. Fine for a schematic; worth revisiting if
-the fill number is ever treated as authoritative.
+Decision: keep the constants (`col-auto` = 2, non-col child = 12) — there's
+no truer number without rendering the content, which `core` won't do — but
+make the *estimate always announce itself*. Two of the three guessed kinds
+(auto, equal) already set `approx` → the pill shows `~N/12`; the non-col
+('plain') case silently didn't, so a full-width guess read as an exact
+total. Fixed: `plain` now sets `approx` too. And when a guess pushes a row
+past 12, the overfull pill says `⚠ ~N/12 → may wrap` (not a definitive
+`→ wraps`), since the row might not actually wrap if the guess is too wide.
+Covered by e2e (`§2.4`, the `<legend>` case) and the sample smoke test.
 
 ### 2.5 `colSequence` / `nestedRows` index alignment **[RESOLVED — was a real bug]**
 

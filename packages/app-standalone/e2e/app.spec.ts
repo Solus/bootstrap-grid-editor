@@ -461,6 +461,23 @@ test.describe('inspector', () => {
     await expect(page.locator('.g-row.overfull')).not.toHaveCount(0);
   });
 
+  test('a non-column child marks the fill estimate as a guess (FOLLOW-UPS §2.4)', async ({ page }) => {
+    // a <legend> in a .row has no col class → drawn full width (12) as a guess.
+    // alone it fills the row exactly, so the pill must show the ~ estimate mark
+    await page.locator('#src').fill('<div class="row"><legend>Section</legend></div>');
+    await page.locator('#applyBtn').click();
+    await expect(page.locator('.g-row').first().locator('.fill-pill'))
+      .toHaveText(/^~12\/12/);
+
+    // add a real column → the guess pushes it "over 12", but because that
+    // rests on a guess the pill says "may wrap", not a definitive "wraps"
+    await page.locator('#src').fill(
+      '<div class="row"><legend>Section</legend><div class="col-4">a</div></div>');
+    await page.locator('#applyBtn').click();
+    await expect(page.locator('.g-row').first().locator('.fill-pill'))
+      .toHaveText(/~16\/12 → may wrap/);
+  });
+
   test('stretch to fit widens the sheet beyond the breakpoint cap', async ({ page }) => {
     // at xs the 400px cap is well below the panel width, so the effect is
     // unambiguous regardless of viewport. The sheet animates max-width

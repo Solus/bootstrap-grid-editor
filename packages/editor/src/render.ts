@@ -52,7 +52,8 @@ export function computeWidths(rowNode: RowNode, bp: Breakpoint): ColWidth[] {
 }
 
 /** Fill sum for a row at the current breakpoint: spans + offsets.
-    approx: contains auto/equal columns (their spans are schematic).
+    approx: contains a column whose width is guessed — auto, equal, or a
+    non-col child drawn full width (their spans are schematic).
     unreliable: has @for/@switch (branches double-count), or a bare @if that
     isn't modeled into a CondRegion. A modeled @if is per-branch: `cols` is
     already the active branch only, so the sum is real. */
@@ -61,7 +62,10 @@ export function rowFill(rowNode: RowNode) {
   let sum = 0, approx = false;
   widths.forEach(w => {
     sum += (w.span === 'auto' ? 2 : w.span) + (w.offset || 0);
-    if (w.span === 'auto' || w.kind === 'equal') approx = true;
+    // auto/equal have no fixed width; a non-col child ('plain') is drawn full
+    // width as a guess too — all three make the sum an estimate, so flag it so
+    // the pill shows the ~ (the 'plain' case used to stay silent).
+    if (w.span === 'auto' || w.kind === 'equal' || w.kind === 'plain') approx = true;
   });
   const modeledIf = !!(rowNode.conds && rowNode.conds.length);
   const unreliable = rowHasForOrSwitch(state.src, rowNode.el) ||
@@ -339,12 +343,17 @@ function renderRow(rowNode: RowNode, path: NodePath, _nested: boolean): HTMLElem
     pill.title = 'Contains @if/@else — all branches counted, sum unreliable';
   } else if (fill.sum > 12) {
     pill.classList.add('over');
-    pill.textContent = '⚠ ' + fill.sum + '/12 → wraps';
-    pill.title = 'Columns + offsets exceed 12 at ' + state.bp + ' — row wraps';
+    // "~" and "may wrap" when the overflow rests on a guessed width — the row
+    // might not actually wrap if the guess is too wide (FOLLOW-UPS §2.4)
+    pill.textContent = '⚠ ' + (fill.approx ? '~' : '') + fill.sum + '/12 → ' +
+      (fill.approx ? 'may wrap' : 'wraps');
+    pill.title = fill.approx
+      ? 'Estimated columns + offsets exceed 12 at ' + state.bp + ' — the row may wrap'
+      : 'Columns + offsets exceed 12 at ' + state.bp + ' — row wraps';
     if (state.tintOverfull) rowDiv.classList.add('overfull');
   } else {
     pill.textContent = (fill.approx ? '~' : '') + fill.sum + '/12';
-    if (fill.approx) pill.title = 'Contains auto/equal columns — approximate';
+    if (fill.approx) pill.title = 'Contains a column with no fixed width (auto, equal, or a non-column child) — approximate';
   }
   // the row's top-edge strip: hidden-region chips (prepended by
   // renderRowBody) followed by the fill pill
