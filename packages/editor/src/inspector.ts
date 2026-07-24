@@ -8,7 +8,7 @@ import {
 } from '@bootstrap-visualizer/core';
 import type { ColNode, RowNode, WidthValue } from '@bootstrap-visualizer/core';
 import { escapeHtml, inspector } from './dom.js';
-import { resolvePath, state } from './state.js';
+import { persistViewPref, resolvePath, state } from './state.js';
 import { render } from './render.js';
 import {
   addColAfter, addColToRow, addRowAfter, changeOffset, deleteEl, nudgeCol,
@@ -31,12 +31,14 @@ export function renderInspector(): void {
 
 function renderViewSection(): void {
   const vs = sec('View');
+  // both persist: flipping the checkbox is remembered (the extension writes
+  // it to user settings; the standalone just keeps it for the session).
   vs.appendChild(viewOpt('Tint overfull rows',
     'Amber border on rows whose columns exceed 12 — off by default since wrapping can be intentional',
-    () => state.tintOverfull, v => { state.tintOverfull = v; }));
+    () => state.tintOverfull, v => persistViewPref('tintOverfull', v)));
   vs.appendChild(viewOpt('Stretch to fit',
     'Let the sheet use the whole canvas panel instead of the breakpoint\'s representative width — proportions are unchanged',
-    () => state.stretchSheet, v => { state.stretchSheet = v; }));
+    () => state.stretchSheet, v => persistViewPref('stretchSheet', v)));
 }
 
 function viewOpt(

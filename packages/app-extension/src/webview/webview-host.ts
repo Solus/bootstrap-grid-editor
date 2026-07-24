@@ -42,5 +42,9 @@ export function createWebviewHost(
     revealSource(el: El | null) {
       if (el) post({ type: 'reveal', start: el.start, end: el.end });
     },
+
+    persistViewPref(pref, value) {
+      post({ type: 'setConfig', pref, value });
+    },
   };
 }

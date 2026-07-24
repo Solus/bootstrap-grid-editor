@@ -11,7 +11,7 @@
    the webview is told it diverged. */
 
 import type { Edit } from '@bootstrap-visualizer/core';
-import type { HostMessage, WebviewMessage } from '../shared/protocol.js';
+import type { ConfigWire, HostMessage, WebviewMessage } from '../shared/protocol.js';
 
 /** Everything the session needs from its VS Code environment. */
 export interface SessionPorts {
@@ -22,6 +22,10 @@ export interface SessionPorts {
   docText(): string;
   docVersion(): number;
   warn(message: string): void;
+  /** The user's settings to seed the canvas with at open. */
+  config(): ConfigWire;
+  /** Persist a sticky view toggle the user flipped in the canvas. */
+  setConfig(pref: 'stretchSheet' | 'tintOverfull', value: boolean): void;
 }
 
 export const OUT_OF_SYNC =
@@ -63,7 +67,13 @@ export class Session {
   async onMessage(msg: WebviewMessage): Promise<void> {
     switch (msg.type) {
       case 'ready':
+        // config first, so the canvas applies the user's settings before it
+        // renders the first source
+        this.ports.post({ type: 'config', config: this.ports.config() });
         this.sendSource();
+        break;
+      case 'setConfig':
+        this.ports.setConfig(msg.pref, msg.value);
         break;
       case 'reveal':
         this.revealed = { start: msg.start, end: msg.end };

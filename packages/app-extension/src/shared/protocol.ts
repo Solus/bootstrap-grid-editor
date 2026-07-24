@@ -5,10 +5,23 @@
    webview) and edits / reveal out (webview → host). Everything else is the
    shared editor running inside the webview. */
 
-import type { Edit } from '@bootstrap-visualizer/core';
+import type { Breakpoint, Edit } from '@bootstrap-visualizer/core';
+
+/** The user's settings the host seeds the canvas with at open. Wire form of
+    the editor's OpenConfig (kept here so `shared`/`host` don't import the DOM
+    editor package). */
+export interface ConfigWire {
+  breakpoint?: Breakpoint;
+  stretchSheet?: boolean;
+  tintOverfull?: boolean;
+  dialect?: 'bootstrap5' | 'bootstrap3';
+}
 
 /** Host → webview. */
 export type HostMessage =
+  /** The user's settings, sent once before the first setSource so the canvas
+      opens with them applied. */
+  | { type: 'config'; config: ConfigWire }
   /** Full document text — sent on open, and on save (the canvas refreshes
       from source on save). `version` is the document version this reflects;
       the webview keeps it to stamp its outgoing edits. Clears divergence. */
@@ -35,4 +48,7 @@ export type WebviewMessage =
   /** Reveal an element's source span in the editor (the revealSource end). */
   | { type: 'reveal'; start: number; end: number }
   /** Reset the canvas to the current buffer (discard divergence). */
-  | { type: 'discard' };
+  | { type: 'discard' }
+  /** The user flipped a sticky view toggle (stretch/tint) in the canvas —
+      write it back to their settings so it's remembered. */
+  | { type: 'setConfig'; pref: 'stretchSheet' | 'tintOverfull'; value: boolean };

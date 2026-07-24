@@ -9,7 +9,7 @@
    Undo is the editor's native undo. */
 
 import * as vscode from 'vscode';
-import type { WebviewMessage } from '../shared/protocol.js';
+import type { ConfigWire, WebviewMessage } from '../shared/protocol.js';
 import { Session } from './session.js';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -53,6 +53,12 @@ function openPanel(context: vscode.ExtensionContext): void {
     docText: () => doc.getText(),
     docVersion: () => doc.version,
     warn: message => void vscode.window.showWarningMessage(message),
+    config: readConfig,
+    setConfig: (pref, value) => {
+      const key = pref === 'stretchSheet' ? 'stretchToFit' : 'tintOverfullRows';
+      void vscode.workspace.getConfiguration('bootstrapVisualizer')
+        .update(key, value, vscode.ConfigurationTarget.Global);
+    },
   });
 
   const disposables: vscode.Disposable[] = [];
@@ -77,6 +83,18 @@ function openPanel(context: vscode.ExtensionContext): void {
 
   panel.onDidDispose(() => disposables.forEach(d => d.dispose()), null, context.subscriptions);
   context.subscriptions.push(panel);
+}
+
+/** The user's settings, read fresh at panel open. Defaults here mirror the
+    package.json contribution defaults (and the canvas built-ins). */
+function readConfig(): ConfigWire {
+  const c = vscode.workspace.getConfiguration('bootstrapVisualizer');
+  return {
+    breakpoint: c.get<ConfigWire['breakpoint']>('defaultBreakpoint'),
+    stretchSheet: c.get<boolean>('stretchToFit'),
+    tintOverfull: c.get<boolean>('tintOverfullRows'),
+    dialect: c.get<ConfigWire['dialect']>('dialect'),
+  };
 }
 
 function revealInEditor(doc: vscode.TextDocument, start: number, end: number): void {

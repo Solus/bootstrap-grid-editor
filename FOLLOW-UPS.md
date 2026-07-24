@@ -490,7 +490,7 @@ grid drafting board.
 
 ## 9. Extension behaviour & settings
 
-### 9.1 Tier-1 settings (user-scoped) **[planned — building next]**
+### 9.1 Tier-1 settings (user-scoped) **[DONE — shipped]**
 
 Four `contributes.configuration` settings, defaults matching today's
 behaviour so no one is surprised:
