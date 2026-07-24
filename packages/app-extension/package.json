@@ -2,7 +2,7 @@
   "name": "bootstrap-visualizer-extension",
   "displayName": "Bootstrap Grid Visualizer",
   "description": "Visual editor for Bootstrap grid layouts in Angular templates.",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "private": true,
   "icon": "media/icon.png",
   "publisher": "BeroXL",
@@ -39,7 +39,14 @@
       "properties": {
         "bootstrapVisualizer.defaultBreakpoint": {
           "type": "string",
-          "enum": ["xs", "sm", "md", "lg", "xl", "xxl"],
+          "enum": [
+            "xs",
+            "sm",
+            "md",
+            "lg",
+            "xl",
+            "xxl"
+          ],
           "default": "md",
           "scope": "application",
           "markdownDescription": "Breakpoint the canvas opens at. Switching breakpoints in the canvas is temporary and does not change this."
@@ -58,7 +65,10 @@
         },
         "bootstrapVisualizer.dialect": {
           "type": "string",
-          "enum": ["bootstrap5", "bootstrap3"],
+          "enum": [
+            "bootstrap5",
+            "bootstrap3"
+          ],
           "enumDescriptions": [
             "New columns use col-*/col-md-* and offset-* (Bootstrap 4/5)",
             "New columns use col-xs-*/col-sm-* and col-sm-offset-* (Bootstrap 3)"
