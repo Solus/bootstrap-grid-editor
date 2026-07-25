@@ -6,7 +6,7 @@
 import {
   BP_LABEL, classIsInterpolated, classValue, colSequence, colTitle, contentHint,
   effectiveAt, elementTitle, hasDynamicClassBinding, hashStr, isContainerCol,
-  isRowEl, rowHasForOrSwitch, rowMentionsIf,
+  isHiddenAt, isRowEl, rowHasForOrSwitch, rowMentionsIf,
 } from '@bootstrap-visualizer/core';
 import type {
   Breakpoint, ColNode, CondRegion, El, NodePath, RootEl, RowNode,
@@ -24,15 +24,20 @@ interface ColWidth {
   span: number | 'auto';
   offset: number;
   kind: 'plain' | 'equal' | 'auto' | 'set';
+  /** Hidden at the current breakpoint by a `d-*` utility: takes no grid width
+      and is not drawn. */
+  hidden: boolean;
 }
 
 export function computeWidths(rowNode: RowNode, bp: Breakpoint): ColWidth[] {
   const infos = rowNode.cols.map(c => ({
     w: effectiveAt(c.spec.width, bp),
     o: effectiveAt(c.spec.offset, bp) || 0,
+    hidden: isHiddenAt(c.spec, bp),
   }));
   let equals = 0, used = 0;
   for (const i of infos) {
+    if (i.hidden) continue;                         // d-* hidden: no footprint
     if (typeof i.w === 'number') used += i.w + i.o;
     else if (i.w === 'auto') used += 2 + i.o;       // schematic guess for auto
     else if (i.w === null) used += 12 + i.o;        // non-col child: full width
@@ -48,6 +53,7 @@ export function computeWidths(rowNode: RowNode, bp: Breakpoint): ColWidth[] {
         : i.w,
     offset: i.o,
     kind: i.w === null ? 'plain' : (i.w === 'equal' ? 'equal' : (i.w === 'auto' ? 'auto' : 'set')),
+    hidden: i.hidden,
   }));
 }
 
@@ -61,6 +67,7 @@ export function rowFill(rowNode: RowNode) {
   const widths = computeWidths(rowNode, state.bp);
   let sum = 0, approx = false;
   widths.forEach(w => {
+    if (w.hidden) return;                            // d-* hidden: not in the sum
     sum += (w.span === 'auto' ? 2 : w.span) + (w.offset || 0);
     // auto/equal have no fixed width; a non-col child ('plain') is drawn full
     // width as a guess too — all three make the sum an estimate, so flag it so
@@ -396,22 +403,30 @@ function renderRowBody(
   const last = cols.length - 1;
   const footprint = (w: ColWidth) => Math.min(w.span === 'auto' ? 2 : w.span, 12) + (w.offset || 0);
 
+  // a d-* column hidden at the current breakpoint occupies no grid width and
+  // isn't drawn; count them so the row can note it in its edge strip.
+  let hiddenCount = 0;
+
   const children = rowNode.el.children;
   let i = 0;
   while (i < children.length) {
     const region = children[i]!.cond?.region;
     if (!region) {
       const hit = byEl.get(children[i]!);   // plain column (non-col child: skipped)
-      if (hit) host.appendChild(renderCol(hit.node, hit.w, path.concat(hit.idx), hit.idx, hit.idx === last));
+      if (hit) {
+        if (hit.w.hidden) hiddenCount++;
+        else host.appendChild(renderCol(hit.node, hit.w, path.concat(hit.idx), hit.idx, hit.idx === last));
+      }
       i++;
       continue;
     }
     // one @if/*ngIf region: gather this run of consecutive branch children that
-    // belong to the active branch (only those are in byEl).
+    // belong to the active branch (only those are in byEl). Hidden (d-*) cols
+    // are dropped from the box just like from the row.
     const hits: Hit[] = [];
     while (i < children.length && children[i]!.cond?.region === region) {
       const hit = byEl.get(children[i]!);
-      if (hit) hits.push(hit);
+      if (hit) { if (hit.w.hidden) hiddenCount++; else hits.push(hit); }
       i++;
     }
     const cr = regionMeta.get(region);
@@ -436,6 +451,18 @@ function renderRowBody(
     hits.forEach(h =>
       box.appendChild(renderCol(h.node, h.w, path.concat(h.idx), h.idx, h.idx === last, span)));
     host.appendChild(box);
+  }
+
+  if (hiddenCount) {
+    // note the omitted columns in the edge strip so they aren't a silent
+    // disappearance — switching the breakpoint reveals them again.
+    const flag = document.createElement('span');
+    flag.className = 'hidden-flag';
+    flag.textContent = '⊘ ' + hiddenCount + ' hidden';
+    flag.title = hiddenCount + (hiddenCount === 1 ? ' column is' : ' columns are') +
+      ' hidden at ' + state.bp + ' by a d-* utility (d-none) — it takes no grid space here';
+    flags.insertBefore(flag, flags.lastChild);
+    host.classList.add('has-flags');
   }
 }
 

@@ -447,7 +447,21 @@ so deferred.
 
 ## 8. Grid-fidelity gaps (deferred features)
 
-### 8.1 `d-*` responsive show/hide utilities **[deferred — planned, not urgent]**
+### 8.1 `d-*` responsive show/hide utilities **[RESOLVED — hidden columns take zero grid space]**
+
+Shipped the faithful version (not the dimmed one first floated — a dimmed
+column still occupies its slot, so the layout would lie). `colSpec` now parses
+`d-*` into a `ColSpec.display` map and `isHiddenAt(spec, bp)` reads it via the
+mobile-first `effectiveAt` cascade. In the render layer a column hidden at the
+current breakpoint contributes 0 to `computeWidths`/`rowFill` and isn't drawn;
+the row notes it with a `⊘ N hidden` chip in the edge strip (no click-to-jump,
+per the maintainer's call). Fully reactive to the breakpoint switch — flip to
+a size where the column shows and it reappears with the fill updated. Covered
+by core tests (parse + cascade) and an e2e (hidden at md, shown at lg, fill and
+chip both correct). Still out of scope: editing visibility (add/remove
+`d-none`), and non-column `d-*` on whole rows/content.
+
+_Original plan below, for reference._
 
 Bootstrap's display utilities (`d-none`, `d-md-block`, `d-lg-none`, …)
 hide/show an element per breakpoint, mobile-first — e.g. `d-none d-lg-block`

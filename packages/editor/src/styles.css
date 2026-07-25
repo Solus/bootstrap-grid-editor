@@ -245,6 +245,12 @@ body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-sele
 }
 .row-flags > .fill-pill{ position:static; flex:0 0 auto; }
 .row-flags > .branch-chip{ padding:1px 8px; font-size:10px; flex:0 1 auto; min-width:2.5em; }
+.row-flags > .hidden-flag{
+  flex:0 1 auto; padding:1px 8px; font-family:var(--mono); font-size:10px;
+  color:var(--faint); font-style:italic; white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis; border:1px solid var(--line); border-radius:6px;
+  background:var(--ink);
+}
 /* rows carrying hidden-region chips give the label less room (38% + 60% ≤ row) */
 .g-row.has-flags > .row-label{ max-width:38%; }
 

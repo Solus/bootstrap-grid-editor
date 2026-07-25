@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   classIsInterpolated, colSpec, definingBp, effectiveAt, halveWidthTokenStr,
-  halvedWidthTokens, hasDynamicClassBinding, offsetTokenBp, setOffsetToken,
-  setWidthToken, widthTokenBp,
+  halvedWidthTokens, hasDynamicClassBinding, isHiddenAt, offsetTokenBp,
+  setOffsetToken, setWidthToken, widthTokenBp,
 } from './classes.js';
 import { buildModel } from './model.js';
 import { parseTemplate } from './parser.js';
@@ -18,6 +18,37 @@ describe('colSpec / effectiveAt', () => {
   it('bare col', () => expect(colSpec(['col']).width.xs).toBe('equal'));
   it('col-auto', () => expect(colSpec(['col-auto']).width.xs).toBe('auto'));
   it('col-md bare', () => expect(colSpec(['col-md']).width.md).toBe('equal'));
+});
+
+describe('d-* display / isHiddenAt', () => {
+  it('parses d-none and breakpoint displays', () => {
+    const s = colSpec(['col-lg-3', 'd-none', 'd-lg-block']);
+    expect(s.display).toEqual({ xs: false, lg: true });
+  });
+
+  it('a plain d-none column is hidden at every breakpoint', () => {
+    const s = colSpec(['col-6', 'd-none']);
+    expect(isHiddenAt(s, 'xs')).toBe(true);
+    expect(isHiddenAt(s, 'xxl')).toBe(true);
+  });
+
+  it('d-none d-lg-block: hidden below lg, shown at lg and up (mobile-first)', () => {
+    const s = colSpec(['col-lg-3', 'd-none', 'd-lg-block']);
+    expect(isHiddenAt(s, 'xs')).toBe(true);
+    expect(isHiddenAt(s, 'md')).toBe(true);
+    expect(isHiddenAt(s, 'lg')).toBe(false);
+    expect(isHiddenAt(s, 'xl')).toBe(false);
+  });
+
+  it('d-lg-none: shown until lg, then hidden', () => {
+    const s = colSpec(['col-6', 'd-lg-none']);
+    expect(isHiddenAt(s, 'md')).toBe(false);
+    expect(isHiddenAt(s, 'lg')).toBe(true);
+  });
+
+  it('a column with no d-* is never hidden', () => {
+    expect(isHiddenAt(colSpec(['col-6']), 'md')).toBe(false);
+  });
 });
 
 describe('setWidthToken preserves order & other tokens', () => {

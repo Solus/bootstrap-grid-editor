@@ -68,9 +68,22 @@ export function colSpec(tokens: string[]): ColSpec {
     m = /^offset(?:-(sm|md|lg|xl|xxl))?-(\d{1,2})$/.exec(t);         // BS4/5 offset
     if (m) {
       spec.offset[(m[1] ?? 'xs') as Breakpoint] = parseInt(m[2]!, 10);
+      continue;
+    }
+    // d-* display utilities: only none-vs-visible matters for the grid
+    m = /^d-(?:(sm|md|lg|xl|xxl)-)?(none|inline|inline-block|block|flex|inline-flex|grid|table|table-cell|table-row|contents)$/.exec(t);
+    if (m) {
+      (spec.display ??= {})[(m[1] ?? 'xs') as Breakpoint] = m[2] !== 'none';
     }
   }
   return spec;
+}
+
+/** Is this column hidden at `bp` by a `d-*` utility? Mobile-first: the nearest
+    `d-*` at or below `bp` decides — `d-none` hides, anything else (or nothing)
+    shows. A hidden column occupies no grid width at that breakpoint. */
+export function isHiddenAt(spec: ColSpec, bp: Breakpoint): boolean {
+  return effectiveAt(spec.display ?? {}, bp) === false;
 }
 
 export function isColTokens(tokens: string[]): boolean {
