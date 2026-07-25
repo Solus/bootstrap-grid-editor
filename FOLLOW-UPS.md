@@ -453,13 +453,17 @@ Shipped the faithful version (not the dimmed one first floated — a dimmed
 column still occupies its slot, so the layout would lie). `colSpec` now parses
 `d-*` into a `ColSpec.display` map and `isHiddenAt(spec, bp)` reads it via the
 mobile-first `effectiveAt` cascade. In the render layer a column hidden at the
-current breakpoint contributes 0 to `computeWidths`/`rowFill` and isn't drawn;
-the row notes it with a `⊘ N hidden` chip in the edge strip (no click-to-jump,
-per the maintainer's call). Fully reactive to the breakpoint switch — flip to
-a size where the column shows and it reappears with the fill updated. Covered
-by core tests (parse + cascade) and an e2e (hidden at md, shown at lg, fill and
-chip both correct). Still out of scope: editing visibility (add/remove
-`d-none`), and non-column `d-*` on whole rows/content.
+current breakpoint contributes 0 to `computeWidths`/`rowFill`. Rather than omit
+it entirely, it's drawn as a **thin dashed marker** in place
+(`renderHiddenCol`): no usable width, but you can see the column is there, it
+stays selectable/editable (click it), and it carries dropzones so other columns
+can be dropped on either side (pure omission left no anchor for "insert before
+the hidden one"). Fully reactive to the breakpoint switch — flip to a size where
+the column shows and it reappears as a real column with the fill updated.
+Covered by core tests (parse + cascade) and an e2e (hidden at md → marker +
+8/12, selectable; shown at lg → real column + 12/12). Still out of scope:
+editing visibility (add/remove `d-none`), and non-column `d-*` on whole
+rows/content.
 
 _Original plan below, for reference._
 

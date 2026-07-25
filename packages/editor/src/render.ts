@@ -403,9 +403,13 @@ function renderRowBody(
   const last = cols.length - 1;
   const footprint = (w: ColWidth) => Math.min(w.span === 'auto' ? 2 : w.span, 12) + (w.offset || 0);
 
-  // a d-* column hidden at the current breakpoint occupies no grid width and
-  // isn't drawn; count them so the row can note it in its edge strip.
-  let hiddenCount = 0;
+  // a d-* column hidden at the current breakpoint occupies no *usable* width
+  // but is drawn as a thin marker in place (renderHiddenCol), so you can see
+  // it's there and drop columns on either side of it.
+  const emit = (h: Hit, into: HTMLElement, denom?: number) => into.appendChild(
+    h.w.hidden
+      ? renderHiddenCol(h.node, path.concat(h.idx), h.idx, h.idx === last)
+      : renderCol(h.node, h.w, path.concat(h.idx), h.idx, h.idx === last, denom));
 
   const children = rowNode.el.children;
   let i = 0;
@@ -413,57 +417,61 @@ function renderRowBody(
     const region = children[i]!.cond?.region;
     if (!region) {
       const hit = byEl.get(children[i]!);   // plain column (non-col child: skipped)
-      if (hit) {
-        if (hit.w.hidden) hiddenCount++;
-        else host.appendChild(renderCol(hit.node, hit.w, path.concat(hit.idx), hit.idx, hit.idx === last));
-      }
+      if (hit) emit(hit, host);
       i++;
       continue;
     }
     // one @if/*ngIf region: gather this run of consecutive branch children that
-    // belong to the active branch (only those are in byEl). Hidden (d-*) cols
-    // are dropped from the box just like from the row.
-    const hits: Hit[] = [];
+    // belong to the active branch (only those are in byEl).
+    const branchCols: Hit[] = [];
     while (i < children.length && children[i]!.cond?.region === region) {
       const hit = byEl.get(children[i]!);
-      if (hit) { if (hit.w.hidden) hiddenCount++; else hits.push(hit); }
+      if (hit) branchCols.push(hit);
       i++;
     }
     const cr = regionMeta.get(region);
     if (!cr) continue;
-    if (!hits.length) {
-      // hidden region: zero grid footprint, so the remaining columns lay out
-      // exactly as Angular would render them. The toggle chip relocates to
-      // the row's top-edge strip, chips in source order, fill pill last.
-      // has-flags caps the row label's width so the two never overlap.
+    if (!branchCols.length) {
+      // the @if branch shows nothing: zero grid footprint, so the remaining
+      // columns lay out as Angular would render them. The toggle chip
+      // relocates to the row's top-edge strip; has-flags caps the label width.
       flags.insertBefore(renderBranchChip(cr), flags.lastChild);
       host.classList.add('has-flags');
       continue;
     }
-    // size the box to its branch's combined span so it sits inline where the
-    // content is; its columns are then laid out relative to that span.
+    // size the box to its branch's *visible* span so it sits inline where the
+    // content is; its columns are laid out relative to that span (hidden cols
+    // contribute a thin marker, not span).
     const box = document.createElement('div');
     box.className = 'cond-box';
     box.appendChild(renderBranchChip(cr));
-    const span = hits.reduce((s, h) => s + footprint(h.w), 0);
+    const span = branchCols.reduce((s, h) => s + (h.w.hidden ? 0 : footprint(h.w)), 0) || 1;
     box.style.flex = '0 0 ' + (Math.min(span / 12, 1) * 100).toFixed(4) + '%';
     box.style.maxWidth = (Math.min(span / 12, 1) * 100).toFixed(4) + '%';
-    hits.forEach(h =>
-      box.appendChild(renderCol(h.node, h.w, path.concat(h.idx), h.idx, h.idx === last, span)));
+    for (const h of branchCols) emit(h, box, span);
     host.appendChild(box);
   }
+}
 
-  if (hiddenCount) {
-    // note the omitted columns in the edge strip so they aren't a silent
-    // disappearance — switching the breakpoint reveals them again.
-    const flag = document.createElement('span');
-    flag.className = 'hidden-flag';
-    flag.textContent = '⊘ ' + hiddenCount + ' hidden';
-    flag.title = hiddenCount + (hiddenCount === 1 ? ' column is' : ' columns are') +
-      ' hidden at ' + state.bp + ' by a d-* utility (d-none) — it takes no grid space here';
-    flags.insertBefore(flag, flags.lastChild);
-    host.classList.add('has-flags');
-  }
+/** A `d-*` column hidden at the current breakpoint: a thin marker where the
+    column sits, rather than omitting it. It takes no usable width but shows
+    the column is there, stays selectable/editable (click it), and carries
+    dropzones so other columns can be dropped on either side. */
+function renderHiddenCol(
+  colNode: ColNode, path: NodePath, index: number, isLast: boolean,
+): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'g-col-hidden';
+  el.dataset.path = path.join(',');
+  if (pathEq(state.sel, path, 'col')) el.classList.add('selected');
+  const cls = classValue(colNode.el) || '(no class)';
+  el.title = 'Hidden here by a d-* utility (' + cls + ') — takes no grid space at ' +
+    state.bp + '; shows at a larger breakpoint. Click to select.';
+  const rowPath = path.slice(0, -1);
+  el.appendChild(makeDropzone(rowPath, index, 'left'));
+  if (isLast) el.appendChild(makeDropzone(rowPath, index + 1, 'right'));
+  el.addEventListener('click', e => { e.stopPropagation(); select({ path, kind: 'col' }); });
+  return el;
 }
 
 function renderCol(

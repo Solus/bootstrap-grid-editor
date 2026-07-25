@@ -475,19 +475,24 @@ test.describe('inspector', () => {
     await page.locator('#applyBtn').click();
 
     const row = page.locator('.g-row').first();
-    // default breakpoint is md → the sidebar is hidden
+    // default breakpoint is md → the sidebar is hidden: no real column, but a
+    // thin marker sits in its place and the fill excludes it
     await expect(row.locator('.g-col')).toHaveCount(1);
     await expect(row).toContainText('main');
     await expect(row).not.toContainText('sidebar');
     await expect(row.locator('.fill-pill')).toHaveText('8/12');   // 4 not counted
-    await expect(row.locator('.hidden-flag')).toHaveText(/1 hidden/);
+    await expect(row.locator('.g-col-hidden')).toHaveCount(1);
 
-    // switch to lg → the sidebar reappears and the row is full
+    // the marker is selectable — clicking it selects the hidden column
+    await row.locator('.g-col-hidden').click();
+    await expect(row.locator('.g-col-hidden.selected')).toHaveCount(1);
+
+    // switch to lg → the sidebar reappears as a real column, row is full
     await page.locator('#bpSwitch button[data-bp="lg"]').click();
     await expect(row.locator('.g-col')).toHaveCount(2);
+    await expect(row.locator('.g-col-hidden')).toHaveCount(0);
     await expect(row).toContainText('sidebar');
     await expect(row.locator('.fill-pill')).toHaveText('12/12');
-    await expect(row.locator('.hidden-flag')).toHaveCount(0);
   });
 
   test('a non-column child marks the fill estimate as a guess (FOLLOW-UPS §2.4)', async ({ page }) => {

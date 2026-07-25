@@ -245,12 +245,20 @@ body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-sele
 }
 .row-flags > .fill-pill{ position:static; flex:0 0 auto; }
 .row-flags > .branch-chip{ padding:1px 8px; font-size:10px; flex:0 1 auto; min-width:2.5em; }
-.row-flags > .hidden-flag{
-  flex:0 1 auto; padding:1px 8px; font-family:var(--mono); font-size:10px;
-  color:var(--faint); font-style:italic; white-space:nowrap; overflow:hidden;
-  text-overflow:ellipsis; border:1px solid var(--line); border-radius:6px;
-  background:var(--ink);
+
+/* a d-* column hidden at the current breakpoint: a thin dashed marker in its
+   place — no usable width, but visible and selectable, with dropzones so
+   columns can be dropped on either side */
+.g-col-hidden{
+  flex:0 0 12px; align-self:stretch; min-height:34px; position:relative;
+  cursor:pointer;
 }
+.g-col-hidden::before{
+  content:''; position:absolute; left:50%; transform:translateX(-50%);
+  top:5px; bottom:5px; border-left:2px dashed var(--faint);
+}
+.g-col-hidden:hover::before{ border-color:var(--text); }
+.g-col-hidden.selected::before{ border-color:var(--amber); }
 /* rows carrying hidden-region chips give the label less room (38% + 60% ≤ row) */
 .g-row.has-flags > .row-label{ max-width:38%; }
 
