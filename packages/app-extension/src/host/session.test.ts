@@ -156,4 +156,16 @@ describe('Session — divergence', () => {
     expect(h.posts.some(p => p.type === 'diverged')).toBe(false);
     expect(h.posts.some(p => p.type === 'applied')).toBe(true);
   });
+
+  it('a caret nudge from our own apply is ignored (keeps the canvas selection)', async () => {
+    // applying a move shifts the buffer and moves the editor caret; that echo
+    // must not bounce back as a selectAt and deselect the moved column
+    const h = harness({ version: 1 });
+    h.duringApply(() => h.session.onEditorSelection(3, 3, 3));
+    await h.session.onMessage({
+      type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'x' }], baseVersion: 1,
+    });
+    expect(h.posts.some(p => p.type === 'selectAt')).toBe(false);
+    expect(h.posts.some(p => p.type === 'applied')).toBe(true);
+  });
 });

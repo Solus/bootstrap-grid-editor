@@ -66,6 +66,11 @@ export class Session {
   /** The editor selection moved to these offsets (start/end of the range and
       the active caret). */
   onEditorSelection(start: number, end: number, active: number): void {
+    // Applying a canvas edit (e.g. a column move) shifts the buffer and nudges
+    // the editor caret, which fires this event. That's our own side effect,
+    // not the user moving the caret — ignore it, or it would bounce back as a
+    // selectAt and deselect what the canvas just acted on.
+    if (this.applying) return;
     if (this.revealed && this.revealed.start === start && this.revealed.end === end) {
       this.revealed = null;       // swallow the echo of our own reveal
       return;
