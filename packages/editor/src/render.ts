@@ -403,12 +403,12 @@ function renderRowBody(
   const last = cols.length - 1;
   const footprint = (w: ColWidth) => Math.min(w.span === 'auto' ? 2 : w.span, 12) + (w.offset || 0);
 
-  // a d-* column hidden at the current breakpoint occupies no *usable* width
-  // but is drawn as a thin marker in place (renderHiddenCol), so you can see
-  // it's there and drop columns on either side of it.
+  // a d-* column hidden at the current breakpoint occupies no width at all but
+  // is drawn as a thin marker in place (renderHiddenCol) so you can see it's
+  // there; dragging other columns still works via their own dropzones.
   const emit = (h: Hit, into: HTMLElement, denom?: number) => into.appendChild(
     h.w.hidden
-      ? renderHiddenCol(h.node, path.concat(h.idx), h.idx, h.idx === last)
+      ? renderHiddenCol(h.node, path.concat(h.idx))
       : renderCol(h.node, h.w, path.concat(h.idx), h.idx, h.idx === last, denom));
 
   const children = rowNode.el.children;
@@ -453,24 +453,18 @@ function renderRowBody(
   }
 }
 
-/** A `d-*` column hidden at the current breakpoint: a thin marker where the
-    column sits, rather than omitting it. It takes no usable width but shows
-    the column is there, stays selectable/editable (click it), and carries
-    dropzones so other columns can be dropped on either side. */
-function renderHiddenCol(
-  colNode: ColNode, path: NodePath, index: number, isLast: boolean,
-): HTMLElement {
+/** A `d-*` column hidden at the current breakpoint: a thin dashed line where
+    the column sits, rather than omitting it. Zero width and pointer-events:none
+    — it adds nothing to the row and never interferes with a column's resize
+    handle or dropzones — so the layout and fill stay exactly right while you
+    can still see the column is there. Switch to a breakpoint where it shows to
+    select/edit it. */
+function renderHiddenCol(colNode: ColNode, path: NodePath): HTMLElement {
   const el = document.createElement('div');
   el.className = 'g-col-hidden';
   el.dataset.path = path.join(',');
-  if (pathEq(state.sel, path, 'col')) el.classList.add('selected');
-  const cls = classValue(colNode.el) || '(no class)';
-  el.title = 'Hidden here by a d-* utility (' + cls + ') — takes no grid space at ' +
-    state.bp + '; shows at a larger breakpoint. Click to select.';
-  const rowPath = path.slice(0, -1);
-  el.appendChild(makeDropzone(rowPath, index, 'left'));
-  if (isLast) el.appendChild(makeDropzone(rowPath, index + 1, 'right'));
-  el.addEventListener('click', e => { e.stopPropagation(); select({ path, kind: 'col' }); });
+  el.title = 'Column hidden here by a d-* utility (' + (classValue(colNode.el) || '(no class)') +
+    ') — no grid space at ' + state.bp + '; shows at a larger breakpoint';
   return el;
 }
 

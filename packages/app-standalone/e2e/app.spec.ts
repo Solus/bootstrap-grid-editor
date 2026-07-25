@@ -476,16 +476,12 @@ test.describe('inspector', () => {
 
     const row = page.locator('.g-row').first();
     // default breakpoint is md → the sidebar is hidden: no real column, but a
-    // thin marker sits in its place and the fill excludes it
+    // thin zero-width marker sits in its place and the fill excludes it
     await expect(row.locator('.g-col')).toHaveCount(1);
     await expect(row).toContainText('main');
     await expect(row).not.toContainText('sidebar');
     await expect(row.locator('.fill-pill')).toHaveText('8/12');   // 4 not counted
     await expect(row.locator('.g-col-hidden')).toHaveCount(1);
-
-    // the marker is selectable — clicking it selects the hidden column
-    await row.locator('.g-col-hidden').click();
-    await expect(row.locator('.g-col-hidden.selected')).toHaveCount(1);
 
     // switch to lg → the sidebar reappears as a real column, row is full
     await page.locator('#bpSwitch button[data-bp="lg"]').click();

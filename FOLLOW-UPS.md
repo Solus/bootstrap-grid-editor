@@ -454,16 +454,16 @@ column still occupies its slot, so the layout would lie). `colSpec` now parses
 `d-*` into a `ColSpec.display` map and `isHiddenAt(spec, bp)` reads it via the
 mobile-first `effectiveAt` cascade. In the render layer a column hidden at the
 current breakpoint contributes 0 to `computeWidths`/`rowFill`. Rather than omit
-it entirely, it's drawn as a **thin dashed marker** in place
-(`renderHiddenCol`): no usable width, but you can see the column is there, it
-stays selectable/editable (click it), and it carries dropzones so other columns
-can be dropped on either side (pure omission left no anchor for "insert before
-the hidden one"). Fully reactive to the breakpoint switch — flip to a size where
-the column shows and it reappears as a real column with the fill updated.
-Covered by core tests (parse + cascade) and an e2e (hidden at md → marker +
-8/12, selectable; shown at lg → real column + 12/12). Still out of scope:
-editing visibility (add/remove `d-none`), and non-column `d-*` on whole
-rows/content.
+it entirely, it's drawn as a **thin dashed line on the seam** where the column
+sits (`renderHiddenCol`): `flex:0 0 0` and `pointer-events:none`, so it adds
+*zero* width to the row (no false overflow/wrap) and never blocks a neighbour's
+resize handle or dropzones — you just see the column is there. Dragging other
+columns still works via their own dropzones. Fully reactive to the breakpoint
+switch — flip to a size where the column shows and it reappears as a real column
+with the fill updated (that's also where you'd select/edit it). Covered by core
+tests (parse + cascade) and an e2e (hidden at md → line + 8/12; shown at lg →
+real column + 12/12). Still out of scope: editing visibility (add/remove
+`d-none`), and non-column `d-*` on whole rows/content.
 
 _Original plan below, for reference._
 
