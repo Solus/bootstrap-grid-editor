@@ -195,6 +195,33 @@ export const SAMPLE = `<div class="container-fluid">
     </div>
   </div>
 
+  <!-- d-* responsive visibility: columns that appear/disappear per breakpoint.
+       Switch the breakpoint to watch them come and go (hidden = zero width). -->
+  <div class="row">
+    <div class="col-6 col-md-8">
+      <text-input formControlName="field070"></text-input>
+    </div>
+    <!-- desktop only: hidden below lg, so on mobile the field above is full row -->
+    <div class="col-md-4 d-none d-lg-block">
+      <help-panel app-i18n="demo.editor.sectionHelp"></help-panel>
+    </div>
+    <!-- mobile only: shown below md, hidden from md up -->
+    <div class="col-6 d-md-none">
+      <button class="btn btn-outline w-100" app-i18n="demo.editor.action002"></button>
+    </div>
+  </div>
+
+  <!-- Always-hidden column (d-none with no breakpoint override): takes no space
+       at any breakpoint, but is kept visible in the editor via the hidden chip -->
+  <div class="row">
+    <div class="col-9">
+      <text-input formControlName="field080"></text-input>
+    </div>
+    <div class="col-3 d-none">
+      <debug-readout [value]="field080"></debug-readout>
+    </div>
+  </div>
+
   <div class="row">
     <div class="col-md-3 offset-md-6">
       <button class="btn btn-secondary w-100" (click)="onCancel()" app-i18n="demo.editor.cancel"></button>
