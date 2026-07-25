@@ -1,5 +1,18 @@
 # Change Log
 
+## 0.0.8
+
+- Added: `d-*` display utilities are now understood. A column hidden at the
+  current breakpoint (`d-none`, `d-md-none`, `d-none d-lg-block`, …) takes no
+  grid space and drops out of the `N/12` — so the layout and fill match what
+  the browser would show. A thin dashed marker sits where the column is, and
+  columns can still be dropped on either side of it (including a hidden last
+  column). Switch the breakpoint to bring hidden columns back.
+- Changed: reopening "Open Grid Visualizer" now reuses the single canvas,
+  re-pointing it at the current file, instead of spawning another panel.
+- Fixed: moving a column with the inspector's Move buttons no longer
+  deselects it, so you can move it again right away.
+
 ## 0.0.7
 
 - Added: four settings (Bootstrap Grid Visualizer section) — default
