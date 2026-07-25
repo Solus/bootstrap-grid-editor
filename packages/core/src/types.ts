@@ -89,6 +89,10 @@ export type WidthValue = number | 'equal' | 'auto';
 export interface ColSpec {
   width: Partial<Record<Breakpoint, WidthValue>>;
   offset: Partial<Record<Breakpoint, number>>;
+  /** Per-breakpoint visibility from `d-*` utilities: `true` = shown,
+      `false` = hidden (`d-none`). Absent at a breakpoint means inherit from
+      the nearest smaller one (mobile-first), like width/offset. */
+  display?: Partial<Record<Breakpoint, boolean>>;
 }
 
 /* ── grid model ──────────────────────────────────────────────────── */

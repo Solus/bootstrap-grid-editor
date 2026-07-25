@@ -130,6 +130,9 @@ test.describe('drag & drop', () => {
     expect(before.indexOf('formControlName="code"'))
       .toBeLessThan(before.indexOf('formControlName="name"'));
 
+    // the status column is d-none below lg, so switch to lg to see all three
+    await page.locator('#bpSwitch button[data-bp="lg"]').click();
+
     // drop onto the third column's left slot — i.e. after "name".
     // (Dropping on name's own left slot is where "code" already is, and the
     // app correctly treats that as a no-op.)
@@ -459,6 +462,32 @@ test.describe('inspector', () => {
     await page.locator('.view-opt', { hasText: 'Tint overfull rows' })
       .locator('input[type="checkbox"]').check();
     await expect(page.locator('.g-row.overfull')).not.toHaveCount(0);
+  });
+
+  test('a d-* hidden column takes no grid space and drops from the fill (FOLLOW-UPS §8.1)', async ({ page }) => {
+    // the sidebar is desktop-only: hidden below lg, so at md the row is just
+    // the col-8, and the fill must not count the hidden column
+    await page.locator('#src').fill(
+      `<div class="row">
+         <div class="col-8">main</div>
+         <div class="col-4 d-none d-lg-block">sidebar</div>
+       </div>`);
+    await page.locator('#applyBtn').click();
+
+    const row = page.locator('.g-row').first();
+    // default breakpoint is md → the sidebar is hidden
+    await expect(row.locator('.g-col')).toHaveCount(1);
+    await expect(row).toContainText('main');
+    await expect(row).not.toContainText('sidebar');
+    await expect(row.locator('.fill-pill')).toHaveText('8/12');   // 4 not counted
+    await expect(row.locator('.hidden-flag')).toHaveText(/1 hidden/);
+
+    // switch to lg → the sidebar reappears and the row is full
+    await page.locator('#bpSwitch button[data-bp="lg"]').click();
+    await expect(row.locator('.g-col')).toHaveCount(2);
+    await expect(row).toContainText('sidebar');
+    await expect(row.locator('.fill-pill')).toHaveText('12/12');
+    await expect(row.locator('.hidden-flag')).toHaveCount(0);
   });
 
   test('a non-column child marks the fill estimate as a guess (FOLLOW-UPS §2.4)', async ({ page }) => {
