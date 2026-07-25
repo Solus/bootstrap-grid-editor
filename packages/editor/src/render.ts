@@ -11,7 +11,7 @@ import {
 import type {
   Breakpoint, ColNode, CondRegion, El, NodePath, RootEl, RowNode,
 } from '@bootstrap-visualizer/core';
-import { $, mkBadge, mkTypeBadge, rowsHost, sheet } from './dom.js';
+import { $, mkBadge, mkTypeBadge, rowsHost, sheet, toast } from './dom.js';
 import { SHEET_WIDTH, setActiveBranch, state, type Selection } from './state.js';
 import { computeFind, updateFindCount } from './find.js';
 import { renderInspector } from './inspector.js';
@@ -189,13 +189,23 @@ function branchTip(region: CondRegion, shown: boolean, hasElse: boolean): string
 /* ── the render pass ─────────────────────────────────────────────── */
 
 export function render(): void {
-  state._rowIds = computeRowIds();
-  computeFind();
-  renderRuler();
-  renderCanvas();
-  renderInspector();
-  renderHeader();
-  updateFindCount();
+  // Backstop: a bug anywhere in the render pass must not throw into the caller
+  // (a keyboard handler, a host message, a drag) and wedge the app. On failure
+  // the last good canvas stays on screen and the user gets a quiet notice,
+  // rather than an uncaught error. Per-row failures are caught closer in
+  // `renderRow` so one bad row is skipped without losing the rest.
+  try {
+    state._rowIds = computeRowIds();
+    computeFind();
+    renderRuler();
+    renderCanvas();
+    renderInspector();
+    renderHeader();
+    updateFindCount();
+  } catch (err) {
+    console.error('[bootstrap-visualizer] render failed', err);
+    toast('Something went wrong drawing the canvas', 'warn');
+  }
 }
 
 export function renderHeader(): void {
@@ -300,7 +310,24 @@ function topCondRegion(region: string): CondRegion | null {
   return { region, branches: meta.branches, activeIndex: state.activeBranch[region] ?? 0 };
 }
 
-function renderRow(rowNode: RowNode, path: NodePath, _nested: boolean): HTMLElement {
+/** Guard around one row's render: a failure drawing a single row must not
+    blank the whole canvas. On error, skip just that row with an inline marker
+    and keep drawing the rest — the robustness contract of "skip what it can't
+    draw, render everything else accurately". */
+function renderRow(rowNode: RowNode, path: NodePath, nested: boolean): HTMLElement {
+  try {
+    return renderRowInner(rowNode, path, nested);
+  } catch (err) {
+    console.error('[bootstrap-visualizer] failed to render row', path.join(','), err);
+    const ph = document.createElement('div');
+    ph.className = 'g-row render-error';
+    ph.dataset.path = path.join(',');
+    ph.textContent = '⚠ This row couldn’t be drawn — skipped.';
+    return ph;
+  }
+}
+
+function renderRowInner(rowNode: RowNode, path: NodePath, _nested: boolean): HTMLElement {
   const rowDiv = document.createElement('div');
   rowDiv.className = 'g-row';
   rowDiv.dataset.path = path.join(',');

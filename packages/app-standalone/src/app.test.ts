@@ -192,6 +192,58 @@ describe('open config + sticky view prefs', () => {
   });
 });
 
+describe('graceful failure — the canvas never breaks (robustness)', () => {
+  it('a row that fails to draw is skipped in place, not fatal', async () => {
+    const ed = await editor();
+    const target = ed.state.model.find(r => r.cols.length)!;
+    expect(target).toBeDefined();
+    const col = target.cols[0]!;
+    const savedSpec = col.spec;
+    // make computeWidths (inside renderRow) throw for just this row; nothing
+    // in the pre-canvas passes reads a column's spec, so only this row's draw
+    // fails
+    Object.defineProperty(col, 'spec', {
+      configurable: true, get() { throw new Error('boom'); },
+    });
+
+    expect(() => ed.render()).not.toThrow();
+    // the bad row is replaced by an inline marker...
+    expect(document.querySelector('.g-row.render-error')).not.toBeNull();
+    // ...while other rows still render normally
+    expect(document.querySelectorAll('.g-row:not(.render-error)').length)
+      .toBeGreaterThan(0);
+
+    Object.defineProperty(col, 'spec', {
+      configurable: true, writable: true, value: savedSpec,
+    });
+    ed.render();
+    expect(document.querySelector('.g-row.render-error')).toBeNull();
+  });
+
+  it('a build failure rejects the edit and keeps the last good view', async () => {
+    const ed = await editor();
+    ed.state.dirty = false;                    // ensure the edit isn't refused first
+    const srcBefore = ed.state.src;
+    const modelBefore = ed.state.model;
+    const savedAB = ed.state.activeBranch;
+    // buildModel dereferences activeBranch for a conditional region → nulling
+    // it makes the build throw on an @if document
+    ed.state.activeBranch = null as unknown as Record<string, number>;
+
+    expect(() =>
+      ed.apply('<div class="row">@if (x) {<div class="col-6">c</div>}</div>'),
+    ).not.toThrow();
+
+    // nothing committed: source and model are still the previous good ones
+    expect(ed.state.src).toBe(srcBefore);
+    expect(ed.state.model).toBe(modelBefore);
+    // and the user got a notice rather than a silent freeze
+    expect(document.querySelector('.toast.warn')).not.toBeNull();
+
+    ed.state.activeBranch = savedAB;
+  });
+});
+
 describe('selection drives the inspector', () => {
   it('selecting a column shows its class and actions', () => {
     const col = document.querySelector<HTMLElement>('.g-col')!;

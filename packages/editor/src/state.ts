@@ -177,6 +177,21 @@ export function apply(newSrc: string, opts: ApplyOpts = {}): void {
       return;
     }
   }
+  // Parse + build BEFORE touching any state, so a failure here leaves the last
+  // good view fully intact: nothing committed, no history push, no host round-
+  // trip — the canvas stays on the previous render instead of going blank or
+  // half-updated. (parseTemplate itself is tolerant and won't throw; this
+  // guards buildModel and any future step that could choke on odd input.)
+  let root: RootEl, model: RowNode[];
+  try {
+    root = parseTemplate(newSrc);
+    model = buildModel(root, state.activeBranch);
+  } catch (err) {
+    console.error('[bootstrap-visualizer] parse/build failed — edit rejected', err);
+    toast('Couldn’t read this template — canvas left unchanged', 'warn');
+    return;
+  }
+
   dnd.src = null;
   document.body.classList.remove('dnd');
   if (pushHistory) {
@@ -185,9 +200,9 @@ export function apply(newSrc: string, opts: ApplyOpts = {}): void {
     state.hIndex = state.history.length - 1;
   }
   state.src = newSrc;
-  state.root = parseTemplate(newSrc);
-  state.model = buildModel(state.root, state.activeBranch);
-  state.docBs3 = detectDialect(state.root);
+  state.root = root;
+  state.model = model;
+  state.docBs3 = detectDialect(root);
   if (!keepSel) state.sel = null;
   if (state.sel && !resolvePath(state.sel.path)) state.sel = null;
   if (!state.sel) state._bandLines = null;
@@ -200,7 +215,15 @@ export function apply(newSrc: string, opts: ApplyOpts = {}): void {
     host. Used by the `@if` branch toggle (a pure view change). */
 export function rebuildModel(): void {
   if (!state.root) return;
-  state.model = buildModel(state.root, state.activeBranch);
+  let model: RowNode[];
+  try {
+    model = buildModel(state.root, state.activeBranch);
+  } catch (err) {
+    console.error('[bootstrap-visualizer] model rebuild failed — view left unchanged', err);
+    toast('Couldn’t update the view — left unchanged', 'warn');
+    return;
+  }
+  state.model = model;
   if (state.sel && !resolvePath(state.sel.path)) state.sel = null;
   render();
 }
