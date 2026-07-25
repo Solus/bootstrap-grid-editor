@@ -457,8 +457,11 @@ current breakpoint contributes 0 to `computeWidths`/`rowFill`. Rather than omit
 it entirely, it's drawn as a **thin dashed line on the seam** where the column
 sits (`renderHiddenCol`): `flex:0 0 0` and `pointer-events:none`, so it adds
 *zero* width to the row (no false overflow/wrap) and never blocks a neighbour's
-resize handle or dropzones — you just see the column is there. Dragging other
-columns still works via their own dropzones. Fully reactive to the breakpoint
+resize handle — you just see the column is there. It still carries dropzones
+(spread to either side of the seam since it's zero-width) so a column can be
+dropped on the left or right of a hidden column — including a hidden *last*
+column, where no visible column would otherwise provide a "drop after" zone.
+Fully reactive to the breakpoint
 switch — flip to a size where the column shows and it reappears as a real column
 with the fill updated (that's also where you'd select/edit it). Covered by core
 tests (parse + cascade) and an e2e (hidden at md → line + 8/12; shown at lg →

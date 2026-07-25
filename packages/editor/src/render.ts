@@ -408,7 +408,7 @@ function renderRowBody(
   // there; dragging other columns still works via their own dropzones.
   const emit = (h: Hit, into: HTMLElement, denom?: number) => into.appendChild(
     h.w.hidden
-      ? renderHiddenCol(h.node, path.concat(h.idx))
+      ? renderHiddenCol(h.node, path.concat(h.idx), h.idx, h.idx === last)
       : renderCol(h.node, h.w, path.concat(h.idx), h.idx, h.idx === last, denom));
 
   const children = rowNode.el.children;
@@ -454,17 +454,23 @@ function renderRowBody(
 }
 
 /** A `d-*` column hidden at the current breakpoint: a thin dashed line where
-    the column sits, rather than omitting it. Zero width and pointer-events:none
-    — it adds nothing to the row and never interferes with a column's resize
-    handle or dropzones — so the layout and fill stay exactly right while you
-    can still see the column is there. Switch to a breakpoint where it shows to
-    select/edit it. */
-function renderHiddenCol(colNode: ColNode, path: NodePath): HTMLElement {
+    the column sits, rather than omitting it. Zero width at rest (adds nothing
+    to the row's layout or fill) but carries dropzones so columns can be dropped
+    on either side of it — crucial when it's the last column in the row, since
+    then no visible column provides a "drop after" zone. The dropzones only
+    activate during a drag, when the marker also widens (CSS) to separate them;
+    resize handles are disabled then, so there's no click conflict. */
+function renderHiddenCol(
+  colNode: ColNode, path: NodePath, index: number, isLast: boolean,
+): HTMLElement {
   const el = document.createElement('div');
   el.className = 'g-col-hidden';
   el.dataset.path = path.join(',');
   el.title = 'Column hidden here by a d-* utility (' + (classValue(colNode.el) || '(no class)') +
     ') — no grid space at ' + state.bp + '; shows at a larger breakpoint';
+  const rowPath = path.slice(0, -1);
+  el.appendChild(makeDropzone(rowPath, index, 'left'));
+  if (isLast) el.appendChild(makeDropzone(rowPath, index + 1, 'right'));
   return el;
 }
 

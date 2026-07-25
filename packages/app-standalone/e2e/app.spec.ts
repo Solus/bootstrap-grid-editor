@@ -491,6 +491,31 @@ test.describe('inspector', () => {
     await expect(row.locator('.fill-pill')).toHaveText('12/12');
   });
 
+  test('a column can be dropped past a hidden LAST column (FOLLOW-UPS §8.1)', async ({ page }) => {
+    // z is d-none below lg → hidden and last at md. Without the marker's
+    // dropzones there'd be no way to drop a column at the end of this row.
+    await page.locator('#src').fill(
+      `<div class="row">
+         <div class="col-4">aaa</div>
+         <div class="col-4">bbb</div>
+         <div class="col-4 d-none d-lg-block">zzz</div>
+       </div>`);
+    await page.locator('#applyBtn').click();
+
+    const row = page.locator('.g-row').first();
+    await expect(row.locator('.g-col-hidden')).toHaveCount(1);   // z hidden, last
+    const before = await source(page);
+    expect(before.indexOf('aaa')).toBeLessThan(before.indexOf('zzz'));
+
+    // drag "aaa" onto the hidden marker's right slot → after the hidden column
+    await row.locator('.g-col', { hasText: 'aaa' })
+      .dragTo(row.locator('.g-col-hidden .dropzone.right'), DROP);
+
+    const after = await source(page);
+    expect(after.indexOf('aaa')).toBeGreaterThan(after.indexOf('zzz'));   // moved to the end
+    expect(after.match(/aaa/g)).toHaveLength(1);                          // a move, not a copy
+  });
+
   test('a non-column child marks the fill estimate as a guess (FOLLOW-UPS §2.4)', async ({ page }) => {
     // a <legend> in a .row has no col class → drawn full width (12) as a guess.
     // alone it fills the row exactly, so the pill must show the ~ estimate mark
