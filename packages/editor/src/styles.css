@@ -258,6 +258,12 @@ body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-sele
   content:''; position:absolute; left:0; transform:translateX(-50%);
   top:5px; bottom:5px; border-left:2px dashed var(--faint);
 }
+/* the marker is zero-width, so its left/right dropzones would coincide — spread
+   them to either side of the seam so you can drop a column on the left OR right
+   of a hidden column (including a hidden LAST column, where no visible column
+   provides a "drop after" zone). They only activate during a drag. */
+.g-col-hidden > .dropzone.left{ left:-15px; }
+.g-col-hidden > .dropzone.right{ right:auto; left:5px; }
 /* rows carrying hidden-region chips give the label less room (38% + 60% ≤ row) */
 .g-row.has-flags > .row-label{ max-width:38%; }
 
