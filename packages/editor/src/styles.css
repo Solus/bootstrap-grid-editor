@@ -334,6 +334,11 @@ body.resizing, body.resizing *{cursor:ew-resize !important; user-select:none}
 .empty-canvas{color:var(--muted); text-align:center; padding:60px 20px; line-height:1.7}
 .empty-canvas code{font-family:var(--mono); color:#9ecbff}
 
+/* a row that failed to render — skipped in place so the rest of the canvas
+   survives (see renderRow's guard) */
+.g-row.render-error{padding:8px 12px; color:#e0a24a; font-size:12px;
+  border:1px dashed #e0a24a55; border-radius:4px; background:#e0a24a10}
+
 /* ── Inspector ──────────────────────────── */
 .insp-section{padding:12px 14px; border-bottom:1px solid var(--line)}
 .insp-title{font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:10px}
