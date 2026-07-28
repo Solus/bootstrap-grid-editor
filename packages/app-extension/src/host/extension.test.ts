@@ -30,6 +30,7 @@ vi.mock('vscode', () => {
   };
   const saves = mkEvent(), changes = mkEvent(), selections = mkEvent();
   const commands = new Map<string, (...a: unknown[]) => unknown>();
+  const serializers = new Map<string, { deserializeWebviewPanel(p: unknown, s: unknown): Thenable<void> }>();
   const infoMsgs: string[] = [];
   const warnMsgs: string[] = [];
   const panels: unknown[] = [];
@@ -112,6 +113,9 @@ vi.mock('vscode', () => {
       showInformationMessage: (m: string) => { infoMsgs.push(m); return Promise.resolve(undefined); },
       showWarningMessage: (m: string) => { warnMsgs.push(m); return Promise.resolve(undefined); },
       onDidChangeTextEditorSelection: selections.on,
+      registerWebviewPanelSerializer: (
+        viewType: string, s: { deserializeWebviewPanel(p: unknown, st: unknown): Thenable<void> },
+      ) => { serializers.set(viewType, s); return { dispose: () => serializers.delete(viewType) }; },
     },
     workspace: {
       onDidSaveTextDocument: saves.on,
@@ -135,7 +139,7 @@ vi.mock('vscode', () => {
     ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
     Range, Selection, WorkspaceEdit, Uri,
     __mock: {
-      state, saves, changes, selections, commands, infoMsgs, warnMsgs, panels, applied,
+      state, saves, changes, selections, commands, serializers, infoMsgs, warnMsgs, panels, applied,
       config, configWrites,
       reset() {
         // dispose any live panel first so extension.ts's module-level `active`
@@ -143,7 +147,7 @@ vi.mock('vscode', () => {
         // next test would reuse a stale panel instead of creating one
         (panels as FakePanel[]).forEach(p => p.dispose());
         saves.clear(); changes.clear(); selections.clear();
-        commands.clear();
+        commands.clear(); serializers.clear();
         infoMsgs.length = 0; warnMsgs.length = 0;
         panels.length = 0; applied.length = 0;
         config.clear(); configWrites.length = 0;
@@ -169,6 +173,7 @@ interface MockApi {
   changes: { fire(e: unknown): void; count(): number };
   selections: { fire(e: unknown): void; count(): number };
   commands: Map<string, (...a: unknown[]) => unknown>;
+  serializers: Map<string, { deserializeWebviewPanel(p: unknown, s: unknown): Thenable<void> }>;
   infoMsgs: string[]; warnMsgs: string[];
   panels: FakePanel[]; applied: { ops: { range: unknown; text: string }[] }[];
   config: Map<string, unknown>;
@@ -229,7 +234,20 @@ describe('activation and the open command', () => {
     const subscriptions: { dispose(): void }[] = [];
     activate({ subscriptions, extensionUri: { path: '/ext' } } as never);
     expect(M.commands.has('bootstrapVisualizer.open')).toBe(true);
-    expect(subscriptions.length).toBe(1);
+    // the command plus the webview-panel serializer
+    expect(subscriptions.length).toBe(2);
+  });
+
+  it('registers a webview serializer that disposes any restored panel', async () => {
+    // VS Code restores persisted panels across restarts; we don't rehydrate, so
+    // the serializer must dispose the blank restored frame rather than orphan it.
+    const subscriptions: { dispose(): void }[] = [];
+    activate({ subscriptions, extensionUri: { path: '/ext' } } as never);
+    const serializer = M.serializers.get('bootstrapVisualizer');
+    expect(serializer).toBeDefined();
+    let disposed = false;
+    await serializer!.deserializeWebviewPanel({ dispose: () => { disposed = true; } }, undefined);
+    expect(disposed).toBe(true);
   });
 
   it('without an active editor: an info message, no panel', () => {
