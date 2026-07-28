@@ -7,12 +7,58 @@ import {
   classEdit, classTokens, definingBp, setWidthToken,
 } from '@bootstrap-visualizer/core';
 import type { ColNode, NodePath } from '@bootstrap-visualizer/core';
-import { toast } from './dom.js';
+import { rowsHost, toast } from './dom.js';
 import { applyOps, canApplyEdit, fallbackTier, resize, resolvePath, state } from './state.js';
 import { moveCol } from './edits.js';
 import { render, type ColWidth } from './render.js';
 
 export const dnd: { src: NodePath | null } = { src: null };
+
+/** Keep a native column drag droppable across the whole window. Call once at
+    startup (both frontends do, alongside the other wiring).
+
+    A native HTML5 drop only fires where some `dragover` handler called
+    `preventDefault`. Our dropzones do — but the instant the pointer crosses a
+    gap between them, strays over the inspector/header, or leaves the window and
+    comes back, the drag is marked non-droppable, and after such an excursion
+    Chromium won't re-arm the drop even once you return over a zone (the
+    reported bug). Accepting `dragover` at the document level for the duration
+    of the gesture keeps a valid drop target under the pointer the whole time;
+    each dropzone still owns the actual placement (its `drop` stops
+    propagation), so this only fills the gaps and stays inert whenever no column
+    is being dragged. The paired `drop` guard swallows a release that lands off
+    every zone, so the drag payload can't fall through to a native text-drop
+    (e.g. getting inserted into the source textarea). */
+export function wireDragSurface(): void {
+  document.addEventListener('dragover', e => { if (dnd.src) e.preventDefault(); });
+  document.addEventListener('drop', e => { if (dnd.src) e.preventDefault(); });
+
+  // Leaving the canvas panel cancels the drag. Native DnD dies silently the
+  // moment the pointer crosses out of the webview iframe (into the source
+  // editor, say) — `dragend` never reaches us, so the dropzones stay lit and
+  // the column dimmed, as if still awaiting a drop. Rather than try to survive
+  // that crossing (native DnD can't, out of an iframe), we treat leaving the
+  // panel as a clean cancel and reset here, so nothing looks stuck. The
+  // `contains(relatedTarget)` check ignores moves onto a child (a dropzone),
+  // firing only when the pointer truly leaves the panel.
+  const panel = rowsHost.closest('.canvas-scroll') ?? rowsHost;
+  panel.addEventListener('dragleave', e => {
+    if (!dnd.src) return;
+    const to = (e as DragEvent).relatedTarget as Node | null;
+    if (!to || !panel.contains(to)) cancelColDrag();
+  });
+}
+
+/** Return the canvas to its resting state after a column drag ends without a
+    real drop (see wireDragSurface). Class-only reset — no model change, so no
+    re-render needed; idempotent, so a later real `dragend` is harmless. */
+function cancelColDrag(): void {
+  if (!dnd.src) return;
+  dnd.src = null;
+  document.body.classList.remove('dnd');
+  document.querySelectorAll('.g-col.dragging').forEach(el => el.classList.remove('dragging'));
+  document.querySelectorAll('.dropzone.over').forEach(el => el.classList.remove('over'));
+}
 
 export function makeDropzone(rowPath: NodePath, index: number, posCls?: string): HTMLElement {
   const z = document.createElement('div');

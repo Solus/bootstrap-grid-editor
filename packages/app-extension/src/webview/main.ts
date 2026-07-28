@@ -7,7 +7,8 @@
 import '@bootstrap-visualizer/editor/styles.css';
 import {
   apply, applyOpenConfig, assertRequiredIds, REQUIRED_EDITOR_IDS, selectAtOffset,
-  setHost, toast, wireBreakpointSwitch, wireCanvasBackground, wireKeyboardNav,
+  setHost, toast, wireBreakpointSwitch, wireCanvasBackground, wireDragSurface,
+  wireKeyboardNav,
 } from '@bootstrap-visualizer/editor';
 import { createWebviewHost, type SyncState } from './webview-host.js';
 import type { HostMessage, WebviewMessage } from '../shared/protocol.js';
@@ -29,6 +30,7 @@ setHost(createWebviewHost(post, sync));
 wireBreakpointSwitch();
 wireKeyboardNav();          // no undo/redo — that's the editor's native undo
 wireCanvasBackground();
+wireDragSurface();
 
 document.getElementById('resyncBtn')
   ?.addEventListener('click', () => post({ type: 'discard' }));

@@ -244,6 +244,51 @@ describe('graceful failure — the canvas never breaks (robustness)', () => {
   });
 });
 
+describe('drag surface keeps a native drag droppable across excursions', () => {
+  it('accepts dragover/drop at the document level only while a column is dragged', async () => {
+    const ed = await editor();
+    // idle: a stray dragover/drop is left alone (no interference with the page)
+    const idleOver = new Event('dragover', { bubbles: true, cancelable: true });
+    document.dispatchEvent(idleOver);
+    expect(idleOver.defaultPrevented).toBe(false);
+
+    // dragging: the whole document accepts the drag, so leaving the dropzones
+    // (or the window) and returning keeps the drop armed
+    ed.dnd.src = [0, 0];
+    const over = new Event('dragover', { bubbles: true, cancelable: true });
+    document.dispatchEvent(over);
+    expect(over.defaultPrevented).toBe(true);
+    // a release off every zone is swallowed (can't fall through to a text-drop)
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    document.dispatchEvent(drop);
+    expect(drop.defaultPrevented).toBe(true);
+
+    ed.dnd.src = null;
+  });
+
+  it('leaving the canvas panel cancels the drag and clears the dragging state', async () => {
+    const ed = await editor();
+    const panel = document.querySelector('.canvas-scroll')!;
+
+    // simulate an in-progress drag
+    ed.dnd.src = [0, 0];
+    document.body.classList.add('dnd');
+
+    // moving onto a child (a dropzone) is NOT leaving — the drag stays live
+    const inner = new Event('dragleave', { bubbles: true }) as Event & { relatedTarget: unknown };
+    Object.defineProperty(inner, 'relatedTarget', { value: panel.querySelector('*') ?? panel });
+    panel.dispatchEvent(inner);
+    expect(ed.dnd.src).not.toBeNull();
+
+    // leaving the panel (relatedTarget outside it / null) cancels and resets
+    const out = new Event('dragleave', { bubbles: true }) as Event & { relatedTarget: unknown };
+    Object.defineProperty(out, 'relatedTarget', { value: null });
+    panel.dispatchEvent(out);
+    expect(ed.dnd.src).toBeNull();
+    expect(document.body.classList.contains('dnd')).toBe(false);
+  });
+});
+
 describe('selection drives the inspector', () => {
   it('selecting a column shows its class and actions', () => {
     const col = document.querySelector<HTMLElement>('.g-col')!;
