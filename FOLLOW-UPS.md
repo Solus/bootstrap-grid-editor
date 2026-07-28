@@ -426,6 +426,57 @@ disposal detaches every listener. What remains genuinely uncovered is only
 the real-Electron layer (an actual `WorkspaceEdit` reaching a real buffer),
 which mostly exercises VS Code itself — still deferred, as below.
 
+### 7.4 `applyEdits` isn't serialized — a concurrent-edit race can false-diverge **[verify]**
+
+*What it is.* The extension's out-of-sync guard is version-based
+(`session.ts:114`): a canvas edit carries the `baseVersion` it was computed
+against, and `applyCanvasEdits` refuses it (`diverged` + `OUT_OF_SYNC`) if
+`baseVersion !== docVersion()`. The webview keeps the two in step by
+**optimistically** bumping `sync.version++` right after posting each batch
+(`webview-host.ts:38`), which is what lets a run of *sequential* canvas-only
+edits sail through with no manual HTML change. But the host dispatches webview
+messages **without awaiting** — `void session.onMessage(msg)`
+(`extension.ts:103`) — and `applyCanvasEdits` reads `docVersion()` for its
+check while VS Code only bumps `doc.version` when `workspace.applyEdit`
+*resolves* (`extension.ts:67`). So if two `applyEdits` messages are queued
+before the first's async apply resolves:
+- edit 1 suspends at `await applyEdit` — `docVersion` still N;
+- edit 2's check runs with `baseVersion` N+1 (correctly predicted) against a
+  still-N `docVersion` → **false mismatch → spurious "out of sync"**, with no
+  manual/external edit involved.
+
+The same non-serialization corrupts the `applying` flag, which is a boolean not
+a counter (`session.ts:37`): edit 2's `finally` can clear `applying` while edit
+1's own `onDidChangeTextDocument` is still pending, so a self-authored change
+reads as user divergence. Same root cause, second symptom.
+
+*Why it matters.* It's a **false** block: the canvas is actually fine, but the
+user is told to Resync. Recovery is non-destructive (Resync re-sends identical
+source, no work lost), and reachability is **low today** because the extension's
+keyboard is nav-only (`main.ts:31` — no keyboard-driven resize/nudge), so edits
+are click/drag-paced by both human timing *and* the postMessage round-trip; you
+need two `applyEdits` in one host event-loop turn. But it's a structural race,
+and any future rapid-edit path (keyboard nudge, batched ops, autoclick) makes it
+easy to hit.
+
+*Also worth recording (separate, already-true):* "out of sync" fires on *any*
+document change the canvas didn't author — so **format-on-save, an
+auto-formatter, or another extension** touching the buffer legitimately
+diverges you. "Assuming no manual edits" is not the full safe-condition; "no
+external buffer changes" is. That part is by-design, not a bug — noting it so
+it isn't rediscovered as one.
+
+*Suggested direction — verify first.* The whole finding rests on the VS Code
+timing assumption (`doc.version` bumps on `applyEdit` *resolve*, not at call).
+Confirm that empirically (an Electron integration test, or an F5 repro firing
+two canvas edits within a tick) before building a fix. If confirmed, the fix is
+small: **serialize `applyEdits`** in `Session` (chain them on a promise queue so
+each batch's version check runs only after the prior apply resolved), and/or
+make `applying` a **counter** so overlapping edits don't clear it early. Both
+belong in the pure `Session` controller, so they're unit-testable
+(`session.test.ts`) without Electron. Cross-check against §7.3's note that the
+real-buffer layer stays uncovered.
+
 ---
 
 *(original entry, kept for context)*
