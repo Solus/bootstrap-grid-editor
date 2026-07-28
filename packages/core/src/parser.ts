@@ -155,6 +155,7 @@ function tagNgIf(els: El[], ctx: Ctx): void {
     ctx.root.condRegions[region] = {
       region,
       branches: [{ index: 0, label: `*ngIf (${condition})`, condition }],
+      structural: true,   // the `*ngIf` attr rides on the element — no braces
     };
     el.cond = { region, branch: 0 };
   }
