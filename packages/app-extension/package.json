@@ -96,7 +96,9 @@
       ]
     }
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onWebviewPanel:bootstrapVisualizer"
+  ],
   "scripts": {
     "vscode:prepublish": "npm run build",
     "build:webview": "vite build",

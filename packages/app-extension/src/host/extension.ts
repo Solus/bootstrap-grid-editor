@@ -15,6 +15,20 @@ import { Session } from './session.js';
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('bootstrapVisualizer.open', () => openPanel(context)),
+    // VS Code persists open webview panels across window restarts and tries to
+    // restore them. We deliberately don't rehydrate: a canvas is bound to a
+    // specific document that may no longer exist (or be open) on reopen, and a
+    // fresh start has no `active` canvas to adopt it — so an unhandled restore
+    // shows up as a blank, orphaned panel. Dispose it instead, leaving a clean
+    // slate the user reopens from the command. (Needs the
+    // `onWebviewPanel:bootstrapVisualizer` activation event so we're alive to
+    // handle the restore at all.)
+    vscode.window.registerWebviewPanelSerializer('bootstrapVisualizer', {
+      deserializeWebviewPanel(panel) {
+        panel.dispose();
+        return Promise.resolve();
+      },
+    }),
   );
 }
 
