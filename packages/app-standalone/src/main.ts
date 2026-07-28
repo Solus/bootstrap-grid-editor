@@ -4,7 +4,7 @@
 import '@bootstrap-visualizer/editor/styles.css';
 import {
   apply, assertRequiredIds, REQUIRED_EDITOR_IDS, setHost, wireBreakpointSwitch,
-  wireCanvasBackground, wireKeyboard,
+  wireCanvasBackground, wireDragSurface, wireKeyboard,
 } from '@bootstrap-visualizer/editor';
 import { standaloneHost } from './standalone-host.js';
 import { wireSourcePane } from './source-pane.js';
@@ -26,5 +26,6 @@ wireSourcePane();
 wireFileIo();
 wireKeyboard();
 wireCanvasBackground();
+wireDragSurface();
 
 apply(SAMPLE, { keepSel: false });
