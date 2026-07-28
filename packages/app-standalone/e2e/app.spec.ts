@@ -696,6 +696,29 @@ test.describe('@if branch toggle', () => {
     await expect(row.locator('.cond-box')).toHaveCount(1);
   });
 
+  test('a *ngIf column moves freely — the condition rides on the element, no braces to cross', async ({ page }) => {
+    await page.locator('#src').fill(
+      `<div class="row">
+         <div class="col-4">head</div>
+         <div class="col-8" *ngIf="flag">maybe</div>
+       </div>`);
+    await page.locator('#applyBtn').click();
+
+    const before = await source(page);
+    expect(before.indexOf('head')).toBeLessThan(before.indexOf('maybe'));
+
+    // select the *ngIf column and move it left, before the plain column
+    await page.locator('.g-col', { hasText: 'maybe' }).click();
+    await page.locator('#inspector').getByText('◀ Move').click();
+
+    // not blocked as a branch crossing (unlike a block @if), and the element
+    // actually moved — carrying its *ngIf attribute with it
+    await expect(page.locator('#toast')).not.toContainText('branch boundary');
+    const after = await source(page);
+    expect(after.indexOf('maybe')).toBeLessThan(after.indexOf('head'));
+    expect(after).toContain('*ngIf="flag"');
+  });
+
   test('many hidden @ifs share the row strip without overlapping the label', async ({ page }) => {
     // worst case: four hideable @ifs with long conditions on a titled row —
     // chips must shrink into the capped strip, never covering the ROW label

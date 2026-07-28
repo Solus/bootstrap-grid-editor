@@ -135,6 +135,8 @@ describe('@if region tagging', () => {
     const tags = tagged(root);
     expect(tags.map(t => t.branch)).toEqual([0, 1]);
     expect(tags.every(t => t.region === reg.region)).toBe(true);
+    // a block @if is NOT structural — its braces surround the element
+    expect(reg.structural).toBeFalsy();
   });
 
   it('models @else if as three branches with conditions', () => {
@@ -194,6 +196,8 @@ describe('@if region tagging', () => {
     expect(regs[0]!.branches.length).toBe(1);
     expect(regs[0]!.branches[0]!.condition).toBe('hasWarning');
     expect(regs[0]!.branches[0]!.label).toBe('*ngIf (hasWarning)');
+    // marked structural: the condition rides on the element, so it moves freely
+    expect(regs[0]!.structural).toBe(true);
     // only the *ngIf column is tagged; the plain column is not
     expect(tagged(root).map(t => t.branch)).toEqual([0]);
   });

@@ -66,6 +66,11 @@ export interface CondBranchMeta {
 export interface CondRegionMeta {
   region: string;
   branches: CondBranchMeta[];
+  /** True for a `*ngIf` region: the condition is an attribute on the element
+      itself (its span includes it), so the element is self-contained and can
+      be moved freely — unlike an inline `@if`/`@else` *block*, whose `{}`
+      braces surround the element. Absent/false for block regions. */
+  structural?: boolean;
 }
 
 /** A conditional region as the model exposes it: its branches plus which one

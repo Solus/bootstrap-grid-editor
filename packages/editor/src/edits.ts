@@ -18,12 +18,18 @@ import {
 } from './state.js';
 import { toast } from './dom.js';
 
-/** Which `@if` branch an element belongs to, or null if outside any `@if`.
-    Two columns can only be reordered / a column moved between them when their
-    branch context matches — a plain text swap across an `@if {}` boundary
-    would move a column across the braces. */
+/** Which `@if` branch an element belongs to, or null if the element is free to
+    move (outside any `@if`, or carrying its own `*ngIf`). Two columns can only
+    be reordered / a column moved between them when their branch context
+    matches — a plain text swap across an `@if {}` boundary would move a column
+    across the braces. A `*ngIf` element is exempt: the condition is an
+    attribute inside its own tag, so the element is self-contained and moving it
+    crosses no braces — it behaves like a plain element (and is still blocked
+    from swapping *into* an inline `@if` block, whose key it will never match). */
 function condKey(el: El): string | null {
-  return el.cond ? `${el.cond.region}:${el.cond.branch}` : null;
+  if (!el.cond) return null;
+  if (state.root?.condRegions[el.cond.region]?.structural) return null;
+  return `${el.cond.region}:${el.cond.branch}`;
 }
 
 const CROSS_BRANCH_MSG = "Can't move a column across an @if branch boundary — switch to that branch first.";
