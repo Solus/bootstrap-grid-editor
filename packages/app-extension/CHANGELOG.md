@@ -1,5 +1,19 @@
 # Change Log
 
+## 0.0.9
+
+- Fixed: reopening VS Code no longer greets you with a blank Grid Visualizer
+  panel. A canvas is tied to a specific file, which may not exist on reopen, so
+  a panel VS Code restores now closes itself instead of lingering empty (and
+  orphaned) — just reopen it from "Open Grid Visualizer".
+- Changed: the "Open Grid Visualizer" button icon reads more clearly as a
+  responsive grid — two mirrored rows of a wide + a narrow column — instead of
+  looking like a camera at small sizes.
+- Fixed: the canvas is harder to break. If a single row or an edit can't be
+  drawn, that row is skipped in place (or the edit is rejected) with a notice,
+  and the rest of the layout still renders — rather than the whole canvas going
+  blank.
+
 ## 0.0.8
 
 - Added: `d-*` display utilities are now understood. A column hidden at the
