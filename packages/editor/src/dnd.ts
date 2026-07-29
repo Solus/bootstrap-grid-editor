@@ -97,7 +97,13 @@ export function startColDrag(colDiv: HTMLElement, path: NodePath): void {
     document.body.classList.add('dnd');
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
-      try { e.dataTransfer.setData('text/plain', path.join(',')); } catch { /* ignore */ }
+      // A custom MIME type, NOT text/plain: the reorder reads dnd.src, never the
+      // payload, so the data is only here because some browsers won't start a
+      // drag without any. text/plain would get inserted verbatim wherever the
+      // drag lands on a native text target — the source <textarea>, or (worse,
+      // and beyond our reach outside the webview) VS Code's own editor. A
+      // custom type is invisible to those, so nothing gets typed in.
+      try { e.dataTransfer.setData('application/x-grid-col', path.join(',')); } catch { /* ignore */ }
     }
   });
   colDiv.addEventListener('dragend', () => {
