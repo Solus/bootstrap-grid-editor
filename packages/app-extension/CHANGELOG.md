@@ -1,5 +1,16 @@
 # Change Log
 
+## 0.0.12
+
+- Fixed: the offset stepper (under "Effective at …") now changes only one
+  breakpoint — the tier already in the column, or the closest to it — just like
+  the width stepper. Stepping it down to 0 removes that offset class instead of
+  leaving a leftover like `col-sm-offset-1 col-md-offset-0`.
+- Fixed: adding a column (or row) can no longer land in the wrong place. If the
+  file changed underneath the canvas, an insertion is now verified against its
+  surroundings and refused with a Resync prompt, rather than being spliced into
+  the middle of another element.
+
 ## 0.0.11
 
 - Fixed: a column resize could occasionally write broken HTML (like
