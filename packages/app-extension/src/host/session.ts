@@ -116,6 +116,17 @@ export class Session {
       this.ports.warn(OUT_OF_SYNC);
       return;
     }
+    // Guard against a silent offset desync: even at the right version, replacing
+    // by raw offset corrupts the file if the buffer no longer matches what the
+    // canvas computed the edit against. Each edit carries the text it expects at
+    // its span; if any doesn't match, refuse the batch and resync rather than
+    // splice a column class into the wrong place.
+    const text = this.ports.docText();
+    if (edits.some(e => e.old != null && text.substring(e.start, e.end) !== e.old)) {
+      this.ports.post({ type: 'diverged' });
+      this.ports.warn(OUT_OF_SYNC);
+      return;
+    }
     this.applying = true;
     try {
       const ok = await this.ports.applyEdit(edits);

@@ -117,6 +117,31 @@ describe('Session — edits out', () => {
     expect(h.warns).toHaveLength(0);
   });
 
+  it('applies when the edit still matches the buffer (old verified)', async () => {
+    const h = harness({ text: '<div class="col">x</div>', version: 1 });
+    await h.session.onMessage({
+      type: 'applyEdits', baseVersion: 1,
+      edits: [{ start: 12, end: 15, text: 'col-4', old: 'col' }],   // "col" is at 12..15
+    });
+    expect(h.posts).toContainEqual({ type: 'applied', version: 2 });
+    expect(h.warns).toHaveLength(0);
+  });
+
+  it('refuses an edit whose span no longer matches the buffer (anti-corruption)', async () => {
+    // Right version, but the offsets were computed against a different source:
+    // old says "col" while the buffer holds col-sm-2 there. Splicing by raw
+    // offset would produce broken HTML (e.g. class=col-sm-42"); refuse instead.
+    const h = harness({ text: '<div class="col-sm-2">x</div>', version: 1 });
+    await h.session.onMessage({
+      type: 'applyEdits', baseVersion: 1,
+      edits: [{ start: 11, end: 14, text: 'col-sm-4', old: 'col' }],
+    });
+    expect(h.types()).toContain('diverged');
+    expect(h.warns).toContain(OUT_OF_SYNC);
+    expect(h.version()).toBe(1);                 // nothing applied
+    expect(h.posts.some(p => p.type === 'applied')).toBe(false);
+  });
+
   it('refuses a stale edit and warns (guard-and-warn)', async () => {
     const h = harness({ version: 5 });
     await h.session.onMessage({
