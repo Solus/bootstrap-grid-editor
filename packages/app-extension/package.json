@@ -76,6 +76,12 @@
           "default": "bootstrap5",
           "scope": "application",
           "markdownDescription": "Class style for **new** columns when a file has no grid classes to detect from. A file that already uses one dialect always keeps it."
+        },
+        "bootstrapVisualizer.liveSync": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "markdownDescription": "Keep the canvas in sync with the editor **as you type** (after a short pause), instead of only when you save. When off (the default), editing the file under the canvas parks it until you save or press Resync. Canvas edits are always verified before they touch the file, so a half-typed buffer can't corrupt it."
         }
       }
     },

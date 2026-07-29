@@ -8,7 +8,9 @@
    Sync model (PLAN.md §3/§6): the editor document is the source of truth. The
    canvas renders it; canvas edits apply to the buffer as workspace edits. On
    save the canvas refreshes. If the user edits the document under the canvas,
-   the webview is told it diverged. */
+   the webview is told it diverged — unless the `liveSync` setting is on, in
+   which case the canvas instead refreshes from the (dirty) buffer after a short
+   debounce (see `onDocChange`). */
 
 import type { Edit } from '@bootstrap-visualizer/core';
 import type { ConfigWire, HostMessage, WebviewMessage } from '../shared/protocol.js';
@@ -60,13 +62,40 @@ export class Session {
       / failed-apply), which is exactly when the webview drops its own diverged
       state. */
   private diverged = false;
+  /** Pending debounced live-sync refresh (see `onDocChange`). */
+  private liveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** How long after the last keystroke a live-sync refresh fires. */
+  private static readonly LIVE_DEBOUNCE = 400;
 
   constructor(private readonly ports: SessionPorts) {}
 
-  /** The editor document changed (not via our own apply → divergence). */
+  /** The editor document changed (not via our own apply → divergence).
+
+      Two behaviours, chosen by the `liveSync` setting (read live so toggling it
+      takes effect without reopening):
+      - off (default): park the canvas — mark it diverged and let the user save
+        or Resync. Safe and quiet, but blocks canvas edits meanwhile.
+      - on: keep the canvas following the editor — debounce, then resend the
+        (possibly dirty) source so the canvas refreshes. The tolerant parser and
+        `apply()`'s last-good-view guard keep a half-typed buffer from breaking
+        the canvas, and the edit context guards still refuse a canvas edit that
+        races an un-synced change. */
   onDocChange(): void {
     if (this.applying) return;
+    if (this.ports.config().liveSync) { this.scheduleLiveResync(); return; }
     this.markDiverged();
+  }
+
+  /** Debounce a live-sync refresh, collapsing a typing burst into one resend. */
+  private scheduleLiveResync(): void {
+    if (this.liveTimer) clearTimeout(this.liveTimer);
+    this.liveTimer = setTimeout(() => {
+      this.liveTimer = null;
+      // A canvas edit is mid-flight — its own apply keeps things in step; retry
+      // after it lands so the refresh reflects the final buffer.
+      if (this.applying) { this.scheduleLiveResync(); return; }
+      this.sendSource(true);   // refresh from the buffer, keeping the selection
+    }, Session.LIVE_DEBOUNCE);
   }
 
   /** Tell the webview it has diverged — but only once per divergence episode,
@@ -77,9 +106,11 @@ export class Session {
     this.ports.post({ type: 'diverged' });
   }
 
-  /** The document was saved → refresh the canvas from source. */
+  /** The document was saved → refresh the canvas from source, keeping the
+      selection where its path still resolves (a save shouldn't cost you the
+      column you had selected). */
   onSave(): void {
-    this.sendSource();
+    this.sendSource(true);
   }
 
   /** Re-point at the bound document (which a reused panel may have just
@@ -141,16 +172,27 @@ export class Session {
     }
   }
 
-  private sendSource(): void {
+  /** Resend the buffer to the canvas — a full resync. `keepSelection` is set
+      only by a live-sync refresh, so the canvas keeps its selection where the
+      path still resolves; save / discard / reload / load leave it unset and the
+      canvas starts fresh. */
+  private sendSource(keepSelection = false): void {
+    // Any immediate resend supersedes a pending live-sync one.
+    if (this.liveTimer) { clearTimeout(this.liveTimer); this.liveTimer = null; }
     // Resending the source is exactly a resync: the webview clears its diverged
     // state on `setSource`, so clear ours in step — the next real buffer change
     // is then a fresh false→true edge that posts `diverged` again.
     this.diverged = false;
-    this.ports.post({
-      type: 'setSource',
-      text: this.ports.docText(),
-      version: this.ports.docVersion(),
-    });
+    const text = this.ports.docText();
+    const version = this.ports.docVersion();
+    this.ports.post(keepSelection
+      ? { type: 'setSource', text, version, keepSelection: true }
+      : { type: 'setSource', text, version });
+  }
+
+  /** Cancel any pending live-sync refresh (panel closing / re-pointing). */
+  dispose(): void {
+    if (this.liveTimer) { clearTimeout(this.liveTimer); this.liveTimer = null; }
   }
 
   private async applyCanvasEdits(edits: Edit[], baseVersion: number): Promise<void> {
