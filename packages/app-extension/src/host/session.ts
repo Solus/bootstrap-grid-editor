@@ -40,6 +40,18 @@ export class Session {
       back as a caret move (the caret lands on the element's exclusive end,
       which resolves to the parent — the row-instead-of-column bug). */
   private revealed: { start: number; end: number } | null = null;
+  /** Serializes message handling. `onDidReceiveMessage` in extension.ts is
+      fire-and-forget — VS Code doesn't wait for one message's handler to
+      finish before delivering the next. Without this queue, two canvas
+      edits fired back-to-back (e.g. clicking "Add column" twice, or two
+      drags) would both start `applyCanvasEdits` concurrently: the second's
+      `baseVersion` (the webview bumps it optimistically per edit) would be
+      checked against `docVersion()` before the first edit's `await
+      ports.applyEdit(...)` actually landed, so it looked stale and got
+      refused as "diverged" — issue #1. Chaining through this queue makes
+      each message wait for the previous one's full effect (including the
+      buffer write) before the next is handled. */
+  private queue: Promise<void> = Promise.resolve();
 
   constructor(private readonly ports: SessionPorts) {}
 
@@ -78,7 +90,18 @@ export class Session {
     this.ports.post({ type: 'selectAt', offset: active });
   }
 
-  async onMessage(msg: WebviewMessage): Promise<void> {
+  /** Queue this message behind any still-in-flight ones (see `queue`), then
+      handle it. Returns the settled handling promise, not the queue chain
+      itself, so a later caller awaiting a specific message doesn't hang on
+      whatever comes after it — and one message's failure never wedges the
+      queue for the rest. */
+  onMessage(msg: WebviewMessage): Promise<void> {
+    const turn = this.queue.then(() => this.handle(msg));
+    this.queue = turn.then(() => undefined, () => undefined);
+    return turn;
+  }
+
+  private async handle(msg: WebviewMessage): Promise<void> {
     switch (msg.type) {
       case 'ready':
         // config first, so the canvas applies the user's settings before it
