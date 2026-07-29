@@ -1,5 +1,18 @@
 # Change Log
 
+## 0.0.10
+
+- Fixed: dragging a column onto text — the editor, or the source pane — no
+  longer types stray text (like `1,0`) into it. The drag no longer carries a
+  plain-text payload.
+- Fixed: a column drag that leaves the canvas now cancels cleanly and the
+  canvas returns to its resting state, instead of looking like it's still
+  waiting for a drop. Drops are also more forgiving as you move across the
+  canvas (over gaps, past the ruler) rather than only landing on a narrow slot.
+- Fixed: a `*ngIf` element can now be moved freely. Because the condition lives
+  on the element itself (not wrapping braces like an `@if` block), moving it
+  carries the `*ngIf` along — so it's no longer blocked as a "branch boundary".
+
 ## 0.0.9
 
 - Fixed: reopening VS Code no longer greets you with a blank Grid Visualizer
