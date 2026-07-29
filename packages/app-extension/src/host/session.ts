@@ -116,13 +116,18 @@ export class Session {
       this.ports.warn(OUT_OF_SYNC);
       return;
     }
-    // Guard against a silent offset desync: even at the right version, replacing
+    // Guard against a silent offset desync: even at the right version, applying
     // by raw offset corrupts the file if the buffer no longer matches what the
     // canvas computed the edit against. Each edit carries the text it expects at
-    // its span; if any doesn't match, refuse the batch and resync rather than
-    // splice a column class into the wrong place.
+    // its span plus a little context on each side; if any doesn't match, refuse
+    // the batch and resync rather than splice into the wrong place. The context
+    // is what catches a misplaced *insertion* (empty `old` matches anywhere).
     const text = this.ports.docText();
-    if (edits.some(e => e.old != null && text.substring(e.start, e.end) !== e.old)) {
+    const misplaced = edits.some(e =>
+      (e.old != null && text.substring(e.start, e.end) !== e.old) ||
+      (e.before != null && text.substring(e.start - e.before.length, e.start) !== e.before) ||
+      (e.after != null && text.substring(e.end, e.end + e.after.length) !== e.after));
+    if (misplaced) {
       this.ports.post({ type: 'diverged' });
       this.ports.warn(OUT_OF_SYNC);
       return;

@@ -242,12 +242,21 @@ export function setActiveBranch(region: string, index: number): void {
     document as minimal workspace edits. */
 export function applyOps(edits: Edit[], opts: ApplyOpts = {}): void {
   if (!edits.length) return;
-  // Stamp each edit with the exact text it expects to replace, read from the
-  // source it was computed against. The extension verifies this before
-  // replaying the edit onto the document, so an offset desync (the webview's
-  // source out of step with the buffer) is refused as a divergence instead of
-  // splicing a column class into the wrong place and corrupting the HTML.
-  const stamped = edits.map(e => ({ ...e, old: state.src.slice(e.start, e.end) }));
+  // Stamp each edit with the exact text it expects to replace, plus a little
+  // context on each side, read from the source it was computed against. The
+  // extension verifies this before replaying the edit onto the document, so an
+  // offset desync (the webview's source out of step with the buffer) is refused
+  // as a divergence instead of splicing into the wrong place and corrupting the
+  // HTML. The `before`/`after` context is what catches an *insertion* (Add
+  // column/row): its `old` is empty and would match anywhere, but a drifted
+  // insertion point won't have the expected surrounding text.
+  const CTX = 16;
+  const stamped = edits.map(e => ({
+    ...e,
+    old: state.src.slice(e.start, e.end),
+    before: state.src.slice(Math.max(0, e.start - CTX), e.start),
+    after: state.src.slice(e.end, e.end + CTX),
+  }));
   apply(applyEdits(state.src, stamped), { ...opts, edits: stamped });
 }
 

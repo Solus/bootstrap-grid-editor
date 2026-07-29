@@ -173,6 +173,12 @@ export interface Edit {
       drifted from the canvas's source) is refused instead of corrupting the
       file. Optional: absent edits skip the check. */
   old?: string;
+  /** A few chars of context just before `start` / just after `end`, as they
+      were when the edit was built. Verified alongside `old` so an *insertion*
+      (start === end, empty `old`, which would otherwise match anywhere) is also
+      caught when it would land at a drifted offset — e.g. inside a `</div>`. */
+  before?: string;
+  after?: string;
 }
 
 /** Where to cut an element out of the source, and what to paste back.

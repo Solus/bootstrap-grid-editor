@@ -499,13 +499,17 @@ webview/Electron; `positionAt`↔`getText` are consistent per the API, so plain
 CRLF alone doesn't explain it — a missed divergence or a stale sync is the more
 likely culprit, cf. §7.4).
 
-*What was done (v0.0.11-ish).* Defense-in-depth so it can't corrupt regardless
-of trigger: every edit now carries `Edit.old` (the exact text it expects at its
-span), stamped in `applyOps` from the source it was computed against; the
-extension's `applyCanvasEdits` verifies each `old` against the current buffer
-and, on any mismatch, refuses the batch as a divergence (resync) instead of
-splicing into the wrong place. Covered by `session.test.ts` (matches → applies;
-mismatch → diverged, nothing applied).
+*What was done (v0.0.11 / v0.0.12).* Defense-in-depth so it can't corrupt
+regardless of trigger: every edit carries `Edit.old` (the exact text it expects
+at its span) plus `before`/`after` (a little context on each side), stamped in
+`applyOps` from the source it was computed against; the extension's
+`applyCanvasEdits` verifies all three against the current buffer and, on any
+mismatch, refuses the batch as a divergence (resync). The `before`/`after`
+context was added (v0.0.12) because the first cut only checked `old`, which is
+**empty for an insertion** (Add column/row) and so matched anywhere — a drifted
+insertion slipped through and spliced a new column into the middle of a `</div>`
+(`</d …new col… iv>`). Covered by `session.test.ts` (replacement + insertion,
+matching → applies, drifted → diverged/nothing applied).
 
 *Leading hypothesis (from the report: extension, "after several edits").* The
 webview keeps its own `state.src` and applies each edit locally *and* replays it

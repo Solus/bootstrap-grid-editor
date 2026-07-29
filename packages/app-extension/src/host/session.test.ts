@@ -142,6 +142,36 @@ describe('Session — edits out', () => {
     expect(h.posts.some(p => p.type === 'applied')).toBe(false);
   });
 
+  it('refuses a misplaced insertion via its context (anti-corruption)', async () => {
+    // Add column is an insertion: start === end, old === '' (matches anywhere).
+    // Its before/after context is what catches a drifted insertion point — here
+    // the buffer no longer has the expected text around the offset, so applying
+    // would splice a new column into the middle of a </div>. Refuse instead.
+    const h = harness({ text: '<div class="row"><div class="col">x</div></div>', version: 1 });
+    await h.session.onMessage({
+      type: 'applyEdits', baseVersion: 1,
+      edits: [{ start: 8, end: 8, text: '<new/>', before: '</div>', after: '\n  <div' }],
+    });
+    expect(h.types()).toContain('diverged');
+    expect(h.warns).toContain(OUT_OF_SYNC);
+    expect(h.version()).toBe(1);                 // nothing applied
+    expect(h.posts.some(p => p.type === 'applied')).toBe(false);
+  });
+
+  it('applies an insertion whose context still matches', async () => {
+    const text = '<div class="row"><div class="col">x</div></div>';
+    const h = harness({ text, version: 1 });
+    // insert right after the inner </div> (offset 41), context taken from `text`
+    const at = text.indexOf('</div></div>') + '</div>'.length;   // 41
+    await h.session.onMessage({
+      type: 'applyEdits', baseVersion: 1,
+      edits: [{ start: at, end: at, text: '<x/>',
+        before: text.slice(at - 6, at), after: text.slice(at, at + 6) }],
+    });
+    expect(h.posts).toContainEqual({ type: 'applied', version: 2 });
+    expect(h.warns).toHaveLength(0);
+  });
+
   it('refuses a stale edit and warns (guard-and-warn)', async () => {
     const h = harness({ version: 5 });
     await h.session.onMessage({
