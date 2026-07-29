@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.0.13
+
+- Fixed: adding or dragging several columns one after another no longer blocks
+  you with a false "the editor changed under the canvas" after the first one.
+  Rapid canvas edits are now applied in order, so you can add or move as many
+  as you like without having to save in between.
+- Fixed: editing the file by hand under the canvas no longer repeats the
+  "Resync" warning on every keystroke — it's shown once, when the canvas first
+  goes out of sync.
+
 ## 0.0.12
 
 - Fixed: the offset stepper (under "Effective at …") now changes only one
