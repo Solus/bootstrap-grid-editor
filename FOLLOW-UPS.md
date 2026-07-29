@@ -655,3 +655,34 @@ state. `onDidDispose` clears `active` so the next open builds fresh. Covered
 by extension-wiring tests (one panel on re-open, routing follows the new
 file, reveal called, fresh panel after close). Focus jumps to the canvas on
 reuse, per the maintainer's call.
+
+### 9.3 Back-to-back canvas edits falsely diverged (issue #1) **[RESOLVED — message queue in Session]**
+
+Fixed: `Session.onMessage` now serializes handling through a promise
+queue, so each webview message waits for the previous one's full effect
+(including the `await ports.applyEdit(...)` buffer write) before the next
+is handled. Root cause was that VS Code delivers `onDidReceiveMessage`
+fire-and-forget: a second canvas edit (Add column twice, or two drags)
+started `applyCanvasEdits` while the first's `applyEdit` was still in
+flight, so its optimistic `baseVersion` was checked against a `docVersion()`
+that hadn't yet incremented — read as stale and refused as "diverged",
+forcing a manual save between every edit. Covered by new
+`session.test.ts` cases (two/many rapid edits both apply; a genuinely
+stale edit is still refused; the queue survives a throwing handler); the
+test harness's `applyEdit` was made genuinely async to model the real
+round-trip the synchronous mock had been hiding.
+
+### 9.4 `onSave`/`onDocChange` bypass the message queue **[verify]**
+
+*What.* The 9.3 fix serializes the *webview message* stream, but
+`onSave` and `onDocChange` (fired from VS Code editor events, not webview
+messages) still call `sendSource`/post divergence synchronously, outside
+the queue. *Why it matters.* If the user saves the document while a canvas
+edit's `applyEdit` is mid-flight (`applying === true`), `onSave` could
+`sendSource` with a `docVersion()` that's about to change, racing the
+in-flight apply. It's a narrow window and largely self-healing (the next
+`setSource`/divergence guard re-syncs), which is why it's a verify rather
+than a fix. *Suggested direction.* Decide whether editor-event handlers
+should also fold into the same queue (making the whole controller strictly
+serial), or whether the version/context guards already make this benign —
+confirm with a targeted test before adding machinery.

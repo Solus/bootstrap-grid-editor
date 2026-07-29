@@ -355,12 +355,14 @@ describe('edits out and reveal', () => {
     expect((op.range as { start: { offset: number }; end: { offset: number } }).end.offset).toBe(17);
   });
 
-  it('reveal drives the visible editor selection and scroll', () => {
+  it('reveal drives the visible editor selection and scroll', async () => {
     const doc = makeDoc('<p>hello world</p>');
     const { editor, panel } = openWith(doc);
     panel.receive({ type: 'reveal', start: 3, end: 8 });
+    // onMessage now serializes through a promise queue, so the handler runs on
+    // a microtask; wait for its effect rather than asserting synchronously.
+    await vi.waitFor(() => expect(editor.revealed).toHaveLength(1));
     expect((editor.selection as { start: { offset: number } }).start.offset).toBe(3);
-    expect(editor.revealed).toHaveLength(1);
   });
 
   it('reveal is a no-op when the document has no visible editor', () => {
@@ -388,11 +390,12 @@ describe('user settings', () => {
       .toMatchObject({ breakpoint: 'lg', stretchSheet: true });
   });
 
-  it('a canvas view-toggle writes back to global user settings', () => {
+  it('a canvas view-toggle writes back to global user settings', async () => {
     const { panel } = openWith(makeDoc('<p>x</p>'));
     panel.receive({ type: 'setConfig', pref: 'tintOverfull', value: true });
-    expect(M.configWrites).toContainEqual(
-      { key: 'tintOverfullRows', value: true, target: 1 });   // 1 = ConfigurationTarget.Global
+    // handled on a microtask now (onMessage serializes through a queue)
+    await vi.waitFor(() => expect(M.configWrites).toContainEqual(
+      { key: 'tintOverfullRows', value: true, target: 1 }));   // 1 = ConfigurationTarget.Global
     expect(M.config.get('tintOverfullRows')).toBe(true);
   });
 });

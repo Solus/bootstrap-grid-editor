@@ -14,11 +14,20 @@ function harness(opts: { text?: string; version?: number } = {}) {
   let text = opts.text ?? '<div class="row"><div class="col">x</div></div>';
   let applyOk = true;
   let onApply: (() => void) | null = null;
+  let throwNextPost = false;
 
   const session = new Session({
-    post: m => posts.push(m),
+    post: m => {
+      if (throwNextPost) { throwNextPost = false; throw new Error('post failed'); }
+      posts.push(m);
+    },
     reveal: (s, e) => reveals.push([s, e]),
     applyEdit: async () => {
+      // a real vscode.workspace.applyEdit() genuinely resolves asynchronously
+      // (it round-trips through the editor) — the await here matters: it's what
+      // lets a second, concurrently-dispatched message observe the *old*
+      // docVersion() before this one lands (see the ordering describe block).
+      await Promise.resolve();
       if (applyOk) { version++; onApply?.(); }   // a real edit bumps version + fires onDidChangeTextDocument
       return applyOk;
     },
@@ -33,6 +42,7 @@ function harness(opts: { text?: string; version?: number } = {}) {
     session, posts, reveals, warns, configWrites,
     setVersion: (v: number) => { version = v; },
     failNextApply: () => { applyOk = false; },
+    throwOnNextPost: () => { throwNextPost = true; },
     duringApply: (fn: () => void) => { onApply = fn; },
     version: () => version,
     types: () => posts.map(p => p.type),
@@ -50,9 +60,9 @@ describe('Session — source in', () => {
     ]);
   });
 
-  it('setConfig routes a canvas view-toggle back to the host', () => {
+  it('setConfig routes a canvas view-toggle back to the host', async () => {
     const h = harness();
-    h.session.onMessage({ type: 'setConfig', pref: 'stretchSheet', value: true });
+    await h.session.onMessage({ type: 'setConfig', pref: 'stretchSheet', value: true });
     expect(h.configWrites).toEqual([['stretchSheet', true]]);
   });
 
@@ -192,6 +202,75 @@ describe('Session — edits out', () => {
     expect(h.warns).toContain(APPLY_FAILED);
     expect(h.types()).toContain('setSource');
     expect(h.posts.some(p => p.type === 'applied')).toBe(false);
+  });
+});
+
+describe('Session — back-to-back canvas edits (issue #1)', () => {
+  /* VS Code delivers webview messages fire-and-forget: it does not wait for one
+     handler to finish before dispatching the next. Two canvas edits in quick
+     succession (Add column twice, or two drags) therefore arrive overlapped.
+     The webview bumps its baseVersion optimistically per edit, so the second
+     message's baseVersion is only correct once the *first* edit has actually
+     landed in the buffer. Session serializes handling to make that true. */
+
+  it('two rapid edits both apply — no spurious divergence', async () => {
+    const h = harness({ version: 1 });
+    // dispatched without awaiting the first, exactly as extension.ts does
+    const first = h.session.onMessage({
+      type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'a' }], baseVersion: 1,
+    });
+    const second = h.session.onMessage({
+      type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'b' }], baseVersion: 2,
+    });
+    await Promise.all([first, second]);
+
+    expect(h.posts.filter(p => p.type === 'applied')).toEqual([
+      { type: 'applied', version: 2 },
+      { type: 'applied', version: 3 },
+    ]);
+    expect(h.posts.some(p => p.type === 'diverged')).toBe(false);
+    expect(h.warns).toHaveLength(0);
+  });
+
+  it('a long run of rapid edits all apply in order', async () => {
+    const h = harness({ version: 1 });
+    const sent = Array.from({ length: 6 }, (_, i) => h.session.onMessage({
+      type: 'applyEdits', edits: [{ start: 0, end: 0, text: String(i) }], baseVersion: 1 + i,
+    }));
+    await Promise.all(sent);
+
+    expect(h.posts.filter(p => p.type === 'applied').map(p => (p as { version: number }).version))
+      .toEqual([2, 3, 4, 5, 6, 7]);
+    expect(h.posts.some(p => p.type === 'diverged')).toBe(false);
+  });
+
+  it('serialization does not mask a genuinely stale edit', async () => {
+    // Both claim baseVersion 1; only the first can be right. The second must
+    // still be refused — the queue removes the false positives, not the guard.
+    const h = harness({ version: 1 });
+    const first = h.session.onMessage({
+      type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'a' }], baseVersion: 1,
+    });
+    const second = h.session.onMessage({
+      type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'b' }], baseVersion: 1,
+    });
+    await Promise.all([first, second]);
+
+    expect(h.posts.filter(p => p.type === 'applied')).toHaveLength(1);
+    expect(h.types()).toContain('diverged');
+    expect(h.warns).toContain(OUT_OF_SYNC);
+  });
+
+  it('a queued message still runs after an earlier one throws', async () => {
+    const h = harness({ version: 1 });
+    // `post` blows up on the first message; the queue must not wedge
+    const boom = h.session.onMessage({ type: 'discard' });
+    h.throwOnNextPost();
+    await boom.catch(() => {});
+    await h.session.onMessage({
+      type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'x' }], baseVersion: 1,
+    });
+    expect(h.posts).toContainEqual({ type: 'applied', version: 2 });
   });
 });
 
