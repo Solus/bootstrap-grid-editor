@@ -14,45 +14,108 @@ import { render, type ColWidth } from './render.js';
 
 export const dnd: { src: NodePath | null } = { src: null };
 
-/** Keep a native column drag droppable across the whole window. Call once at
-    startup (both frontends do, alongside the other wiring).
+/* Auto-scroll + leave-cancel tuning. */
+const EDGE = 48;          // px from the panel's top/bottom edge that auto-scrolls
+const MAX_SPEED = 20;     // px/frame at the very edge (ramps down toward EDGE)
+const LEAVE_GRACE = 150;  // ms an edge overshoot may last before the drag cancels
+
+let scrollPanel: HTMLElement | null = null;   // the .canvas-scroll to auto-scroll
+let dragPointerY = 0;                         // last pointer Y seen during a drag
+let autoScrollRAF = 0;
+let leaveTimer = 0;
+
+/** Keep a native column drag droppable across the whole window, and let you
+    reach an off-screen drop target in a tall document. Call once at startup
+    (both frontends do, alongside the other wiring).
 
     A native HTML5 drop only fires where some `dragover` handler called
     `preventDefault`. Our dropzones do — but the instant the pointer crosses a
     gap between them, strays over the inspector/header, or leaves the window and
     comes back, the drag is marked non-droppable, and after such an excursion
-    Chromium won't re-arm the drop even once you return over a zone (the
-    reported bug). Accepting `dragover` at the document level for the duration
-    of the gesture keeps a valid drop target under the pointer the whole time;
-    each dropzone still owns the actual placement (its `drop` stops
-    propagation), so this only fills the gaps and stays inert whenever no column
-    is being dragged. The paired `drop` guard swallows a release that lands off
-    every zone, so the drag payload can't fall through to a native text-drop
-    (e.g. getting inserted into the source textarea). */
+    Chromium won't re-arm the drop even once you return over a zone. Accepting
+    `dragover` at the document level for the duration of the gesture keeps a
+    valid drop target under the pointer the whole time; each dropzone still owns
+    the actual placement (its `drop` stops propagation). The paired `drop` guard
+    swallows a release that lands off every zone, so the drag payload can't fall
+    through to a native text-drop (e.g. into the source textarea).
+
+    Two scroll helpers ride on the same gesture because native DnD does NOT
+    auto-scroll a nested `overflow` container: edge auto-scroll (reliable —
+    hover the top/bottom edge and the canvas scrolls) and wheel-scroll
+    (best-effort — native DnD delivers `wheel` inconsistently, so it's a bonus,
+    not the primary path). */
 export function wireDragSurface(): void {
-  document.addEventListener('dragover', e => { if (dnd.src) e.preventDefault(); });
+  scrollPanel = (rowsHost.closest('.canvas-scroll') ?? rowsHost) as HTMLElement;
+
+  document.addEventListener('dragover', e => {
+    if (!dnd.src) return;
+    e.preventDefault();
+    dragPointerY = (e as DragEvent).clientY;
+    if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = 0; }   // re-entry cancels a pending leave
+    startAutoScroll();
+  });
   document.addEventListener('drop', e => { if (dnd.src) e.preventDefault(); });
+  document.addEventListener('dragend', stopAutoScroll);
+
+  // Best-effort wheel-scroll while dragging (see the note above); a normal wheel
+  // (no drag) falls through to native scrolling.
+  document.addEventListener('wheel', e => {
+    if (!dnd.src || !scrollPanel) return;
+    scrollPanel.scrollTop += e.deltaY;
+    e.preventDefault();
+  }, { passive: false });
 
   // Leaving the canvas panel cancels the drag. Native DnD dies silently the
   // moment the pointer crosses out of the webview iframe (into the source
   // editor, say) — `dragend` never reaches us, so the dropzones stay lit and
-  // the column dimmed, as if still awaiting a drop. Rather than try to survive
-  // that crossing (native DnD can't, out of an iframe), we treat leaving the
-  // panel as a clean cancel and reset here, so nothing looks stuck. The
-  // `contains(relatedTarget)` check ignores moves onto a child (a dropzone),
-  // firing only when the pointer truly leaves the panel.
-  const panel = rowsHost.closest('.canvas-scroll') ?? rowsHost;
+  // the column dimmed, as if still awaiting a drop. We treat leaving the panel
+  // as a clean cancel and reset here, so nothing looks stuck. The
+  // `contains(relatedTarget)` check ignores moves onto a child (a dropzone).
+  // The LEAVE_GRACE delay lets a fast drag briefly overshoot the top/bottom
+  // edge (to engage auto-scroll) and return without cancelling — the re-entry
+  // `dragover` above clears the pending cancel.
+  const panel = scrollPanel;
   panel.addEventListener('dragleave', e => {
     if (!dnd.src) return;
     const to = (e as DragEvent).relatedTarget as Node | null;
-    if (!to || !panel.contains(to)) cancelColDrag();
+    if (to && panel.contains(to)) return;   // moved onto a child, not out
+    if (leaveTimer) clearTimeout(leaveTimer);
+    leaveTimer = window.setTimeout(() => { leaveTimer = 0; cancelColDrag(); }, LEAVE_GRACE);
   });
+}
+
+/** Scroll the canvas while the pointer sits near an edge, driven by rAF (not by
+    `dragover`) so it keeps scrolling even when the pointer is held still. */
+function startAutoScroll(): void {
+  if (autoScrollRAF || typeof requestAnimationFrame !== 'function') return;
+  autoScrollRAF = requestAnimationFrame(autoScrollTick);
+}
+
+function autoScrollTick(): void {
+  autoScrollRAF = 0;
+  if (!dnd.src || !scrollPanel) return;                 // drag ended → stop looping
+  const r = scrollPanel.getBoundingClientRect();
+  let v = 0;
+  if (dragPointerY < r.top + EDGE) v = -edgeSpeed(r.top + EDGE - dragPointerY);
+  else if (dragPointerY > r.bottom - EDGE) v = edgeSpeed(dragPointerY - (r.bottom - EDGE));
+  if (v) scrollPanel.scrollTop += v;
+  autoScrollRAF = requestAnimationFrame(autoScrollTick);
+}
+
+function edgeSpeed(dist: number): number {
+  return Math.ceil(Math.min(1, dist / EDGE) * MAX_SPEED);
+}
+
+function stopAutoScroll(): void {
+  if (autoScrollRAF) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = 0; }
 }
 
 /** Return the canvas to its resting state after a column drag ends without a
     real drop (see wireDragSurface). Class-only reset — no model change, so no
     re-render needed; idempotent, so a later real `dragend` is harmless. */
 function cancelColDrag(): void {
+  if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = 0; }
+  stopAutoScroll();
   if (!dnd.src) return;
   dnd.src = null;
   document.body.classList.remove('dnd');
