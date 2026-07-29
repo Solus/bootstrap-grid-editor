@@ -54,18 +54,12 @@ export function quickOffset(node: ColNode, dir: number): void {
   const cur = effectiveAt(node.spec.offset, state.bp) || 0;
   const next = Math.min(11, Math.max(0, cur + dir));
   if (next === cur) return;
-  const defBp = definingBp(node.spec.offset, state.bp);
-  const bp = defBp || fallbackTier(node, rowOfSel());
-  // Going to 0 at the view breakpoint while a *smaller* tier still supplies
-  // a nonzero offset → write an explicit offset-*-0 at the view breakpoint
-  // instead of editing/removing the lower token.
-  let targetBp: Breakpoint = bp, keepZero = false;
-  if (next === 0) {
-    const belowDef = definingBp(node.spec.offset, state.bp);
-    if (belowDef && belowDef !== state.bp) { targetBp = state.bp; keepZero = true; }
-  }
-  const tokens = setOffsetToken(classTokens(node.el), targetBp,
-                                next === 0 ? 0 : next, state.docBs3, keepZero);
+  // Mirror quickWidth: edit the tier that *defines* the effective offset (the
+  // nearest token at or below the view breakpoint), and when it reaches 0 just
+  // remove that token. So +/- only ever touches the one breakpoint already in
+  // the column (or the closest to it) — never invents a new tier's -0 token.
+  const bp = definingBp(node.spec.offset, state.bp) || fallbackTier(node, rowOfSel());
+  const tokens = setOffsetToken(classTokens(node.el), bp, next, state.docBs3);
   applyOps([classEdit(state.src, node.el, tokens)]);
 }
 
