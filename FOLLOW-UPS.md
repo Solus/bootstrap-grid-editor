@@ -699,15 +699,23 @@ two `applyCanvasEdits` refusal paths route through `markDiverged` too, so the
 flag stays accurate across a refused stale/misplaced edit. Covered by new
 `session.test.ts` cases (a burst flags once; a save/discard re-arms it).
 
-### 9.6 Auto-resync on external edits instead of blocking **[decide]**
+### 9.6 Auto-resync on external edits instead of blocking **[declined for now — save already syncs]**
+
+**Decision (maintainer):** not doing this. Saving the editor already
+auto-syncs the canvas — `onDidSaveTextDocument` → `Session.onSave()` →
+`sendSource()` re-parses the buffer, refreshes the canvas, and clears the
+diverged state — and save-to-sync is considered good enough. The proposal
+below (syncing *without* a save, mid-typing) is an extra convenience, not a
+fix, and isn't worth the debounce/gesture/selection complexity right now.
+Kept for the record in case the friction resurfaces.
 
 *What.* Today a manual edit to the buffer under the canvas flags divergence
 and **blocks** all canvas edits until the user saves or clicks Resync
 (`canApplyEdit` returns false while `sync.diverged`). Proposal: instead of
 parking, **auto-refresh the canvas from the buffer** shortly after the user
 stops typing — the same `sendSource` path `onSave` already uses — so the
-canvas simply stays live with the editor and the Resync step disappears for
-the common case.
+canvas simply stays live with the editor and the Resync step disappears even
+without a save.
 
 *Why it's safe in principle.* The editor buffer is already the source of
 truth, and the per-edit anti-corruption guard (`old`/`before`/`after` context
