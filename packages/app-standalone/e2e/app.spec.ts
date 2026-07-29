@@ -394,6 +394,29 @@ test.describe('inspector', () => {
     expect(await source(page)).toContain('col-md-5 col-lg-3');
   });
 
+  test('the offset stepper edits the defining tier and removes it at zero', async ({ page }) => {
+    // view md, but the offset is defined only at sm — like resize, the stepper
+    // must touch that sm token, never invent an md override or an -0 tier
+    await page.locator('#src').fill(
+      '<div class="row"><div class="col-md-6 col-sm-offset-1">x</div></div>');
+    await page.locator('#applyBtn').click();
+    await page.locator('#bpSwitch button[data-bp="md"]').click();
+    await colWithClass(page, 'col-md-6 col-sm-offset-1').click();
+
+    const offsetStepper = page.locator('.bp-grid').first().locator('.stepper').nth(1);
+    await offsetStepper.locator('button').last().click();          // +  (sm 1 → 2)
+    expect(await source(page)).toContain('col-sm-offset-2');
+    expect(await source(page)).not.toContain('offset-md');
+    expect(await source(page)).not.toContain('col-md-offset');
+
+    // step down to zero: the sm token is removed outright — no -0 tier left
+    await offsetStepper.locator('button').first().click();         // −  (2 → 1)
+    await offsetStepper.locator('button').first().click();         // −  (1 → 0)
+    const after = await source(page);
+    expect(after).not.toContain('offset');
+    expect(after).toContain('col-md-6');
+  });
+
   test('equal-width column disables the width stepper', async ({ page }) => {
     await colWithClass(page, 'col').click();
     const widthStepper = page.locator('.bp-grid').first().locator('.stepper').first();
