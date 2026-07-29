@@ -281,6 +281,38 @@ describe('Session — divergence', () => {
     expect(h.posts).toEqual([{ type: 'diverged' }]);
   });
 
+  it('a burst of changes flags divergence only once (no per-keystroke re-toast)', () => {
+    // The editor fires onDidChangeTextDocument per keystroke. We must post
+    // `diverged` on the false→true edge only, or the webview re-toasts "Resync"
+    // on every character typed — the friction issue #1's reporter hit.
+    const h = harness();
+    for (let i = 0; i < 5; i++) h.session.onDocChange();
+    expect(h.posts.filter(p => p.type === 'diverged')).toHaveLength(1);
+  });
+
+  it('a resync re-arms divergence: changes after a save flag it again', () => {
+    const h = harness();
+    h.session.onDocChange();          // first episode → 1 diverged
+    h.session.onSave();               // resync: webview clears diverged, so do we
+    h.session.onDocChange();          // fresh edit → new episode → another diverged
+    expect(h.posts.filter(p => p.type === 'diverged')).toHaveLength(2);
+  });
+
+  it('a refused stale edit re-arms after the resync it triggers', async () => {
+    // A stale applyEdits both warns and flags divergence; a following buffer
+    // change while still diverged must not re-post, but a change after the user
+    // resyncs (discard) must.
+    const h = harness({ version: 5 });
+    await h.session.onMessage({
+      type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'x' }], baseVersion: 3,
+    });
+    h.session.onDocChange();          // still diverged → swallowed
+    expect(h.posts.filter(p => p.type === 'diverged')).toHaveLength(1);
+    await h.session.onMessage({ type: 'discard' });   // resync
+    h.session.onDocChange();          // re-armed → posts again
+    expect(h.posts.filter(p => p.type === 'diverged')).toHaveLength(2);
+  });
+
   it('our own apply is not divergence (change fires while applying)', async () => {
     const h = harness({ version: 1 });
     h.duringApply(() => h.session.onDocChange());   // the buffer change our edit causes
