@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.0.11
+
+- Fixed: a column resize could occasionally write broken HTML (like
+  `class=col-sm-42"`) after a run of edits, if something else changed the file
+  underneath the canvas. Edits now carry the exact text they expect to replace
+  and are verified against the file before applying — on a mismatch the canvas
+  refuses and asks you to Resync, rather than corrupting the class.
+
 ## 0.0.10
 
 - Fixed: dragging a column onto text — the editor, or the source pane — no
