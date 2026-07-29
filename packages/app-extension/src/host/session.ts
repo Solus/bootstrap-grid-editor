@@ -52,12 +52,28 @@ export class Session {
       each message wait for the previous one's full effect (including the
       buffer write) before the next is handled. */
   private queue: Promise<void> = Promise.resolve();
+  /** Whether the canvas is currently known to be diverged from the buffer.
+      Tracked so we post `diverged` only on the false→true edge: the editor
+      fires a change per keystroke, and re-posting on each one made the webview
+      re-toast "Resync" on every character typed (the "asks too often"
+      friction). Cleared whenever we resend the source (save / discard / reload
+      / failed-apply), which is exactly when the webview drops its own diverged
+      state. */
+  private diverged = false;
 
   constructor(private readonly ports: SessionPorts) {}
 
   /** The editor document changed (not via our own apply → divergence). */
   onDocChange(): void {
     if (this.applying) return;
+    this.markDiverged();
+  }
+
+  /** Tell the webview it has diverged — but only once per divergence episode,
+      so a burst of buffer changes doesn't spam the warning. */
+  private markDiverged(): void {
+    if (this.diverged) return;
+    this.diverged = true;
     this.ports.post({ type: 'diverged' });
   }
 
@@ -126,6 +142,10 @@ export class Session {
   }
 
   private sendSource(): void {
+    // Resending the source is exactly a resync: the webview clears its diverged
+    // state on `setSource`, so clear ours in step — the next real buffer change
+    // is then a fresh false→true edge that posts `diverged` again.
+    this.diverged = false;
     this.ports.post({
       type: 'setSource',
       text: this.ports.docText(),
@@ -135,7 +155,7 @@ export class Session {
 
   private async applyCanvasEdits(edits: Edit[], baseVersion: number): Promise<void> {
     if (baseVersion !== this.ports.docVersion()) {
-      this.ports.post({ type: 'diverged' });
+      this.markDiverged();
       this.ports.warn(OUT_OF_SYNC);
       return;
     }
@@ -151,7 +171,7 @@ export class Session {
       (e.before != null && text.substring(e.start - e.before.length, e.start) !== e.before) ||
       (e.after != null && text.substring(e.end, e.end + e.after.length) !== e.after));
     if (misplaced) {
-      this.ports.post({ type: 'diverged' });
+      this.markDiverged();
       this.ports.warn(OUT_OF_SYNC);
       return;
     }
