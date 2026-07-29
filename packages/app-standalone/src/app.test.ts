@@ -10,7 +10,7 @@
  * cheapest thing that would catch a cycle, a stale element id, or a crash
  * in the first render pass.
  */
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import indexHtml from '../index.html?raw';
 
 // Imported dynamically inside tests, NOT statically: the editor's dom.ts
@@ -266,26 +266,35 @@ describe('drag surface keeps a native drag droppable across excursions', () => {
     ed.dnd.src = null;
   });
 
-  it('leaving the canvas panel cancels the drag and clears the dragging state', async () => {
-    const ed = await editor();
-    const panel = document.querySelector('.canvas-scroll')!;
+  it('leaving the canvas panel cancels the drag after a short grace', async () => {
+    vi.useFakeTimers();
+    try {
+      const ed = await editor();
+      const panel = document.querySelector('.canvas-scroll')!;
 
-    // simulate an in-progress drag
-    ed.dnd.src = [0, 0];
-    document.body.classList.add('dnd');
+      // simulate an in-progress drag
+      ed.dnd.src = [0, 0];
+      document.body.classList.add('dnd');
 
-    // moving onto a child (a dropzone) is NOT leaving — the drag stays live
-    const inner = new Event('dragleave', { bubbles: true }) as Event & { relatedTarget: unknown };
-    Object.defineProperty(inner, 'relatedTarget', { value: panel.querySelector('*') ?? panel });
-    panel.dispatchEvent(inner);
-    expect(ed.dnd.src).not.toBeNull();
+      // moving onto a child (a dropzone) is NOT leaving — no cancel is scheduled
+      const inner = new Event('dragleave', { bubbles: true }) as Event & { relatedTarget: unknown };
+      Object.defineProperty(inner, 'relatedTarget', { value: panel.querySelector('*') ?? panel });
+      panel.dispatchEvent(inner);
+      vi.advanceTimersByTime(300);
+      expect(ed.dnd.src).not.toBeNull();
 
-    // leaving the panel (relatedTarget outside it / null) cancels and resets
-    const out = new Event('dragleave', { bubbles: true }) as Event & { relatedTarget: unknown };
-    Object.defineProperty(out, 'relatedTarget', { value: null });
-    panel.dispatchEvent(out);
-    expect(ed.dnd.src).toBeNull();
-    expect(document.body.classList.contains('dnd')).toBe(false);
+      // truly leaving (relatedTarget outside / null) schedules a cancel — but
+      // only fires after the grace, so a quick return could still save it
+      const out = new Event('dragleave', { bubbles: true }) as Event & { relatedTarget: unknown };
+      Object.defineProperty(out, 'relatedTarget', { value: null });
+      panel.dispatchEvent(out);
+      expect(ed.dnd.src).not.toBeNull();          // still alive during the grace
+      vi.advanceTimersByTime(300);
+      expect(ed.dnd.src).toBeNull();              // cancelled once the grace elapsed
+      expect(document.body.classList.contains('dnd')).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
