@@ -686,3 +686,51 @@ than a fix. *Suggested direction.* Decide whether editor-event handlers
 should also fold into the same queue (making the whole controller strictly
 serial), or whether the version/context guards already make this benign —
 confirm with a targeted test before adding machinery.
+
+### 9.5 Divergence warned on every keystroke **[RESOLVED — edge-triggered]**
+
+Fixed: `Session` now tracks a `diverged` flag and posts `{type:'diverged'}`
+only on the false→true edge (`markDiverged`), clearing it in `sendSource`
+(the single resync point: save / discard / reload / failed-apply, which is
+exactly when the webview drops its own diverged state). Before, `onDocChange`
+posted on every buffer change, so a typing burst in the editor re-toasted
+"Resync" on every character — the visible half of issue #1's friction. The
+two `applyCanvasEdits` refusal paths route through `markDiverged` too, so the
+flag stays accurate across a refused stale/misplaced edit. Covered by new
+`session.test.ts` cases (a burst flags once; a save/discard re-arms it).
+
+### 9.6 Auto-resync on external edits instead of blocking **[decide]**
+
+*What.* Today a manual edit to the buffer under the canvas flags divergence
+and **blocks** all canvas edits until the user saves or clicks Resync
+(`canApplyEdit` returns false while `sync.diverged`). Proposal: instead of
+parking, **auto-refresh the canvas from the buffer** shortly after the user
+stops typing — the same `sendSource` path `onSave` already uses — so the
+canvas simply stays live with the editor and the Resync step disappears for
+the common case.
+
+*Why it's safe in principle.* The editor buffer is already the source of
+truth, and the per-edit anti-corruption guard (`old`/`before`/`after` context
+check in `applyCanvasEdits`) already refuses any edit computed against a stale
+source — so following the buffer can't corrupt it. Divergence-blocking is a
+coarse *earlier* guard; auto-resync replaces "freeze and ask" with "keep up".
+
+*Why it needs a decision, not just a patch:*
+- **Cost.** Re-parsing runs `@angular/compiler`; refreshing on every keystroke
+  is wasteful. Needs a debounce (~300–500 ms idle) so it fires once per pause.
+- **In-progress gestures.** Must not refresh mid-drag/resize (`resize.active`,
+  or a live dnd) — a re-render would yank the gesture. Hold the refresh until
+  the gesture ends.
+- **Selection preservation.** `apply({fromSource})` already re-resolves the
+  selection path and drops it if gone; confirm that a hand-edit that keeps the
+  selected column intact doesn't visibly drop the selection. A content-keyed
+  re-select may be worth it.
+- **Keep a manual fallback.** If a re-parse throws (mid-typing invalid HTML),
+  don't blow away the canvas — keep the last good render and fall back to the
+  existing diverged/Resync affordance until the source parses again.
+
+*Suggested shape.* In `Session`: on `onDocChange` (not applying), start/restart
+a debounce timer; when it fires and no gesture is active, `sendSource`. Keep
+`markDiverged` as the fallback for the "re-parse failed" and "refused stale
+edit" cases only. The debounce/timer is injected as a port so it stays
+unit-testable (fake timer), consistent with the rest of `Session`.
