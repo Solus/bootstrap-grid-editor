@@ -46,8 +46,10 @@ window.addEventListener('message', (e: MessageEvent<HostMessage>) => {
       sync.version = msg.version;
       sync.diverged = false;
       document.body.classList.remove('diverged');
-      // fromSource: this is the document arriving, not a canvas edit
-      apply(msg.text, { keepSel: false, fromSource: true });
+      // fromSource: this is the document arriving, not a canvas edit. A live-sync
+      // refresh sets keepSelection so the canvas holds its selection where the
+      // path still resolves (apply nulls it only if it no longer does).
+      apply(msg.text, { keepSel: msg.keepSelection ?? false, fromSource: true });
       break;
     case 'applied':
       sync.version = msg.version;   // our edit landed; stay in step

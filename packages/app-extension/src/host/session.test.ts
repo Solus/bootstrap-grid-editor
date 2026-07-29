@@ -1,11 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APPLY_FAILED, OUT_OF_SYNC, Session } from './session.js';
 import type { HostMessage } from '../shared/protocol.js';
 
 /* A fake VS Code environment: records what the session posts / reveals /
    warns, and simulates the buffer (a successful applyEdit bumps the version
    and can fire a mid-apply document-change hook). */
-function harness(opts: { text?: string; version?: number } = {}) {
+function harness(opts: { text?: string; version?: number; liveSync?: boolean } = {}) {
   const posts: HostMessage[] = [];
   const reveals: Array<[number, number]> = [];
   const warns: string[] = [];
@@ -34,7 +34,8 @@ function harness(opts: { text?: string; version?: number } = {}) {
     docText: () => text,
     docVersion: () => version,
     warn: m => warns.push(m),
-    config: () => ({ breakpoint: 'lg', tintOverfull: true }),
+    config: () => ({ breakpoint: 'lg' as const, tintOverfull: true,
+      ...(opts.liveSync !== undefined ? { liveSync: opts.liveSync } : {}) }),
     setConfig: (pref, value) => configWrites.push([pref, value]),
   });
 
@@ -48,6 +49,8 @@ function harness(opts: { text?: string; version?: number } = {}) {
     types: () => posts.map(p => p.type),
   };
 }
+
+afterEach(() => vi.useRealTimers());
 
 describe('Session — source in', () => {
   it('ready sends config first, then the current document', async () => {
@@ -66,10 +69,13 @@ describe('Session — source in', () => {
     expect(h.configWrites).toEqual([['stretchSheet', true]]);
   });
 
-  it('save refreshes from source', () => {
+  it('save refreshes from source, keeping the selection', () => {
     const h = harness({ version: 7 });
     h.session.onSave();
-    expect(h.posts).toEqual([{ type: 'setSource', text: expect.any(String), version: 7 }]);
+    // keepSelection: a save shouldn't drop the column you had selected
+    expect(h.posts).toEqual([
+      { type: 'setSource', text: expect.any(String), version: 7, keepSelection: true },
+    ]);
   });
 
   it('discard resets the canvas to the buffer', async () => {
@@ -333,5 +339,46 @@ describe('Session — divergence', () => {
     });
     expect(h.posts.some(p => p.type === 'selectAt')).toBe(false);
     expect(h.posts.some(p => p.type === 'applied')).toBe(true);
+  });
+});
+
+describe('Session — live sync (opt-in)', () => {
+  it('off by default: an external change parks the canvas, no auto refresh', () => {
+    const h = harness();                 // no liveSync → off
+    h.session.onDocChange();
+    expect(h.types()).toEqual(['diverged']);
+    expect(h.posts.some(p => p.type === 'setSource')).toBe(false);
+  });
+
+  it('on: an external change refreshes the canvas after a debounce, keeping the selection', () => {
+    vi.useFakeTimers();
+    const h = harness({ liveSync: true, text: '<p>x</p>', version: 3 });
+    h.session.onDocChange();
+    expect(h.posts).toHaveLength(0);     // debounced — nothing yet
+    vi.advanceTimersByTime(500);
+    expect(h.posts).toContainEqual(
+      { type: 'setSource', text: '<p>x</p>', version: 3, keepSelection: true });
+    expect(h.posts.some(p => p.type === 'diverged')).toBe(false);   // never parked
+  });
+
+  it('on: a typing burst collapses into a single refresh', () => {
+    vi.useFakeTimers();
+    const h = harness({ liveSync: true });
+    h.session.onDocChange();
+    vi.advanceTimersByTime(100);
+    h.session.onDocChange();
+    vi.advanceTimersByTime(100);
+    h.session.onDocChange();
+    vi.advanceTimersByTime(500);
+    expect(h.posts.filter(p => p.type === 'setSource')).toHaveLength(1);
+  });
+
+  it('a save cancels a pending live refresh (no duplicate resync)', () => {
+    vi.useFakeTimers();
+    const h = harness({ liveSync: true });
+    h.session.onDocChange();             // schedules a live refresh
+    h.session.onSave();                  // immediate resync — supersedes it
+    vi.advanceTimersByTime(500);
+    expect(h.posts.filter(p => p.type === 'setSource')).toHaveLength(1);
   });
 });

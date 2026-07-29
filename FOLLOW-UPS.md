@@ -699,15 +699,37 @@ two `applyCanvasEdits` refusal paths route through `markDiverged` too, so the
 flag stays accurate across a refused stale/misplaced edit. Covered by new
 `session.test.ts` cases (a burst flags once; a save/discard re-arms it).
 
-### 9.6 Auto-resync on external edits instead of blocking **[declined for now — save already syncs]**
+### 9.6 Auto-resync on external edits instead of blocking **[IMPLEMENTED — opt-in `liveSync`]**
 
-**Decision (maintainer):** not doing this. Saving the editor already
-auto-syncs the canvas — `onDidSaveTextDocument` → `Session.onSave()` →
-`sendSource()` re-parses the buffer, refreshes the canvas, and clears the
-diverged state — and save-to-sync is considered good enough. The proposal
-below (syncing *without* a save, mid-typing) is an extra convenience, not a
-fix, and isn't worth the debounce/gesture/selection complexity right now.
-Kept for the record in case the friction resurfaces.
+**Update (maintainer reversed the earlier decline):** shipped as an **opt-in**
+setting `bootstrapVisualizer.liveSync` (default **off** — save-to-sync stays the
+default). When on, `Session.onDocChange` debounces (~400 ms) and calls
+`sendSource(keepSelection=true)` instead of `markDiverged`, so the canvas
+follows the (dirty) editor and never parks. Safe because: the tolerant parser +
+`apply()`'s last-good-view guard keep a half-typed buffer from breaking the
+canvas, and the per-edit `old`/`before`/`after` context guard still refuses a
+canvas edit that races an un-synced change. Selection is kept where its path
+still resolves (`apply({keepSel:true})`). Covered by `session.test.ts`
+(off→parks; on→debounced refresh with `keepSelection`; burst→one refresh; save
+cancels a pending refresh).
+
+**Deferred refinement — don't refresh mid-drag/resize:** a live refresh guards
+on `applying` (a canvas edit in-flight) but not on a webview drag/resize gesture,
+which the host can't see. Only reachable if an *external* tool changes the buffer
+while you're mid-gesture on the canvas (rare — you're dragging, not typing); a
+mid-gesture re-render would replace the element under the pointer and drop the
+gesture (no corruption, just a lost drag). Fix if it bites: have the webview
+**defer** an incoming `setSource` while `resize.active` / `dnd.src` is set and
+apply it once the gesture ends. Left for later on purpose.
+
+*(Fixed: `onSave` now keeps the selection too — `sendSource(true)` — so save and
+live refresh behave the same; only a fresh load / discard / reload starts the
+canvas empty.)*
+
+*Original decline (kept for context):* Saving the editor already auto-syncs the
+canvas, so save-to-sync was considered good enough and the mid-typing
+convenience not worth the complexity — until the back-to-back-edit friction made
+the live option worth having behind a flag.
 
 *What.* Today a manual edit to the buffer under the canvas flags divergence
 and **blocks** all canvas edits until the user saves or clicks Resync

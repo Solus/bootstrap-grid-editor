@@ -98,6 +98,9 @@ function createCanvas(context: vscode.ExtensionContext, initial: vscode.TextEdit
 
   const disposables: vscode.Disposable[] = [];
 
+  // Cancel any pending live-sync refresh when the panel goes away.
+  disposables.push({ dispose: () => session.dispose() });
+
   disposables.push(vscode.workspace.onDidSaveTextDocument(saved => {
     if (saved === doc) session.onSave();
   }));
@@ -141,6 +144,7 @@ function readConfig(): ConfigWire {
     stretchSheet: c.get<boolean>('stretchToFit'),
     tintOverfull: c.get<boolean>('tintOverfullRows'),
     dialect: c.get<ConfigWire['dialect']>('dialect'),
+    liveSync: c.get<boolean>('liveSync'),
   };
 }
 
