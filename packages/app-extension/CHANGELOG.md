@@ -1,5 +1,19 @@
 # Change Log
 
+## 0.0.14
+
+- Added: dragging a column now scrolls the canvas. Hold the drag near the top or
+  bottom edge and it scrolls that way (and the mouse wheel scrolls too, where the
+  browser allows it during a drag) — so you can drop onto a target that's
+  scrolled off-screen in a tall document, instead of the drag cancelling when the
+  cursor leaves the canvas.
+- Added: an optional **Live sync** setting (off by default). When on, the canvas
+  follows the editor as you type — after a short pause it refreshes from the
+  file, keeping your selection — instead of parking until you save or Resync.
+  Canvas edits are still verified before they touch the file, so a half-typed
+  buffer can't corrupt it. A save now also keeps your selection.
+- Changed: the extension icon now matches the toolbar button's grid shape.
+
 ## 0.0.13
 
 - Fixed: adding or dragging several columns one after another no longer blocks
