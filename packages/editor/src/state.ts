@@ -242,7 +242,13 @@ export function setActiveBranch(region: string, index: number): void {
     document as minimal workspace edits. */
 export function applyOps(edits: Edit[], opts: ApplyOpts = {}): void {
   if (!edits.length) return;
-  apply(applyEdits(state.src, edits), { ...opts, edits });
+  // Stamp each edit with the exact text it expects to replace, read from the
+  // source it was computed against. The extension verifies this before
+  // replaying the edit onto the document, so an offset desync (the webview's
+  // source out of step with the buffer) is refused as a divergence instead of
+  // splicing a column class into the wrong place and corrupting the HTML.
+  const stamped = edits.map(e => ({ ...e, old: state.src.slice(e.start, e.end) }));
+  apply(applyEdits(state.src, stamped), { ...opts, edits: stamped });
 }
 
 /* undo/redo pre-check: `apply()` holds the authoritative guard, but it runs

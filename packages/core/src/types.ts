@@ -167,6 +167,12 @@ export interface Edit {
   start: number;
   end: number;
   text: string;
+  /** The exact source text this edit expects to find at [start, end), captured
+      when the edit was built. Lets the applier verify the offsets still line up
+      before splicing — so an offset desync (e.g. the extension's buffer having
+      drifted from the canvas's source) is refused instead of corrupting the
+      file. Optional: absent edits skip the check. */
+  old?: string;
 }
 
 /** Where to cut an element out of the source, and what to paste back.
