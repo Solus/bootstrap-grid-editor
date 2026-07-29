@@ -477,6 +477,60 @@ belong in the pure `Session` controller, so they're unit-testable
 (`session.test.ts`) without Electron. Cross-check against §7.3's note that the
 real-buffer layer stays uncovered.
 
+### 7.5 Column resize occasionally corrupts a class in the extension — guarded, root cause unconfirmed **[verify]**
+
+*Symptom (reported).* In the extension, resizing e.g. `<div class="col-sm-2">`
+sometimes wrote broken HTML like `<div class=col-sm-42">` — the opening quote
+gone and the old digit glued on. That exact shape means the applied span was
+shifted one char left (started on the opening quote, ended before the last
+value char): an **offset desync** between the offsets the canvas computed and
+where they landed in the buffer.
+
+*What was ruled out.* The core edit construction is provably correct: a scan of
+**every** `col-*` element in both `examples/` files (122 columns, LF **and**
+CRLF) through `setWidthToken` → `writeClass` produced zero broken results, as
+did clean/`@if`/`@for`/`*ngIf`/CRLF/attr-order variants. The standalone writes
+`state.src` in exactly one place (`apply()`), re-parsing in the same step, so
+its model offsets can't go stale against the source it splices. So the
+corruption is **not** in `core` and not in the standalone — it's at the
+extension's apply seam, where webview offsets are replayed onto the VS Code
+document via `positionAt`. Couldn't be reproduced from code here (needs the live
+webview/Electron; `positionAt`↔`getText` are consistent per the API, so plain
+CRLF alone doesn't explain it — a missed divergence or a stale sync is the more
+likely culprit, cf. §7.4).
+
+*What was done (v0.0.11-ish).* Defense-in-depth so it can't corrupt regardless
+of trigger: every edit now carries `Edit.old` (the exact text it expects at its
+span), stamped in `applyOps` from the source it was computed against; the
+extension's `applyCanvasEdits` verifies each `old` against the current buffer
+and, on any mismatch, refuses the batch as a divergence (resync) instead of
+splicing into the wrong place. Covered by `session.test.ts` (matches → applies;
+mismatch → diverged, nothing applied).
+
+*Leading hypothesis (from the report: extension, "after several edits").* The
+webview keeps its own `state.src` and applies each edit locally *and* replays it
+onto the buffer, trusting the two to stay identical. They drift if the buffer's
+result ever differs from the webview's local `applyEdits` — most plausibly a
+**formatter / auto-close-tag / another extension reacting to our
+`WorkspaceEdit`**. Such a change fires `onDidChangeTextDocument`, but if it lands
+*during* our apply it's masked by the `applying` flag (§ `Session.applying`), so
+the webview is never told it diverged and keeps a now-stale source. Over several
+edits the drift compounds until an edit lands one char off → the corrupted
+class. The new `old` guard turns that into a refuse-and-resync at the first
+mismatch, which also stops the compounding.
+
+*Caveat / still open.* The guard only catches desyncs where the buffer
+**content** differs from `old` at raw char offsets. It assumes `positionAt`
+agrees with those char offsets (true per the VS Code API); if some
+`positionAt`/EOL edge disagreed, the `old` check (via `substring`) could pass
+while the `WorkspaceEdit` still landed wrong. To close this: reproduce in a real
+extension host (a sequence of resizes, ideally with a formatter/auto-close
+enabled) and confirm the guard fires; if root-causing to formatter drift,
+consider re-syncing the webview source after an apply that changed the buffer
+beyond our own edit (e.g. `applied` carrying the buffer text / a checksum), or
+narrowing what the `applying` flag suppresses. If it recurs for a user, the
+resync toast is now the signal that the guard caught it.
+
 ---
 
 *(original entry, kept for context)*
