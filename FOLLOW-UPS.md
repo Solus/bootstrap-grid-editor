@@ -679,13 +679,16 @@ round-trip the synchronous mock had been hiding.
 messages) still call `sendSource`/post divergence synchronously, outside
 the queue. *Why it matters.* If the user saves the document while a canvas
 edit's `applyEdit` is mid-flight (`applying === true`), `onSave` could
-`sendSource` with a `docVersion()` that's about to change, racing the
-in-flight apply. It's a narrow window and largely self-healing (the next
-`setSource`/divergence guard re-syncs), which is why it's a verify rather
-than a fix. *Suggested direction.* Decide whether editor-event handlers
-should also fold into the same queue (making the whole controller strictly
-serial), or whether the version/context guards already make this benign —
-confirm with a targeted test before adding machinery.
+`sendSource` a buffer that's about to change, racing the in-flight apply.
+It's a narrow window and largely self-healing (the next `setSource`
+re-syncs), which is why it's a verify rather than a fix. **Narrowed by
+9.7:** with sync decided by content, the in-flight apply overwrites
+`syncedText` with the settled buffer afterwards, so the worst case is one
+momentarily stale render — not a false divergence. *Suggested direction.*
+Decide whether editor-event handlers should also fold into the same queue
+(making the whole controller strictly serial), or whether the content and
+context guards already make this benign — confirm with a targeted test
+before adding machinery.
 
 ### 9.5 Divergence warned on every keystroke **[RESOLVED — edge-triggered]**
 
@@ -764,3 +767,54 @@ a debounce timer; when it fires and no gesture is active, `sendSource`. Keep
 `markDiverged` as the fallback for the "re-parse failed" and "refused stale
 edit" cases only. The debounce/timer is injected as a port so it stays
 unit-testable (fake timer), consistent with the rest of `Session`.
+
+### 9.7 Sync is decided by content, not `doc.version` **[RESOLVED — `syncedText`]**
+
+Fixed: `Session` now tracks `syncedText` — the buffer text the canvas is known
+to agree with (set in `sendSource`, re-read from `docText()` after each canvas
+edit lands) — and decides both "may this canvas edit apply?" and "did the user
+change the document under us?" by comparing it to `docText()`. The document
+`version` is gone from the protocol (`setSource`/`applied`/`applyEdits`), from
+`SessionPorts` (`docVersion`), and from the webview's `SyncState`.
+
+*Root cause it removes.* The webview stamped each outgoing edit with the
+document version and then **guessed the next one** (`sync.version++` in
+`webview-host.ts`), on the assumption that one `applyEdit` bumps `doc.version`
+by exactly one. The host refused anything whose `baseVersion` didn't match. The
+guess is a claim about VS Code internals we never verified — and a column drag
+sends **two** edits in one `WorkspaceEdit` (`moveCol`: cut + insert), so any
+per-text-edit bump made it wrong. The authoritative version only came back in
+the `applied` round-trip, so the failure was timing-dependent: a second drag or
+a fast offset click fired before that confirmation arrived was refused as
+diverged, while the same action a moment later worked. Reported as "drag one
+column, drag another immediately → asks to Resync" and the same for rapid
+offset steps.
+
+*Why content is the right question.* Versions count *that* something happened,
+never *what*: they can't distinguish our own write from the user's, they never
+come back down when an edit is undone, and keeping a mirror of them in the
+webview means guessing. Comparing the text answers what actually matters. Note
+the test harness had encoded the same wrong assumption (`version++` per apply),
+so no test could have caught it — the harness now really splices edits into its
+buffer, so `docText()` is what a real buffer would hold.
+
+*Behaviour change (deliberate).* Typing a character and deleting it — or undoing
+a hand-edit back to the original text — now returns the canvas to sync instead
+of parking it until a save: `onDocChange` sees the buffer equal to `syncedText`
+and, if it had parked, resends the (identical) source to clear the webview's
+warning. The `old`/`before`/`after` per-edit context guards are unchanged and
+still stand behind this as the byte-level safety net.
+
+*Residual gaps (small, deliberate):*
+- `syncedText` is `null` until the first `sendSource`, and an `applyEdits`
+  arriving before then is let through to the context guards rather than refused.
+  Unreachable in practice (the webview posts `ready` first, which sends source),
+  but it's a permissive default worth knowing about.
+- The comparison is a full string compare per document change. Negligible for
+  template-sized files; if a very large file ever makes it show up, compare
+  lengths first or hash.
+- 9.4 (editor-event handlers bypassing the message queue) is *narrower* now but
+  not gone: `onSave` racing an in-flight `applyEdit` can still `sendSource` a
+  buffer that's about to change. It's now self-correcting — the apply overwrites
+  `syncedText` with the settled buffer — so the window costs at most one stale
+  render, not a false divergence.

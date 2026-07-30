@@ -299,7 +299,7 @@ describe('event routing is filtered to the panel document', () => {
     const { panel } = openWith(doc);
     panel.receive({ type: 'ready' });
     await vi.waitFor(() => expect(panel.posts).toContainEqual(
-      { type: 'setSource', text: '<div class="row"></div>', version: 1 }));
+      { type: 'setSource', text: '<div class="row"></div>' }));
   });
 
   it('a save of this document refreshes the canvas; another does not', () => {
@@ -342,12 +342,12 @@ describe('edits out and reveal', () => {
     const { panel } = openWith(doc);
     M.state.applyHook = () => doc.setText('<div class="col-4">x</div>');
     panel.receive({
-      type: 'applyEdits', baseVersion: 1,
+      type: 'applyEdits',
       edits: [{ start: 12, end: 17, text: 'col-4' }],
     });
     // the message handler is fire-and-forget; wait for the async apply chain
     await vi.waitFor(() =>
-      expect(panel.posts).toContainEqual({ type: 'applied', version: 2 }));
+      expect(panel.posts).toContainEqual({ type: 'applied' }));
     expect(M.applied).toHaveLength(1);
     const op = M.applied[0]!.ops[0]!;
     expect(op.text).toBe('col-4');
@@ -425,7 +425,7 @@ describe('one reusable panel', () => {
     expect(panel.revealCount()).toBe(1);      // the canvas is brought to front
     // the canvas now shows docB
     expect(panel.posts).toContainEqual(
-      { type: 'setSource', text: '<div class="row">B</div>', version: 1 });
+      { type: 'setSource', text: '<div class="row">B</div>' });
 
     // routing now follows docB and no longer docA
     const n = panel.posts.filter(p => p.type === 'setSource').length;

@@ -86,7 +86,6 @@ function createCanvas(context: vscode.ExtensionContext, initial: vscode.TextEdit
       return vscode.workspace.applyEdit(edit);
     },
     docText: () => doc.getText(),
-    docVersion: () => doc.version,
     warn: message => void vscode.window.showWarningMessage(message),
     config: readConfig,
     setConfig: (pref, value) => {

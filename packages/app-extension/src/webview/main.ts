@@ -23,7 +23,7 @@ declare function acquireVsCodeApi(): VsCodeApi;
 
 const vscode = acquireVsCodeApi();
 const post = (m: WebviewMessage) => vscode.postMessage(m);
-const sync: SyncState = { version: -1, diverged: false };
+const sync: SyncState = { diverged: false };
 let firstEdit = true;   // show the "save to persist" cue once per session
 
 setHost(createWebviewHost(post, sync));
@@ -43,7 +43,6 @@ window.addEventListener('message', (e: MessageEvent<HostMessage>) => {
       applyOpenConfig(msg.config);
       break;
     case 'setSource':
-      sync.version = msg.version;
       sync.diverged = false;
       document.body.classList.remove('diverged');
       // fromSource: this is the document arriving, not a canvas edit. A live-sync
@@ -52,7 +51,6 @@ window.addEventListener('message', (e: MessageEvent<HostMessage>) => {
       apply(msg.text, { keepSel: msg.keepSelection ?? false, fromSource: true });
       break;
     case 'applied':
-      sync.version = msg.version;   // our edit landed; stay in step
       if (firstEdit) {              // gentle one-time reminder that it's unsaved
         firstEdit = false;
         toast('Applied to the editor — press Ctrl+S to save');

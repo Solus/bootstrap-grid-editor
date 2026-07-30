@@ -10,7 +10,15 @@
    save the canvas refreshes. If the user edits the document under the canvas,
    the webview is told it diverged — unless the `liveSync` setting is on, in
    which case the canvas instead refreshes from the (dirty) buffer after a short
-   debounce (see `onDocChange`). */
+   debounce (see `onDocChange`).
+
+   "In sync" is decided by *content*, not by `doc.version` (see `syncedText`).
+   Versions only count that something happened, never what: they can't tell our
+   own write from the user's, they never come back down when an edit is undone,
+   and advancing one in step with VS Code means guessing how many it bumps per
+   `applyEdit` — a guess that was wrong for multi-edit batches (a column drag)
+   and refused the next canvas edit as a false divergence. Comparing the buffer
+   to the text the canvas last agreed with answers the actual question. */
 
 import type { Edit } from '@bootstrap-visualizer/core';
 import type { ConfigWire, HostMessage, WebviewMessage } from '../shared/protocol.js';
@@ -22,7 +30,6 @@ export interface SessionPorts {
   /** Apply the edits to the buffer; resolves true on success. */
   applyEdit(edits: Edit[]): Promise<boolean>;
   docText(): string;
-  docVersion(): number;
   warn(message: string): void;
   /** The user's settings to seed the canvas with at open. */
   config(): ConfigWire;
@@ -42,17 +49,20 @@ export class Session {
       back as a caret move (the caret lands on the element's exclusive end,
       which resolves to the parent — the row-instead-of-column bug). */
   private revealed: { start: number; end: number } | null = null;
+  /** The buffer text the canvas is known to agree with — set every time we
+      send the source, and re-read from the buffer after each canvas edit
+      lands. Anything else in the buffer means the user changed it under us.
+      `null` until the first send (nothing to compare against yet). */
+  private syncedText: string | null = null;
   /** Serializes message handling. `onDidReceiveMessage` in extension.ts is
       fire-and-forget — VS Code doesn't wait for one message's handler to
       finish before delivering the next. Without this queue, two canvas
       edits fired back-to-back (e.g. clicking "Add column" twice, or two
-      drags) would both start `applyCanvasEdits` concurrently: the second's
-      `baseVersion` (the webview bumps it optimistically per edit) would be
-      checked against `docVersion()` before the first edit's `await
-      ports.applyEdit(...)` actually landed, so it looked stale and got
-      refused as "diverged" — issue #1. Chaining through this queue makes
-      each message wait for the previous one's full effect (including the
-      buffer write) before the next is handled. */
+      drags) would both start `applyCanvasEdits` concurrently, and the second
+      would read the buffer before the first's `await ports.applyEdit(...)`
+      landed — so it looked out of sync and got refused (issue #1). Chaining
+      through this queue makes each message wait for the previous one's full
+      effect (including the buffer write) before the next is handled. */
   private queue: Promise<void> = Promise.resolve();
   /** Whether the canvas is currently known to be diverged from the buffer.
       Tracked so we post `diverged` only on the false→true edge: the editor
@@ -69,7 +79,8 @@ export class Session {
 
   constructor(private readonly ports: SessionPorts) {}
 
-  /** The editor document changed (not via our own apply → divergence).
+  /** The editor document changed. Only a change that leaves the buffer holding
+      text the canvas hasn't seen is a divergence.
 
       Two behaviours, chosen by the `liveSync` setting (read live so toggling it
       takes effect without reopening):
@@ -81,7 +92,18 @@ export class Session {
         the canvas, and the edit context guards still refuse a canvas edit that
         races an un-synced change. */
   onDocChange(): void {
+    // Mid-apply the buffer passes through intermediate states (VS Code can fire
+    // a change per text edit in one batch) — those aren't ours to react to; the
+    // apply itself records the settled text.
     if (this.applying) return;
+    if (this.ports.docText() === this.syncedText) {
+      // The buffer holds exactly what the canvas has: our own write, or a user
+      // edit typed and undone back to the same text. Not a divergence — and if
+      // we'd already parked, un-park by resending (identical) source, which is
+      // what clears the webview's warning.
+      if (this.diverged) this.sendSource(true);
+      return;
+    }
     if (this.ports.config().liveSync) { this.scheduleLiveResync(); return; }
     this.markDiverged();
   }
@@ -167,7 +189,7 @@ export class Session {
         this.sendSource();          // reset the canvas to the buffer
         break;
       case 'applyEdits':
-        await this.applyCanvasEdits(msg.edits, msg.baseVersion);
+        await this.applyCanvasEdits(msg.edits);
         break;
     }
   }
@@ -184,10 +206,10 @@ export class Session {
     // is then a fresh false→true edge that posts `diverged` again.
     this.diverged = false;
     const text = this.ports.docText();
-    const version = this.ports.docVersion();
+    this.syncedText = text;      // this is now what the canvas agrees with
     this.ports.post(keepSelection
-      ? { type: 'setSource', text, version, keepSelection: true }
-      : { type: 'setSource', text, version });
+      ? { type: 'setSource', text, keepSelection: true }
+      : { type: 'setSource', text });
   }
 
   /** Cancel any pending live-sync refresh (panel closing / re-pointing). */
@@ -195,19 +217,23 @@ export class Session {
     if (this.liveTimer) { clearTimeout(this.liveTimer); this.liveTimer = null; }
   }
 
-  private async applyCanvasEdits(edits: Edit[], baseVersion: number): Promise<void> {
-    if (baseVersion !== this.ports.docVersion()) {
+  private async applyCanvasEdits(edits: Edit[]): Promise<void> {
+    const text = this.ports.docText();
+    // The canvas computed these edits against the source it last agreed with;
+    // if the buffer no longer holds exactly that, the user changed it underneath
+    // and every offset here may be stale. (`syncedText` is null only before the
+    // first send — nothing to compare against, so let the guards below decide.)
+    if (this.syncedText != null && text !== this.syncedText) {
       this.markDiverged();
       this.ports.warn(OUT_OF_SYNC);
       return;
     }
-    // Guard against a silent offset desync: even at the right version, applying
-    // by raw offset corrupts the file if the buffer no longer matches what the
-    // canvas computed the edit against. Each edit carries the text it expects at
-    // its span plus a little context on each side; if any doesn't match, refuse
-    // the batch and resync rather than splice into the wrong place. The context
-    // is what catches a misplaced *insertion* (empty `old` matches anywhere).
-    const text = this.ports.docText();
+    // Second line of defence against a silent offset desync: applying by raw
+    // offset corrupts the file if the buffer doesn't match what the canvas
+    // computed the edit against. Each edit carries the text it expects at its
+    // span plus a little context on each side; if any doesn't match, refuse the
+    // batch and resync rather than splice into the wrong place. The context is
+    // what catches a misplaced *insertion* (empty `old` matches anywhere).
     const misplaced = edits.some(e =>
       (e.old != null && text.substring(e.start, e.end) !== e.old) ||
       (e.before != null && text.substring(e.start - e.before.length, e.start) !== e.before) ||
@@ -220,7 +246,12 @@ export class Session {
     this.applying = true;
     try {
       const ok = await this.ports.applyEdit(edits);
-      if (ok) this.ports.post({ type: 'applied', version: this.ports.docVersion() });
+      if (ok) {
+        // Read the settled buffer back rather than assuming our edits produced
+        // it — this is what the next canvas edit is checked against.
+        this.syncedText = this.ports.docText();
+        this.ports.post({ type: 'applied' });
+      }
       else { this.ports.warn(APPLY_FAILED); this.sendSource(); }
     } finally {
       this.applying = false;
