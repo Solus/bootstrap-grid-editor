@@ -27,15 +27,14 @@ export type HostMessage =
       opens with them applied. */
   | { type: 'config'; config: ConfigWire }
   /** Full document text — sent on open, on save, and (with liveSync) on a
-      debounced external edit. `version` is the document version this reflects;
-      the webview keeps it to stamp its outgoing edits. Clears divergence.
-      `keepSelection` (live-sync refreshes only) tells the canvas to keep its
-      selection where the path still resolves instead of clearing it. */
-  | { type: 'setSource'; text: string; version: number; keepSelection?: boolean }
-  /** A canvas edit was applied to the buffer; the document is now at
-      `version`. Lets the webview advance its synced version without a
-      re-render (it already has the edited source locally). */
-  | { type: 'applied'; version: number }
+      debounced external edit. Clears divergence. `keepSelection` (live-sync
+      refreshes only) tells the canvas to keep its selection where the path
+      still resolves instead of clearing it. */
+  | { type: 'setSource'; text: string; keepSelection?: boolean }
+  /** A canvas edit reached the buffer. The webview already has the edited
+      source locally, so this is only a confirmation (it drives the one-time
+      "press Ctrl+S" cue) — the host tracks what's in sync, not the webview. */
+  | { type: 'applied' }
   /** The document changed underneath the canvas (the user edited the editor).
       The webview guards further canvas edits until a save or a discard. */
   | { type: 'diverged' }
@@ -48,9 +47,10 @@ export type WebviewMessage =
   /** The webview has loaded and is ready to receive the first setSource. */
   | { type: 'ready' }
   /** Apply a canvas edit to the editor document as minimal workspace edits.
-      `baseVersion` is the document version the edits were computed against,
-      so the host can guard-and-warn if the buffer has since diverged. */
-  | { type: 'applyEdits'; edits: Edit[]; baseVersion: number }
+      The host decides whether it's safe (it holds the text the canvas is in
+      sync with) and guard-and-warns if the buffer has since diverged; each
+      edit also carries the text it expects at its span. */
+  | { type: 'applyEdits'; edits: Edit[] }
   /** Reveal an element's source span in the editor (the revealSource end). */
   | { type: 'reveal'; start: number; end: number }
   /** Reset the canvas to the current buffer (discard divergence). */
