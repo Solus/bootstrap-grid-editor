@@ -618,6 +618,83 @@ grid-relevant gaps toward "full fidelity". Bootstrap the *framework*
 (components, JS, utilities at large) is explicitly out of scope — this is a
 grid drafting board.
 
+### 8.3 An `@if` directly inside an `@if`/`@else` branch loses its nesting **[RESOLVED — `El.condPath`]**
+
+**Fixed:** `El.cond` became `El.condPath` — the chain of enclosing branches,
+outermost first — and the parser now *prepends* to it instead of skipping an
+already-tagged element. Grouping and rendering walk that chain by depth: one
+recursive helper in core (`walkCond`, used by all three collectors) and the
+matching recursion in the three render walks (`renderTopRows`, `renderRowBody`,
+the nested-rows loop in `renderCol`). A region box now draws inside its
+enclosing box, sized relative to that box's span rather than the row's, so the
+proportions stay true at every level. `condKey` keys on the whole chain (minus
+structural `*ngIf` links), so a column can't hop out of an inner block while
+staying in the outer one. All three defects below are covered by tests: the
+model cases in `core/src/model.test.ts` ("@if nested directly inside another
+@if branch"), the tagging in `core/src/parser.test.ts`, and the nested-box DOM
+in `app-standalone/src/app.test.ts`. *Original report below.*
+
+*What.* `El.cond` (`types.ts`) held **one** `{region, branch}` tag, and
+`parser.ts:133` only set it when empty ("innermost region wins"). So a
+conditional block written directly inside another branch —
+
+```html
+<div class="row">
+  @if (a) {
+    @if (b) { <div class="col-6">A</div> }
+    <div class="col-3">B</div>
+  } @else { <div class="col-12">C</div> }
+</div>
+```
+
+— tags `col-6` with the **inner** region only. Its membership of `@if (a)` is
+gone, and `groupChildren`/`renderRowBody` (which walk source children in
+maximal same-region *runs*) see two unrelated sibling regions.
+
+*Verified behaviour* (repro run against the tree, three separate defects):
+1. **Not nested.** The canvas draws two side-by-side `.cond-box`es —
+   `@if (b)` and `@if (a)/@else` — instead of the inner box sitting inside the
+   outer one.
+2. **Wrong content shown (correctness, not layout).** Toggle the outer region
+   to `@else` and the shown columns are `col-6` + `col-12`: `col-6` lives
+   inside the `@if (a)` branch that was just switched away, so it must not
+   render at all. The fill pill counts it too.
+3. **Duplicate chips.** With the nested block inside the `@else`, the outer
+   region is split into two runs by the interposed inner run, so
+   `RowNode.conds` lists it **twice** — two chips for one `@if`.
+
+The same applies with the nesting in an `@else` branch, and to `*ngIf` on an
+element inside a branch (`tagNgIf` has the same `if (el.cond) continue`).
+An `@if` nested *inside a column* (`<div class="col">@if (b) { … }</div>`) is
+fine — the element tree already separates the levels; only a block directly
+inside a branch, at the same tree level, is affected.
+
+*Suggested direction.* Make the tag a **path**, not a single value:
+`El.condPath?: CondTag[]` ordered outermost→innermost (parser prepends as the
+`collectIf` recursion unwinds, instead of the `if (!el.cond)` skip). Then
+- **model**: `groupChildren` / `findRows` / `collectNestedRows` become
+  depth-aware — group by `condPath[depth]`, and recurse into the active
+  branch's run at `depth + 1`. `CondRegion` gains children so `RowNode.conds` /
+  `ColNode.conds` describe a tree rather than a flat list; grouping by subtree
+  rather than by run also fixes defect 3.
+- **render**: `renderRowBody` recurses, nesting `.cond-box` inside `.cond-box`;
+  the existing span-sum + `denom` width math already composes if applied per
+  level.
+- **edits**: `condKey` (`editor/src/edits.ts:30`) should key on the whole path,
+  so a move across *any* brace boundary is blocked (today it compares the
+  innermost tag only).
+
+Not a small change (core types + parser + model, editor render + edits, plus
+tests), which is why it's filed rather than patched. Worth confirming first
+whether nested `@if` is common enough in the maintainer's templates to justify
+it now — defect 2 is the one that argues for "yes", since it silently shows
+columns that Angular wouldn't render.
+
+*Known limitation of the fix:* a nested region whose branch shows **nothing**
+puts its chip in the row's top-edge strip, same as a hidden top-level one —
+so you can still toggle it back, but the strip doesn't show which region it
+was nested in. Only visible when an inner branch is empty/hidden; left as is.
+
 ## 9. Extension behaviour & settings
 
 ### 9.1 Tier-1 settings (user-scoped) **[DONE — shipped]**

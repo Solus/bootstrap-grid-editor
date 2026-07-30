@@ -25,11 +25,18 @@ import { toast } from './dom.js';
     across the braces. A `*ngIf` element is exempt: the condition is an
     attribute inside its own tag, so the element is self-contained and moving it
     crosses no braces — it behaves like a plain element (and is still blocked
-    from swapping *into* an inline `@if` block, whose key it will never match). */
+    from swapping *into* an inline `@if` block, whose key it will never match).
+
+    Nested `@if`s make this a *path*: two columns match only when they sit in
+    the same branch at every level, so a column can't hop out of (or into) an
+    inner block while staying in the outer one. Structural (`*ngIf`) links are
+    dropped from the key wherever they appear in the chain, for the reason
+    above — what's left is the block braces the text would have to cross. */
 function condKey(el: El): string | null {
-  if (!el.cond) return null;
-  if (state.root?.condRegions[el.cond.region]?.structural) return null;
-  return `${el.cond.region}:${el.cond.branch}`;
+  const blocks = (el.condPath ?? [])
+    .filter(t => !state.root?.condRegions[t.region]?.structural);
+  if (!blocks.length) return null;
+  return blocks.map(t => `${t.region}:${t.branch}`).join('|');
 }
 
 const CROSS_BRANCH_MSG = "Can't move a column across an @if branch boundary — switch to that branch first.";

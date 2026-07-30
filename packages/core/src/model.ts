@@ -27,11 +27,46 @@ export function subtreeHasRow(el: El): boolean {
 
 /** Per-build state: which branch is active for each `@if` region, and the
     region registry (branch labels/conditions) from the parsed root. */
-interface CondCtx {
+export interface CondCtx {
   active: Record<string, number>;
   regions: Record<string, CondRegionMeta>;
 }
 const NO_COND: CondCtx = { active: {}, regions: {} };
+
+/** Walk a flat child list as the *tree* its `@if`s describe.
+
+    At `depth`, each maximal run of consecutive children sharing a region is
+    that region; only the run members belonging to its active branch survive,
+    and those are re-walked at `depth + 1` so an `@if` written directly inside
+    a branch nests inside it instead of reading as a sibling region. Children
+    with nothing at this depth are unconditional here and pass straight through.
+
+    `onActive` sees every child active at *every* depth, in source order;
+    `onRegion` sees each region once, outermost first. The three collectors
+    below (row columns, top-level rows, a column's nested rows) differ only in
+    what they do with those. The renderer walks the same shape from `condPath`
+    to draw the boxes, so the two stay in step. */
+export function walkCond(
+  children: El[], ctx: CondCtx, depth: number,
+  onActive: (el: El) => void,
+  onRegion: (region: CondRegion) => void = () => {},
+): void {
+  let i = 0;
+  while (i < children.length) {
+    const tag = children[i]!.condPath?.[depth];
+    if (!tag) { onActive(children[i]!); i++; continue; }
+    const { region } = tag;
+    const run: El[] = [];
+    while (i < children.length && children[i]!.condPath?.[depth]?.region === region) {
+      run.push(children[i]!);
+      i++;
+    }
+    const activeIndex = ctx.active[region] ?? 0;
+    onRegion({ region, branches: ctx.regions[region]?.branches ?? [], activeIndex });
+    walkCond(run.filter(e => e.condPath![depth]!.branch === activeIndex),
+      ctx, depth + 1, onActive, onRegion);
+  }
+}
 
 /** Build the grid model. `active` maps each `@if` region key to the branch
     index to show (default 0); only the active branch's columns/rows appear in
@@ -47,27 +82,10 @@ export function buildModel(root: El, active: Record<string, number> = {}): RowNo
     renderer reconstructs box positions from the tagged source tree, so no
     extra metadata is returned here. */
 export function findRows(el: El, out: RowNode[] = [], ctx: CondCtx = NO_COND): RowNode[] {
-  const children = el.children;
-  let i = 0;
-  while (i < children.length) {
-    const c = children[i]!;
-    if (c.cond) {
-      const region = c.cond.region;
-      const activeIndex = ctx.active[region] ?? 0;
-      while (i < children.length && children[i]!.cond?.region === region) {
-        const rc = children[i]!;
-        if (rc.cond!.branch === activeIndex) {
-          if (isRowEl(rc)) out.push(buildRow(rc, ctx));
-          else findRows(rc, out, ctx);
-        }
-        i++;
-      }
-    } else {
-      if (isRowEl(c)) out.push(buildRow(c, ctx));
-      else findRows(c, out, ctx);
-      i++;
-    }
-  }
+  walkCond(el.children, ctx, 0, c => {
+    if (isRowEl(c)) out.push(buildRow(c, ctx));
+    else findRows(c, out, ctx);
+  });
   return out;
 }
 
@@ -92,23 +110,12 @@ export function buildCol(el: El, ctx: CondCtx = NO_COND): ColNode {
 }
 
 /** Split a flat child list into the active-branch children (in source order,
-    interleaved with untagged children) and the `@if` regions found. Each
-    maximal run of consecutive same-region children is one region. */
+    interleaved with untagged children) and the `@if` regions found, nested
+    regions included. */
 function groupChildren(children: El[], ctx: CondCtx): { active: El[]; conds: CondRegion[] } {
   const active: El[] = [];
   const conds: CondRegion[] = [];
-  let i = 0;
-  while (i < children.length) {
-    const c = children[i]!;
-    if (!c.cond) { active.push(c); i++; continue; }
-    const region = c.cond.region;
-    const activeIndex = ctx.active[region] ?? 0;
-    conds.push({ region, branches: ctx.regions[region]?.branches ?? [], activeIndex });
-    while (i < children.length && children[i]!.cond?.region === region) {
-      if (children[i]!.cond!.branch === activeIndex) active.push(children[i]!);
-      i++;
-    }
-  }
+  walkCond(children, ctx, 0, e => active.push(e), r => conds.push(r));
   return { active, conds };
 }
 
@@ -117,28 +124,15 @@ function groupChildren(children: El[], ctx: CondCtx): { active: El[]; conds: Con
 function collectNestedRows(el: El, ctx: CondCtx): { rows: RowNode[]; conds: CondRegion[] } {
   const rows: RowNode[] = [];
   const conds: CondRegion[] = [];
-  let i = 0;
-  const children = el.children;
-  while (i < children.length) {
-    const c = children[i]!;
-    if (c.cond) {
-      const region = c.cond.region;
-      const activeIndex = ctx.active[region] ?? 0;
-      conds.push({ region, branches: ctx.regions[region]?.branches ?? [], activeIndex });
-      while (i < children.length && children[i]!.cond?.region === region) {
-        const rc = children[i]!;
-        if (rc.cond!.branch === activeIndex) {
-          if (isRowEl(rc)) rows.push(buildRow(rc, ctx));
-          else { const sub = collectNestedRows(rc, ctx); rows.push(...sub.rows); conds.push(...sub.conds); }
-        }
-        i++;
-      }
-    } else {
-      if (isRowEl(c)) rows.push(buildRow(c, ctx));
-      else { const sub = collectNestedRows(c, ctx); rows.push(...sub.rows); conds.push(...sub.conds); }
-      i++;
+  walkCond(el.children, ctx, 0, c => {
+    if (isRowEl(c)) rows.push(buildRow(c, ctx));
+    else {
+      // a wrapper element: its own children start a fresh condPath level
+      const sub = collectNestedRows(c, ctx);
+      rows.push(...sub.rows);
+      conds.push(...sub.conds);
     }
-  }
+  }, r => conds.push(r));
   return { rows, conds };
 }
 

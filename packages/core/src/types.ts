@@ -36,14 +36,24 @@ export interface El {
   contentEnd: number;
   selfClosing?: boolean;
   parent: El | null;
-  /** Set on the top-level elements of an `@if` branch (the parser flattens
-      the branches into siblings but tags them). `region` keys into
-      `RootEl.condRegions`; `branch` is the branch index. */
-  cond?: { region: string; branch: number };
+  /** The chain of `@if` branches this element sits inside, **outermost
+      first** — set on the top-level elements of each branch (the parser
+      flattens branches into siblings but tags them). One entry per enclosing
+      conditional at this level of the child list, so an `@if` written directly
+      inside another branch nests instead of reading as a sibling region.
+      Absent when the element is unconditional. */
+  condPath?: CondTag[];
+}
+
+/** One link in `El.condPath`: `region` keys into `RootEl.condRegions`,
+    `branch` is which branch of it the element belongs to. */
+export interface CondTag {
+  region: string;
+  branch: number;
 }
 
 /** The synthetic document root. Spans the whole source; has no open tag.
-    Carries the `@if` region registry the tags on `El.cond` point into. */
+    Carries the `@if` region registry the tags on `El.condPath` point into. */
 export interface RootEl extends El {
   tag: '#root';
   condRegions: Record<string, CondRegionMeta>;
@@ -106,8 +116,10 @@ export interface RowNode {
   kind: 'row';
   el: El;
   cols: ColNode[];
-  /** `@if` regions among this row's columns (active branch's cols are already
-      in `cols`; this drives the branch toggle). Absent when there are none. */
+  /** Every `@if` region among this row's columns, at any nesting depth, each
+      once (active branch's cols are already in `cols`; this drives the branch
+      toggle). Flat — the *shape* of the nesting is read from `El.condPath`;
+      this is the lookup table. Absent when there are none. */
   conds?: CondRegion[];
 }
 
