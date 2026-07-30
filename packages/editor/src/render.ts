@@ -9,7 +9,7 @@ import {
   isHiddenAt, isRowEl, rowHasForOrSwitch, rowMentionsIf,
 } from '@bootstrap-visualizer/core';
 import type {
-  Breakpoint, ColNode, CondRegion, El, NodePath, RootEl, RowNode,
+  Breakpoint, ColNode, ColSeqItem, CondRegion, El, NodePath, RootEl, RowNode,
 } from '@bootstrap-visualizer/core';
 import { $, mkBadge, mkTypeBadge, rowsHost, sheet, toast } from './dom.js';
 import { SHEET_WIDTH, setActiveBranch, state, type Selection } from './state.js';
@@ -237,7 +237,7 @@ function renderCanvas(): void {
   rowsHost.innerHTML = '';
   if (state.root) {
     const byEl = new Map(state.model.map((r, i) => [r.el, i]));
-    renderTopRows(rowsHost, state.root, byEl);
+    renderTopRows(rowsHost, state.root.children, byEl);
   }
   if (!rowsHost.children.length) {
     const d = document.createElement('div');
@@ -253,28 +253,33 @@ function renderCanvas(): void {
     so `@if`-of-rows regions group into a bounding box: a run of same-region
     branch children renders as a `.cond-box.rows` with the toggle chip (only
     the active branch's rows are in the model); a run with nothing shown
-    collapses to the thin chip-only strip at its source position. */
-function renderTopRows(host: HTMLElement, el: El, byEl: Map<El, number>): number {
-  const children = el.children;
+    collapses to the thin chip-only strip at its source position. `depth`
+    indexes into `condPath`, so an `@if` written directly inside a branch draws
+    its box *inside* the enclosing one. */
+function renderTopRows(
+  host: HTMLElement, children: El[], byEl: Map<El, number>, depth = 0,
+): number {
   let emitted = 0;
   let i = 0;
   while (i < children.length) {
-    const c = children[i]!;
-    const region = c.cond?.region;
-    const cr = region ? topCondRegion(region) : null;
+    const tag = children[i]!.condPath?.[depth];
+    const cr = tag ? topCondRegion(tag.region) : null;
     if (!cr) {
-      emitted += renderRowOrDescend(host, c, byEl);
+      emitted += renderRowOrDescend(host, children[i]!, byEl);
       i++;
       continue;
+    }
+    const run: El[] = [];
+    while (i < children.length && children[i]!.condPath?.[depth]?.region === cr.region) {
+      run.push(children[i]!);
+      i++;
     }
     const box = document.createElement('div');
     box.className = 'cond-box rows';
     box.appendChild(renderBranchChip(cr));
-    let shown = 0;
-    while (i < children.length && children[i]!.cond?.region === cr.region) {
-      shown += renderRowOrDescend(box, children[i]!, byEl);
-      i++;
-    }
+    // only this branch's members descend; the rest belong to branches not shown
+    const shown = renderTopRows(
+      box, run.filter(e => e.condPath![depth]!.branch === cr.activeIndex), byEl, depth + 1);
     if (shown) {
       host.appendChild(box);
       emitted += shown;
@@ -299,7 +304,8 @@ function renderRowOrDescend(into: HTMLElement, c: El, byEl: Map<El, number>): nu
   }
   if (isRowEl(c)) return 0;               // hidden/inactive branch row
   if (!c.children.length) return 0;
-  return renderTopRows(into, c, byEl);
+  // a wrapper element: its children carry their own condPath from depth 0
+  return renderTopRows(into, c.children, byEl);
 }
 
 /** Region metadata for a top-level run, straight from the parse registry —
@@ -438,46 +444,61 @@ function renderRowBody(
       ? renderHiddenCol(h.node, path.concat(h.idx), h.idx, h.idx === last)
       : renderCol(h.node, h.w, path.concat(h.idx), h.idx, h.idx === last, denom));
 
-  const children = rowNode.el.children;
-  let i = 0;
-  while (i < children.length) {
-    const region = children[i]!.cond?.region;
-    if (!region) {
-      const hit = byEl.get(children[i]!);   // plain column (non-col child: skipped)
-      if (hit) emit(hit, host);
-      i++;
-      continue;
+  /** Total grid footprint of the columns under `list` (at any nesting depth):
+      what a region box has to be sized to. Only active columns are in `byEl`,
+      so an inner branch that isn't shown contributes nothing — exactly its
+      real footprint. */
+  const spanOf = (list: El[]) => list.reduce((s, el) => {
+    const hit = byEl.get(el);
+    return s + (hit && !hit.w.hidden ? footprint(hit.w) : 0);
+  }, 0);
+
+  /* Lay out one child list at `depth` of `condPath`, into `into`, with widths
+     relative to `denom` twelfths. A region's run becomes a `.cond-box` sized to
+     its active branch's visible span, and that branch is laid out inside it
+     relative to that span — so a nested `@if` draws a box inside a box, with
+     the proportions still true at every level. */
+  const layout = (list: El[], depth: number, into: HTMLElement, denom: number) => {
+    let i = 0;
+    while (i < list.length) {
+      const tag = list[i]!.condPath?.[depth];
+      if (!tag) {
+        const hit = byEl.get(list[i]!);     // plain column (non-col child: skipped)
+        if (hit) emit(hit, into, denom);
+        i++;
+        continue;
+      }
+      const run: El[] = [];
+      while (i < list.length && list[i]!.condPath?.[depth]?.region === tag.region) {
+        run.push(list[i]!);
+        i++;
+      }
+      const cr = regionMeta.get(tag.region);
+      if (!cr) continue;
+      const branch = run.filter(e => e.condPath![depth]!.branch === cr.activeIndex);
+      const span = spanOf(branch);
+      if (!span) {
+        // the branch shows nothing: zero grid footprint, so the remaining
+        // columns lay out as Angular would render them. The toggle chip
+        // relocates to the row's top-edge strip; has-flags caps the label
+        // width. (A hidden *inner* region's chip goes to the same strip — it
+        // has no box to sit on, but stays reachable to toggle back.)
+        flags.insertBefore(renderBranchChip(cr), flags.lastChild);
+        host.classList.add('has-flags');
+        continue;
+      }
+      const box = document.createElement('div');
+      box.className = 'cond-box';
+      box.appendChild(renderBranchChip(cr));
+      const pct = (Math.min(span / denom, 1) * 100).toFixed(4) + '%';
+      box.style.flex = '0 0 ' + pct;
+      box.style.maxWidth = pct;
+      layout(branch, depth + 1, box, span);
+      into.appendChild(box);
     }
-    // one @if/*ngIf region: gather this run of consecutive branch children that
-    // belong to the active branch (only those are in byEl).
-    const branchCols: Hit[] = [];
-    while (i < children.length && children[i]!.cond?.region === region) {
-      const hit = byEl.get(children[i]!);
-      if (hit) branchCols.push(hit);
-      i++;
-    }
-    const cr = regionMeta.get(region);
-    if (!cr) continue;
-    if (!branchCols.length) {
-      // the @if branch shows nothing: zero grid footprint, so the remaining
-      // columns lay out as Angular would render them. The toggle chip
-      // relocates to the row's top-edge strip; has-flags caps the label width.
-      flags.insertBefore(renderBranchChip(cr), flags.lastChild);
-      host.classList.add('has-flags');
-      continue;
-    }
-    // size the box to its branch's *visible* span so it sits inline where the
-    // content is; its columns are laid out relative to that span (hidden cols
-    // contribute a thin marker, not span).
-    const box = document.createElement('div');
-    box.className = 'cond-box';
-    box.appendChild(renderBranchChip(cr));
-    const span = branchCols.reduce((s, h) => s + (h.w.hidden ? 0 : footprint(h.w)), 0) || 1;
-    box.style.flex = '0 0 ' + (Math.min(span / 12, 1) * 100).toFixed(4) + '%';
-    box.style.maxWidth = (Math.min(span / 12, 1) * 100).toFixed(4) + '%';
-    for (const h of branchCols) emit(h, box, span);
-    host.appendChild(box);
-  }
+  };
+
+  layout(rowNode.el.children, 0, host, 12);
 }
 
 /** A `d-*` column hidden at the current breakpoint: a thin dashed line where
@@ -578,7 +599,8 @@ function renderCol(
   }
   // a modeled *ngIf column is already framed by its region box + toggle chip,
   // so the badge would be redundant; show it only when it isn't modeled.
-  if (colNode.el.attrs.find(a => a.name.toLowerCase() === '*ngif') && !colNode.el.cond) {
+  if (colNode.el.attrs.find(a => a.name.toLowerCase() === '*ngif')
+      && !colNode.el.condPath?.length) {
     badges.appendChild(mkBadge('*ngIf', ''));
   }
   if (hasDynamicClassBinding(colNode.el) || !editable) {
@@ -604,61 +626,69 @@ function renderCol(
     const regionMeta = new Map((colNode.conds ?? []).map(c => [c.region, c]));
     const rendered = new Set<number>();
     let skippedTitle = false;
-    let s = 0;
-    while (s < seq.length) {
-      const item = seq[s]!;
-      if (item.kind !== 'row') {
-        if (item.direct && titleFromHeading && !skippedTitle) {
-          skippedTitle = true;          // this heading is already the block title
+
+    /* Render a slice of the sequence at `depth` of `condPath`, returning how
+       many rows actually drew. An `@if`-of-rows region boxes its run of
+       consecutive same-region rows (the sequence carries every branch's rows;
+       only the active branch's are in nestedRows), and recurses so a nested
+       `@if` boxes inside it. A run with nothing shown collapses to a thin
+       chip-only strip — near-zero footprint, still toggleable in place. */
+    const layoutSeq = (items: ColSeqItem[], depth: number, into: HTMLElement): number => {
+      let shown = 0;
+      let s = 0;
+      while (s < items.length) {
+        const item = items[s]!;
+        if (item.kind !== 'row') {
+          s++;
+          if (item.direct && titleFromHeading && !skippedTitle) {
+            skippedTitle = true;        // this heading is already the block title
+            continue;
+          }
+          const sep = document.createElement('div');
+          sep.className = 'nested-sep';
+          sep.textContent = item.text;
+          sep.title = item.full;
+          into.appendChild(sep);
+          continue;
+        }
+        const tag = item.el.condPath?.[depth];
+        const cr = tag ? regionMeta.get(tag.region) : undefined;
+        if (!cr) {
+          const i = indexByEl.get(item.el);
+          if (i !== undefined && !rendered.has(i)) {
+            into.appendChild(renderRow(colNode.nestedRows[i]!, path.concat(i), true));
+            rendered.add(i);
+            shown++;
+          }
           s++;
           continue;
         }
-        const sep = document.createElement('div');
-        sep.className = 'nested-sep';
-        sep.textContent = item.text;
-        sep.title = item.full;
-        nest.appendChild(sep);
-        s++;
-        continue;
-      }
-      const cr = item.el.cond ? regionMeta.get(item.el.cond.region) : undefined;
-      if (!cr) {
-        const i = indexByEl.get(item.el);
-        if (i !== undefined && !rendered.has(i)) {
-          nest.appendChild(renderRow(colNode.nestedRows[i]!, path.concat(i), true));
-          rendered.add(i);
+        const run: ColSeqItem[] = [];
+        while (s < items.length) {
+          const it = items[s]!;
+          if (it.kind !== 'row' || it.el.condPath?.[depth]?.region !== cr.region) break;
+          run.push(it);
+          s++;
         }
-        s++;
-        continue;
-      }
-      // an @if-of-rows region: box the run of consecutive same-region rows
-      // (the sequence carries every branch's rows; only the active branch's
-      // are in nestedRows). A run with nothing shown collapses to a thin
-      // chip-only strip — near-zero footprint, still toggleable in place.
-      const box = document.createElement('div');
-      box.className = 'cond-box rows';
-      box.appendChild(renderBranchChip(cr));
-      let shown = 0;
-      while (s < seq.length) {
-        const it = seq[s]!;
-        if (it.kind !== 'row' || it.el.cond?.region !== cr.region) break;
-        const i = indexByEl.get(it.el);
-        if (i !== undefined && !rendered.has(i)) {
-          box.appendChild(renderRow(colNode.nestedRows[i]!, path.concat(i), true));
-          rendered.add(i);
-          shown++;
+        const box = document.createElement('div');
+        box.className = 'cond-box rows';
+        box.appendChild(renderBranchChip(cr));
+        const inBranch = run.filter(it =>
+          it.kind === 'row' && it.el.condPath![depth]!.branch === cr.activeIndex);
+        const drew = layoutSeq(inBranch, depth + 1, box);
+        if (!drew) {
+          const strip = document.createElement('div');
+          strip.className = 'cond-strip';
+          strip.appendChild(box.firstChild!);   // just the chip, no box
+          into.appendChild(strip);
+          continue;
         }
-        s++;
+        into.appendChild(box);
+        shown += drew;
       }
-      if (!shown) {
-        const strip = document.createElement('div');
-        strip.className = 'cond-strip';
-        strip.appendChild(box.firstChild!);   // just the chip, no box
-        nest.appendChild(strip);
-        continue;
-      }
-      nest.appendChild(box);
-    }
+      return shown;
+    };
+    layoutSeq(seq, 0, nest);
     // Any nested rows the sequence never surfaced (e.g. inside a heading)
     // still render, at their own path, so none are silently lost.
     colNode.nestedRows.forEach((r, i) => {

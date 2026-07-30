@@ -315,3 +315,58 @@ describe('selection drives the inspector', () => {
     expect(insp.textContent).toContain('Add row after');
   });
 });
+
+describe('an @if nested in an @if branch draws as a nested box', () => {
+  const NESTED = `<div class="row">
+    @if (a) {
+      @if (b) { <div class="col-6">A</div> }
+      <div class="col-3">B</div>
+    } @else { <div class="col-12">C</div> }
+  </div>`;
+
+  it('boxes the inner region inside the outer one, and follows its branch', async () => {
+    const ed = await editor();
+    const restore = ed.state.src;
+    ed.state.dirty = false;
+    ed.apply(NESTED);
+
+    // one region box directly in the row, with the nested block inside it —
+    // not two boxes side by side
+    const boxes = document.querySelectorAll('.g-row > .cond-box');
+    expect(boxes).toHaveLength(1);
+    const outer = boxes[0]!;
+    expect(outer.querySelector('.cond-box')).not.toBeNull();
+    expect(outer.querySelectorAll('.g-col')).toHaveLength(2);      // A (inner) + B
+
+    // switching the outer branch takes the whole inner block with it
+    outer.querySelector<HTMLButtonElement>(':scope > .branch-chip')!.click();
+    const after = document.querySelector('.g-row > .cond-box')!;
+    expect(after.querySelector('.cond-box')).toBeNull();
+    expect(document.querySelectorAll('.g-col')).toHaveLength(1);   // just C
+
+    ed.state.activeBranch = {};
+    ed.apply(restore);
+  });
+
+  it('blocks moving a column out of the inner block into the outer branch', async () => {
+    const ed = await editor();
+    const restore = ed.state.src;
+    ed.state.dirty = false;
+    ed.apply(NESTED);
+    const srcBefore = ed.state.src;
+
+    // A (inside `@if (b)`) and B (only inside `@if (a)`) are adjacent columns
+    // of the same row, but a text swap would carry A across the inner `}`.
+    ed.state.sel = { path: [0, 0], kind: 'col' };
+    ed.nudgeCol(1);
+
+    expect(ed.state.src).toBe(srcBefore);            // refused, nothing rewritten
+    expect(document.querySelector('.toast.warn')!.textContent)
+      .toContain('branch boundary');
+
+    ed.state.sel = null;
+    ed.state.activeBranch = {};
+    ed.apply(restore);
+  });
+});
+

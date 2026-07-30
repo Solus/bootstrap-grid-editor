@@ -109,11 +109,13 @@ describe('legacy fallback on parse errors', () => {
 });
 
 describe('@if region tagging', () => {
-  // find every element in the tree that carries a cond tag
+  // find every element in the tree that carries a cond tag (innermost one —
+  // the enclosing chain is asserted separately, in the nesting cases)
   function tagged(root: ReturnType<typeof parseTemplate>) {
     const out: { region: string; branch: number; cls: string }[] = [];
     const walk = (el: any) => {
-      if (el.cond) out.push({ region: el.cond.region, branch: el.cond.branch, cls: el.cls ?? '' });
+      const t = el.condPath?.[el.condPath.length - 1];
+      if (t) out.push({ region: t.region, branch: t.branch, cls: el.cls ?? '' });
       el.children?.forEach(walk);
     };
     root.children.forEach(walk);
@@ -183,6 +185,56 @@ describe('@if region tagging', () => {
     const keys = Object.keys(root.condRegions);
     expect(keys.length).toBe(2);
     expect(new Set(keys).size).toBe(2); // distinct
+  });
+
+  it('an @if directly inside a branch nests: condPath is outermost-first', () => {
+    // Both blocks live at the same level of the element tree (the parser
+    // flattens branches into siblings), so the *chain* is the only record that
+    // col-6 is inside `@if (a)` as well as `@if (b)`.
+    const s = `<div class="row">
+      @if (a) {
+        @if (b) { <div class="col-6">A</div> }
+        <div class="col-3">B</div>
+      } @else { <div class="col-12">C</div> }
+    </div>`;
+    const root = parseTemplate(s);
+    const outer = Object.values(root.condRegions).find(r => r.branches.length === 2)!;
+    const inner = Object.values(root.condRegions).find(r => r.branches.length === 1)!;
+    const [a, b, c] = root.children[0]!.children;
+
+    expect(a!.condPath).toEqual([
+      { region: outer.region, branch: 0 },     // outermost first…
+      { region: inner.region, branch: 0 },     // …then the nested one
+    ]);
+    expect(b!.condPath).toEqual([{ region: outer.region, branch: 0 }]);
+    expect(c!.condPath).toEqual([{ region: outer.region, branch: 1 }]);
+  });
+
+  it('an @if nested in an @else branch records that branch in the chain', () => {
+    const s = `<div class="row">
+      @if (a) { <div class="col-3">B</div> }
+      @else {
+        @if (b) { <div class="col-6">A</div> }
+        <div class="col-12">C</div>
+      }
+    </div>`;
+    const root = parseTemplate(s);
+    const outer = Object.values(root.condRegions).find(r => r.branches.length === 2)!;
+    const nested = root.children[0]!.children[1]!;
+    expect(nested.condPath![0]).toEqual({ region: outer.region, branch: 1 });
+    expect(nested.condPath!.length).toBe(2);
+  });
+
+  it('*ngIf on an element inside an @if branch keeps both links', () => {
+    const s = `<div class="row">
+      @if (a) { <div class="col-6" *ngIf="b">A</div> }
+    </div>`;
+    const root = parseTemplate(s);
+    const path = root.children[0]!.children[0]!.condPath!;
+    expect(path.length).toBe(2);
+    // the block is the outer link, the structural *ngIf the inner one
+    expect(root.condRegions[path[0]!.region]!.structural).toBeFalsy();
+    expect(root.condRegions[path[1]!.region]!.structural).toBe(true);
   });
 
   it('models a column *ngIf as a single-branch region (like a bare @if)', () => {

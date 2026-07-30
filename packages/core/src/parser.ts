@@ -87,7 +87,8 @@ export function parseTemplate(src: string): RootEl {
 /** Walk a node list into the El children it contributes, flattening control
     flow and unwrapping structural-directive / ng-template wrappers. `@if`
     branches are flattened too, but each branch's top-level elements are
-    tagged (`el.cond`) so the model can group them back into a CondRegion. */
+    tagged (`el.condPath`) so the model can group them back into a CondRegion,
+    nesting included. */
 function collectElements(nodes: Node[], parent: El, src: string, ctx: Ctx): El[] {
   const out: El[] = [];
   for (const n of nodes) {
@@ -113,8 +114,10 @@ function collectElements(nodes: Node[], parent: El, src: string, ctx: Ctx): El[]
 
 /** Flatten an `@if`, tagging each branch's top-level elements with a shared
     region key + branch index, and registering the full branch list (incl.
-    empty branches) on the root. Innermost region wins if an element is already
-    tagged by a nested `@if` sitting directly inside a branch. */
+    empty branches) on the root. An `@if` written directly inside a branch is
+    collected first (the recursion runs innermost-out), so this prepends its
+    region to whatever is already on the element — leaving `condPath` ordered
+    outermost-first and the nesting intact. */
 function collectIf(n: TmplAstIfBlock, parent: El, src: string, ctx: Ctx): El[] {
   const branches: CondBranchMeta[] = n.branches.map((b, index) => ({
     index,
@@ -130,7 +133,7 @@ function collectIf(n: TmplAstIfBlock, parent: El, src: string, ctx: Ctx): El[] {
   const out: El[] = [];
   n.branches.forEach((b, branch) => {
     const els = collectElements(b.children as unknown as Node[], parent, src, ctx);
-    for (const el of els) if (!el.cond) el.cond = { region, branch };
+    for (const el of els) el.condPath = [{ region, branch }, ...(el.condPath ?? [])];
     out.push(...els);
   });
   return out;
@@ -144,7 +147,7 @@ function collectIf(n: TmplAstIfBlock, parent: El, src: string, ctx: Ctx): El[] {
     dropped (the detached template stays flat, as today). */
 function tagNgIf(els: El[], ctx: Ctx): void {
   for (const el of els) {
-    if (el.cond) continue;                    // already a branch of an inline @if
+    if (el.condPath?.length) continue;         // already tagged by an inline @if
     const attr = el.attrs.find(a => a.name.toLowerCase() === '*ngif');
     if (!attr) continue;
     const condition = (attr.value ?? '').split(';')[0]!.trim();
@@ -157,7 +160,7 @@ function tagNgIf(els: El[], ctx: Ctx): void {
       branches: [{ index: 0, label: `*ngIf (${condition})`, condition }],
       structural: true,   // the `*ngIf` attr rides on the element — no braces
     };
-    el.cond = { region, branch: 0 };
+    el.condPath = [{ region, branch: 0 }];
   }
 }
 

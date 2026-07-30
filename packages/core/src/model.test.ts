@@ -239,6 +239,101 @@ describe('@if grouping into active-branch cols', () => {
   });
 });
 
+describe('@if nested directly inside another @if branch', () => {
+  /* Both blocks flatten to the same level of the element tree, so the whole
+     nesting lives in `El.condPath`. Getting this wrong doesn't just draw the
+     boxes side by side — it shows columns Angular wouldn't render. */
+  const clsOf = (src: string) => (c: { el: { start: number; openEnd: number } }) =>
+    /col-\d+/.exec(src.slice(c.el.start, c.el.openEnd))?.[0];
+
+  const inIf = `<div class="row">
+    @if (a) {
+      @if (b) { <div class="col-6">A</div> }
+      <div class="col-3">B</div>
+    } @else { <div class="col-12">C</div> }
+  </div>`;
+  const rootIf = parseTemplate(inIf);
+  const outerIf = Object.values(rootIf.condRegions).find(r => r.branches.length === 2)!.region;
+  const innerIf = Object.values(rootIf.condRegions).find(r => r.branches.length === 1)!.region;
+
+  it('shows the inner branch inside the active outer branch', () => {
+    expect(buildModel(rootIf)[0]!.cols.map(clsOf(inIf))).toEqual(['col-6', 'col-3']);
+  });
+
+  it('switching the outer branch hides the whole inner block', () => {
+    // col-6 lives inside the `@if (a)` branch we just switched away from, so
+    // it must not render — the bug this nesting fixes.
+    expect(buildModel(rootIf, { [outerIf]: 1 })[0]!.cols.map(clsOf(inIf)))
+      .toEqual(['col-12']);
+  });
+
+  it('hiding the inner branch leaves the outer branch alone', () => {
+    expect(buildModel(rootIf, { [innerIf]: -1 })[0]!.cols.map(clsOf(inIf)))
+      .toEqual(['col-3']);
+  });
+
+  it('lists the inner region only while it is reachable', () => {
+    const shown = buildModel(rootIf)[0]!.conds!.map(c => c.region);
+    expect(shown).toEqual([outerIf, innerIf]);
+    // outer switched to @else: the inner block isn't rendered, so no chip
+    expect(buildModel(rootIf, { [outerIf]: 1 })[0]!.conds!.map(c => c.region))
+      .toEqual([outerIf]);
+  });
+
+  const inElse = `<div class="row">
+    @if (a) { <div class="col-3">B</div> }
+    @else {
+      @if (b) { <div class="col-6">A</div> }
+      <div class="col-12">C</div>
+    }
+  </div>`;
+  const rootElse = parseTemplate(inElse);
+  const outerElse = Object.values(rootElse.condRegions).find(r => r.branches.length === 2)!.region;
+
+  it('nesting inside an @else branch behaves the same way', () => {
+    expect(buildModel(rootElse)[0]!.cols.map(clsOf(inElse))).toEqual(['col-3']);
+    expect(buildModel(rootElse, { [outerElse]: 1 })[0]!.cols.map(clsOf(inElse)))
+      .toEqual(['col-6', 'col-12']);
+  });
+
+  it('an interposed nested region does not split the outer one into two chips', () => {
+    // grouping by subtree, not by adjacency: the outer region is one entry even
+    // though the inner run sits between two of its members
+    const conds = buildModel(rootElse, { [outerElse]: 1 })[0]!.conds!;
+    expect(conds.filter(c => c.region === outerElse)).toHaveLength(1);
+  });
+
+  it('nests @if-of-rows the same way at the top level', () => {
+    const s = `<div class="container">
+      @if (a) {
+        @if (b) { <div class="row"><div class="col-6">A</div></div> }
+        <div class="row"><div class="col-3">B</div></div>
+      } @else { <div class="row"><div class="col-12">C</div></div> }
+    </div>`;
+    const root2 = parseTemplate(s);
+    const outer = Object.values(root2.condRegions).find(r => r.branches.length === 2)!.region;
+    const colOf = (r: { cols: { el: { start: number; openEnd: number } }[] }) =>
+      /col-\d+/.exec(s.slice(r.cols[0]!.el.start, r.cols[0]!.el.openEnd))?.[0];
+    expect(buildModel(root2).map(colOf)).toEqual(['col-6', 'col-3']);
+    expect(buildModel(root2, { [outer]: 1 }).map(colOf)).toEqual(['col-12']);
+  });
+
+  it('nests @if-of-rows the same way inside a container column', () => {
+    const s = `<div class="row"><div class="col-6">
+      @if (a) {
+        @if (b) { <div class="row"><div class="col-4">A</div></div> }
+        <div class="row"><div class="col-5">B</div></div>
+      } @else { <div class="row"><div class="col-9">C</div></div> }
+    </div></div>`;
+    const root2 = parseTemplate(s);
+    const outer = Object.values(root2.condRegions).find(r => r.branches.length === 2)!.region;
+    const nested = (m: ReturnType<typeof buildModel>) =>
+      m[0]!.cols[0]!.nestedRows.map(r => clsOf(s)(r.cols[0]!));
+    expect(nested(buildModel(root2))).toEqual(['col-4', 'col-5']);
+    expect(nested(buildModel(root2, { [outer]: 1 }))).toEqual(['col-9']);
+  });
+});
+
 describe('hashStr identity stability', () => {
   const hs = `<div class="row"><div class="col">a</div></div>
 <div class="row"><div class="col">TARGET</div></div>`;
