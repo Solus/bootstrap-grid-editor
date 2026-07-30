@@ -1,5 +1,27 @@
 # Change Log
 
+## 0.0.15
+
+- Fixed: making one canvas edit right after another — dragging a second column,
+  or clicking the offset stepper quickly — no longer stops you with "the canvas
+  is out of sync". The canvas and the editor are now compared by their actual
+  contents rather than by a document version the canvas had to predict.
+- Fixed: typing something in the editor and deleting it again (or undoing a
+  hand-edit) returns the canvas to sync on its own, instead of parking it until
+  you save.
+- Fixed: an `@if` written directly inside another `@if`/`@else` branch is now
+  drawn nested, inside its enclosing block, rather than beside it. Switching the
+  outer branch now correctly hides the whole inner block — previously its
+  columns stayed on the canvas and counted toward the row's fill even though
+  Angular wouldn't render them — and the outer block no longer shows a duplicate
+  toggle chip.
+- Fixed: anything the canvas inserts now indents the way your file does. A
+  tab-indented file no longer gets two-space indentation spliced into it —
+  including when a column is moved into an empty row.
+- Fixed: your file's line endings are preserved. Inserted markup follows the
+  document (CRLF stays CRLF), and deleting or moving a column no longer leaves a
+  stray carriage return behind on the line above.
+
 ## 0.0.14
 
 - Added: dragging a column now scrolls the canvas. Hold the drag near the top or
