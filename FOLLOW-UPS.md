@@ -695,6 +695,30 @@ puts its chip in the row's top-edge strip, same as a hidden top-level one —
 so you can still toggle it back, but the strip doesn't show which region it
 was nested in. Only visible when an inner branch is empty/hidden; left as is.
 
+### 8.5 Inserted markup matched neither the file's indent character nor width **[RESOLVED — `detectIndentUnit`]**
+
+Fixed: `detectIndentUnit(src)` in `core/src/edits.ts` infers one level of
+indentation from the document (a tab if the file indents with tabs, else its
+narrowest space indent, two spaces when there's nothing to learn from). The
+editor computes it per `apply` into `state.indentUnit`, and every builder uses
+it instead of a hardcoded `'  '` / `'    '`; `rowChildIndent` takes it for the
+empty-row fallback.
+
+Root cause: the *base* indent was always copied correctly from a sibling
+(`elementCutRange` reads spaces and tabs alike), but the step to the next level
+in was literal two spaces — so a tab-indented file got `\t\t<div…>` followed by
+`\t\t  <!-- new column -->`. The reported "moving a column introduces spaces"
+was the one move path that also indents from scratch: `rowChildIndent`'s
+fallback when the destination row has no element child to copy from (moving a
+column into an empty row). Covered by unit tests on `detectIndentUnit` /
+`rowChildIndent` and by end-to-end assertions in `app-standalone/src/app.test.ts`
+that a tab document stays tab-only after add / split / add-row / move.
+
+*Not made a setting on purpose:* detection is right for every consistently
+indented file, and a setting would need a per-file override to be useful (a
+workspace is rarely uniform). Revisit only if a real file infers wrongly —
+the fallback order is documented above, so a bad inference is diagnosable.
+
 ## 9. Extension behaviour & settings
 
 ### 9.1 Tier-1 settings (user-scoped) **[DONE — shipped]**

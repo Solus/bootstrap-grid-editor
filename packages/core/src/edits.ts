@@ -69,9 +69,35 @@ export function elementCutRange(src: string, el: El): CutRange {
 }
 
 /** Indent to use for children of a row: copied from its first element
-    child, else the row's own indent plus two spaces. */
-export function rowChildIndent(src: string, rowEl: El): string {
+    child, else the row's own indent plus one level (`unit`). */
+export function rowChildIndent(src: string, rowEl: El, unit?: string): string {
   const first = rowEl.children[0];
   if (first) return elementCutRange(src, first).indent;
-  return elementCutRange(src, rowEl).indent + '  ';
+  return elementCutRange(src, rowEl).indent + (unit ?? detectIndentUnit(src));
+}
+
+/* Leading whitespace of every line that has content on it. */
+const INDENTED_LINE = /^[ \t]+(?=\S)/gm;
+
+/** One level of indentation, as *this document* writes it — so inserted or
+    re-indented markup matches what's already there instead of forcing two
+    spaces into a tab-indented file.
+
+    A tab if tabs are how the file indents (counted by line, so a stray
+    space-aligned continuation doesn't outvote them); otherwise the narrowest
+    space indent it uses, which is the unit for any consistently indented file
+    (2 or 4). Widths of one are ignored — no one indents by a single space, but
+    a wrapped attribute or a comment can easily start with one. Two spaces when
+    the file has nothing to learn from (all flat, or empty). */
+export function detectIndentUnit(src: string): string {
+  let tabLines = 0, spaceLines = 0;
+  let narrowest = Infinity;
+  for (const m of src.matchAll(INDENTED_LINE)) {
+    const ws = m[0]!;
+    if (ws.includes('\t')) { tabLines++; continue; }
+    spaceLines++;
+    if (ws.length >= 2 && ws.length < narrowest) narrowest = ws.length;
+  }
+  if (tabLines && tabLines >= spaceLines) return '\t';
+  return ' '.repeat(narrowest === Infinity ? 2 : narrowest);
 }

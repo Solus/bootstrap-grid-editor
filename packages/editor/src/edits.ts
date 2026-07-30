@@ -127,8 +127,8 @@ export function splitCol(node: ColNode): void {
     secondClasses = conventionNewColTokens(null, rowOfSel());
   }
   const { indent } = elementCutRange(state.src, el);
-  const newColHtml = '\n' + indent +
-    '<div class="' + secondClasses.join(' ') + '">\n' + indent + '  <!-- new column -->\n' + indent + '</div>';
+  const newColHtml = '\n' + indent + '<div class="' + secondClasses.join(' ') + '">\n' +
+    indent + state.indentUnit + '<!-- new column -->' + '\n' + indent + '</div>';
   // insert the new column after the original, and (if it has widths) halve
   // the original's classes — both against the original source; applyEdits
   // orders them, so no length-delta juggling is needed
@@ -141,18 +141,18 @@ export function addColAfter(node: ColNode): void {
   const el = node.el;
   const { indent } = elementCutRange(state.src, el);
   const cls = conventionNewColTokens(classTokens(el), rowOfSel()).join(' ');
-  const html = '\n' + indent +
-    '<div class="' + cls + '">\n' + indent + '  <!-- new column -->\n' + indent + '</div>';
+  const html = '\n' + indent + '<div class="' + cls + '">\n' +
+    indent + state.indentUnit + '<!-- new column -->' + '\n' + indent + '</div>';
   applyOps([{ start: el.end, end: el.end, text: html }]);
 }
 
 export function addColToRow(rowNode: RowNode): void {
   const rowEl = rowNode.el;
-  const indent = rowChildIndent(state.src, rowEl);
+  const indent = rowChildIndent(state.src, rowEl, state.indentUnit);
   const lastCol = rowNode.cols[rowNode.cols.length - 1];
   const cls = conventionNewColTokens(lastCol ? classTokens(lastCol.el) : null, rowNode).join(' ');
-  const html = '\n' + indent +
-    '<div class="' + cls + '">\n' + indent + '  <!-- new column -->\n' + indent + '</div>';
+  const html = '\n' + indent + '<div class="' + cls + '">\n' +
+    indent + state.indentUnit + '<!-- new column -->' + '\n' + indent + '</div>';
   // insert after the last *shown* column so a conditional row adds into the
   // active branch (rowEl.children is every flattened branch); for a plain row
   // this is the same as the last child.
@@ -163,8 +163,10 @@ export function addColToRow(rowNode: RowNode): void {
 export function addRowAfter(rowNode: RowNode): void {
   const el = rowNode.el;
   const { indent } = elementCutRange(state.src, el);
+  const one = indent + state.indentUnit;
+  const two = one + state.indentUnit;
   const html = '\n\n' + indent + '<div class="row">\n' +
-    indent + '  <div class="col">\n' + indent + '    <!-- new column -->\n' + indent + '  </div>\n' +
+    one + '<div class="col">\n' + two + '<!-- new column -->\n' + one + '</div>\n' +
     indent + '</div>';
   applyOps([{ start: el.end, end: el.end, text: html }]);
 }
@@ -251,7 +253,7 @@ export function moveCol(srcPath: NodePath, dstRowPath: NodePath, dstIndex: numbe
   const elText = state.src.slice(textStart, el.end);
 
   // insertion point in ORIGINAL coordinates
-  const indent = rowChildIndent(state.src, dstRow.el);
+  const indent = rowChildIndent(state.src, dstRow.el, state.indentUnit);
   let insertAt: number;
   if (dstIndex < dstRow.cols.length) {
     const target = dstRow.cols[dstIndex]!.el;
