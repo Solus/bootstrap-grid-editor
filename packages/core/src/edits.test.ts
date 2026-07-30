@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { classTokens, setWidthToken } from './classes.js';
 import {
-  applyEdits, classEdit, elementCutRange, rowChildIndent, splice, writeClass,
+  applyEdits, classEdit, detectIndentUnit, elementCutRange, rowChildIndent,
+  splice, writeClass,
 } from './edits.js';
 import { buildModel } from './model.js';
 import { parseTemplate } from './parser.js';
@@ -35,6 +36,42 @@ describe('elementCutRange / rowChildIndent', () => {
   it('delete clean', () =>
     expect(splice(src7, cr.cutStart, cr.cutEnd, ''))
       .toBe(`<div class="row">\n    <div class="col-6">a</div>\n</div>`));
+
+  // an empty row has no child to copy from, so it falls back to one level in
+  const empty = `<div class="wrap">\n\t<div class="row">\n\t</div>\n</div>`;
+  const emptyRow = parseTemplate(empty).children[0]!.children[0]!;
+  it('empty row falls back to the document’s own indent unit', () =>
+    expect(rowChildIndent(empty, emptyRow)).toBe('\t\t'));
+  it('empty row honours an explicit unit', () =>
+    expect(rowChildIndent(empty, emptyRow, '    ')).toBe('\t    '));
+});
+
+describe('detectIndentUnit', () => {
+  const tabbed = `<div>\n\t<div class="row">\n\t\t<div class="col-6">a</div>\n\t</div>\n</div>`;
+  it('tabs', () => expect(detectIndentUnit(tabbed)).toBe('\t'));
+
+  it('two spaces', () =>
+    expect(detectIndentUnit(`<div>\n  <div class="row">\n    <div>a</div>\n  </div>\n</div>`))
+      .toBe('  '));
+
+  it('four spaces', () =>
+    expect(detectIndentUnit(`<div>\n    <div class="row">\n        <div>a</div>\n    </div>\n</div>`))
+      .toBe('    '));
+
+  it('a stray single-space line does not become the unit', () =>
+    // a wrapped attribute or a hanging comment often starts with one space;
+    // nobody indents by one, so it must not win over the real 4-space unit
+    expect(detectIndentUnit(`<div>\n    <div\n     class="row">a</div>\n</div>`))
+      .toBe('    '));
+
+  it('tabs win over space-aligned continuation lines', () =>
+    expect(detectIndentUnit(`<div>\n\t<div\n\t  class="row">a</div>\n\t<p>b</p>\n</div>`))
+      .toBe('\t'));
+
+  it('a flat or empty document falls back to two spaces', () => {
+    expect(detectIndentUnit('<div class="row"></div>')).toBe('  ');
+    expect(detectIndentUnit('')).toBe('  ');
+  });
 });
 
 describe('cut range carries the comment', () => {

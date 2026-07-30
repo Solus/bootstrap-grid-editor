@@ -370,3 +370,70 @@ describe('an @if nested in an @if branch draws as a nested box', () => {
   });
 });
 
+describe('canvas edits indent the way the document does', () => {
+  const TABS = [
+    '<div class="container">',
+    '\t<div class="row">',
+    '\t\t<div class="col-6">A</div>',
+    '\t\t<div class="col-3">B</div>',
+    '\t</div>',
+    '\t<div class="row">',
+    '\t</div>',
+    '</div>',
+  ].join('\n');
+
+  /** Every indented line of the result, so a single stray space is visible. */
+  const indents = (src: string) => src.split('\n')
+    .map(l => /^[ \t]+/.exec(l)?.[0] ?? '')
+    .filter(Boolean);
+
+  const load = async () => {
+    const ed = await editor();
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply(TABS);
+    expect(ed.state.indentUnit).toBe('\t');   // detected from the document
+    return ed;
+  };
+
+  it('adding a column writes tabs, not two spaces', async () => {
+    const ed = await load();
+    ed.addColToRow(ed.state.model[0]!);
+    expect(indents(ed.state.src).every(i => !i.includes(' '))).toBe(true);
+    expect(ed.state.src).toContain('\n\t\t\t<!-- new column -->');
+  });
+
+  it('splitting a column writes tabs', async () => {
+    const ed = await load();
+    ed.splitCol(ed.state.model[0]!.cols[0]!);
+    expect(indents(ed.state.src).every(i => !i.includes(' '))).toBe(true);
+  });
+
+  it('adding a row writes tabs at both nesting levels', async () => {
+    const ed = await load();
+    ed.addRowAfter(ed.state.model[0]!);
+    expect(indents(ed.state.src).every(i => !i.includes(' '))).toBe(true);
+    expect(ed.state.src).toContain('\n\t\t<div class="col">');
+  });
+
+  it('moving a column into an empty row writes tabs', async () => {
+    // the reported case: with no child to copy an indent from, the insertion
+    // used to fall back to a hardcoded two spaces
+    const ed = await load();
+    ed.moveCol([0, 1], [1], 0);
+    expect(indents(ed.state.src).every(i => !i.includes(' '))).toBe(true);
+    expect(ed.state.src).toContain('\n\t\t<div class="col-3">B</div>');
+  });
+
+  it('a two-space document still gets two spaces', async () => {
+    const ed = await editor();
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply('<div class="container">\n  <div class="row">\n  </div>\n</div>');
+    expect(ed.state.indentUnit).toBe('  ');
+    ed.addColToRow(ed.state.model[0]!);
+    expect(ed.state.src).toMatch(/\n {4}<div class="col/);
+    expect(ed.state.src).toContain('\n      <!-- new column -->');
+    expect(ed.state.src).not.toContain('\t');
+  });
+});

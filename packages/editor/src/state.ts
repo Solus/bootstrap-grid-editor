@@ -4,7 +4,7 @@
 
 import {
   BPS, applyEdits, buildModel, classTokens, classValue, definingBp,
-  isColTokens, parseTemplate, usesBs3, widthTokenBp,
+  detectIndentUnit, isColTokens, parseTemplate, usesBs3, widthTokenBp,
 } from '@bootstrap-visualizer/core';
 import type {
   Breakpoint, ColNode, Edit, El, NodePath, RootEl, RowNode,
@@ -43,6 +43,10 @@ export interface AppState {
   fileName: string | null;
   /** Any BS3-style grid class anywhere in the document. */
   docBs3: boolean;
+  /** One level of indentation as this document writes it (a tab, two spaces,
+      four…), detected on every apply. Everything the canvas inserts indents
+      with this, so a tab-indented file never gets spaces spliced into it. */
+  indentUnit: string;
   find: string;
   findMatches: Selection[];
   findIdx: number | null;
@@ -71,6 +75,7 @@ export const state: AppState = {
   stretchSheet: false,
   fileName: null,
   docBs3: false,
+  indentUnit: '  ',
   find: '',
   findMatches: [],
   findIdx: null,
@@ -203,6 +208,7 @@ export function apply(newSrc: string, opts: ApplyOpts = {}): void {
   state.root = root;
   state.model = model;
   state.docBs3 = detectDialect(root);
+  state.indentUnit = detectIndentUnit(newSrc);
   if (!keepSel) state.sel = null;
   if (state.sel && !resolvePath(state.sel.path)) state.sel = null;
   if (!state.sel) state._bandLines = null;
