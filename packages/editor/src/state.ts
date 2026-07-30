@@ -4,7 +4,7 @@
 
 import {
   BPS, applyEdits, buildModel, classTokens, classValue, definingBp,
-  detectIndentUnit, isColTokens, parseTemplate, usesBs3, widthTokenBp,
+  detectEol, detectIndentUnit, isColTokens, parseTemplate, usesBs3, widthTokenBp,
 } from '@bootstrap-visualizer/core';
 import type {
   Breakpoint, ColNode, Edit, El, NodePath, RootEl, RowNode,
@@ -47,6 +47,9 @@ export interface AppState {
       four…), detected on every apply. Everything the canvas inserts indents
       with this, so a tab-indented file never gets spaces spliced into it. */
   indentUnit: string;
+  /** The document's line ending (`\n` or `\r\n`), detected alongside
+      `indentUnit` and used by every builder that inserts a new line. */
+  eol: string;
   find: string;
   findMatches: Selection[];
   findIdx: number | null;
@@ -76,6 +79,7 @@ export const state: AppState = {
   fileName: null,
   docBs3: false,
   indentUnit: '  ',
+  eol: '\n',
   find: '',
   findMatches: [],
   findIdx: null,
@@ -209,6 +213,7 @@ export function apply(newSrc: string, opts: ApplyOpts = {}): void {
   state.model = model;
   state.docBs3 = detectDialect(root);
   state.indentUnit = detectIndentUnit(newSrc);
+  state.eol = detectEol(newSrc);
   if (!keepSel) state.sel = null;
   if (state.sel && !resolvePath(state.sel.path)) state.sel = null;
   if (!state.sel) state._bandLines = null;

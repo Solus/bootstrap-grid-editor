@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { classTokens, setWidthToken } from './classes.js';
 import {
-  applyEdits, classEdit, detectIndentUnit, elementCutRange, rowChildIndent,
-  splice, writeClass,
+  applyEdits, classEdit, detectEol, detectIndentUnit, elementCutRange,
+  rowChildIndent, splice, writeClass,
 } from './edits.js';
 import { buildModel } from './model.js';
 import { parseTemplate } from './parser.js';
@@ -71,6 +71,33 @@ describe('detectIndentUnit', () => {
   it('a flat or empty document falls back to two spaces', () => {
     expect(detectIndentUnit('<div class="row"></div>')).toBe('  ');
     expect(detectIndentUnit('')).toBe('  ');
+  });
+});
+
+describe('detectEol', () => {
+  it('LF document', () =>
+    expect(detectEol('<div>\n  <p>a</p>\n</div>')).toBe('\n'));
+  it('CRLF document', () =>
+    expect(detectEol('<div>\r\n  <p>a</p>\r\n</div>')).toBe('\r\n'));
+  it('no newlines at all', () =>
+    expect(detectEol('<div class="row"></div>')).toBe('\n'));
+  it('a stray CRLF in a mostly-LF file does not flip it', () =>
+    expect(detectEol('<a/>\n<b/>\n<c/>\r\n<d/>\n<e/>\n')).toBe('\n'));
+  it('a stray LF in a mostly-CRLF file does not flip it', () =>
+    expect(detectEol('<a/>\r\n<b/>\r\n<c/>\n<d/>\r\n')).toBe('\r\n'));
+});
+
+describe('cut range in a CRLF document', () => {
+  // the cut must take \r\n as one unit — taking only the \n leaves the
+  // previous line ending in a lone \r
+  const crlf = `<div class="row">\r\n  <div class="col-6">a</div>\r\n  <div class="col-6">b</div>\r\n</div>`;
+  const mc = buildModel(parseTemplate(crlf));
+
+  it('deleting a column leaves no orphaned \\r', () => {
+    const r = elementCutRange(crlf, mc[0]!.cols[1]!.el);
+    const after = splice(crlf, r.cutStart, r.cutEnd, '');
+    expect(after).toBe(`<div class="row">\r\n  <div class="col-6">a</div>\r\n</div>`);
+    expect(/\r(?!\n)/.test(after)).toBe(false);
   });
 });
 

@@ -64,7 +64,12 @@ export function elementCutRange(src: string, el: El): CutRange {
   let cs = anchor;
   while (cs > 0 && (src[cs - 1] === ' ' || src[cs - 1] === '\t')) cs--;
   let cutStart = cs;
-  if (cs > 0 && src[cs - 1] === '\n') cutStart = cs - 1;
+  if (cs > 0 && src[cs - 1] === '\n') {
+    cutStart = cs - 1;
+    // take the \r with the \n in a CRLF document, or the cut leaves the
+    // previous line ending in a lone \r
+    if (cutStart > 0 && src[cutStart - 1] === '\r') cutStart--;
+  }
   return { cutStart, cutEnd: el.end, textStart: anchor, indent };
 }
 
@@ -89,6 +94,17 @@ const INDENTED_LINE = /^[ \t]+(?=\S)/gm;
     (2 or 4). Widths of one are ignored — no one indents by a single space, but
     a wrapped attribute or a comment can easily start with one. Two spaces when
     the file has nothing to learn from (all flat, or empty). */
+/** The line ending *this document* writes, so inserted markup doesn't leave
+    LF lines in a CRLF file (invisible in the editor, loud in a diff, and some
+    formatters then rewrite the whole file). CRLF only when it's the document's
+    actual convention, not merely present somewhere. */
+export function detectEol(src: string): string {
+  const crlf = (src.match(/\r\n/g) ?? []).length;
+  if (!crlf) return '\n';
+  const newlines = (src.match(/\n/g) ?? []).length;   // CRLF ones included
+  return crlf * 2 >= newlines ? '\r\n' : '\n';
+}
+
 export function detectIndentUnit(src: string): string {
   let tabLines = 0, spaceLines = 0;
   let narrowest = Infinity;

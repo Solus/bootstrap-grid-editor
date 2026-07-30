@@ -127,8 +127,9 @@ export function splitCol(node: ColNode): void {
     secondClasses = conventionNewColTokens(null, rowOfSel());
   }
   const { indent } = elementCutRange(state.src, el);
-  const newColHtml = '\n' + indent + '<div class="' + secondClasses.join(' ') + '">\n' +
-    indent + state.indentUnit + '<!-- new column -->' + '\n' + indent + '</div>';
+  const nl = state.eol;
+  const newColHtml = nl + indent + '<div class="' + secondClasses.join(' ') + '">' + nl +
+    indent + state.indentUnit + '<!-- new column -->' + nl + indent + '</div>';
   // insert the new column after the original, and (if it has widths) halve
   // the original's classes — both against the original source; applyEdits
   // orders them, so no length-delta juggling is needed
@@ -141,8 +142,9 @@ export function addColAfter(node: ColNode): void {
   const el = node.el;
   const { indent } = elementCutRange(state.src, el);
   const cls = conventionNewColTokens(classTokens(el), rowOfSel()).join(' ');
-  const html = '\n' + indent + '<div class="' + cls + '">\n' +
-    indent + state.indentUnit + '<!-- new column -->' + '\n' + indent + '</div>';
+  const nl = state.eol;
+  const html = nl + indent + '<div class="' + cls + '">' + nl +
+    indent + state.indentUnit + '<!-- new column -->' + nl + indent + '</div>';
   applyOps([{ start: el.end, end: el.end, text: html }]);
 }
 
@@ -151,8 +153,9 @@ export function addColToRow(rowNode: RowNode): void {
   const indent = rowChildIndent(state.src, rowEl, state.indentUnit);
   const lastCol = rowNode.cols[rowNode.cols.length - 1];
   const cls = conventionNewColTokens(lastCol ? classTokens(lastCol.el) : null, rowNode).join(' ');
-  const html = '\n' + indent + '<div class="' + cls + '">\n' +
-    indent + state.indentUnit + '<!-- new column -->' + '\n' + indent + '</div>';
+  const nl = state.eol;
+  const html = nl + indent + '<div class="' + cls + '">' + nl +
+    indent + state.indentUnit + '<!-- new column -->' + nl + indent + '</div>';
   // insert after the last *shown* column so a conditional row adds into the
   // active branch (rowEl.children is every flattened branch); for a plain row
   // this is the same as the last child.
@@ -165,8 +168,9 @@ export function addRowAfter(rowNode: RowNode): void {
   const { indent } = elementCutRange(state.src, el);
   const one = indent + state.indentUnit;
   const two = one + state.indentUnit;
-  const html = '\n\n' + indent + '<div class="row">\n' +
-    one + '<div class="col">\n' + two + '<!-- new column -->\n' + one + '</div>\n' +
+  const nl = state.eol;
+  const html = nl + nl + indent + '<div class="row">' + nl +
+    one + '<div class="col">' + nl + two + '<!-- new column -->' + nl + one + '</div>' + nl +
     indent + '</div>';
   applyOps([{ start: el.end, end: el.end, text: html }]);
 }
@@ -266,7 +270,7 @@ export function moveCol(srcPath: NodePath, dstRowPath: NodePath, dstIndex: numbe
   // same-row same-position no-op
   if (insertAt >= cutStart && insertAt <= cutEnd) return;
 
-  const insText = '\n' + indent + elText;
+  const insText = state.eol + indent + elText;
   state.sel = null;
   // remove the element from its old spot and insert it at the new one — two
   // non-overlapping edits (the no-op guard above ensures insertAt is outside
