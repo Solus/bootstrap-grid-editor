@@ -437,3 +437,74 @@ describe('canvas edits indent the way the document does', () => {
     expect(ed.state.src).not.toContain('\t');
   });
 });
+
+describe('canvas edits keep the document’s line endings', () => {
+  const CRLF = [
+    '<div class="container">',
+    '\t<div class="row">',
+    '\t\t<div class="col-6">A</div>',
+    '\t\t<div class="col-3">B</div>',
+    '\t</div>',
+    '\t<div class="row">',
+    '\t</div>',
+    '</div>',
+  ].join('\r\n');
+
+  /** A \r without a \n after it — or a \n without one before — means the
+      document ended up with mixed line endings. */
+  const mixed = (src: string) => /\r(?!\n)/.test(src) || /(?<!\r)\n/.test(src);
+
+  const load = async () => {
+    const ed = await editor();
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply(CRLF);
+    expect(ed.state.eol).toBe('\r\n');         // detected from the document
+    expect(mixed(ed.state.src)).toBe(false);   // and the input really is pure CRLF
+    return ed;
+  };
+
+  it('adding a column inserts CRLF lines', async () => {
+    const ed = await load();
+    ed.addColToRow(ed.state.model[0]!);
+    expect(mixed(ed.state.src)).toBe(false);
+    expect(ed.state.src).toContain('<!-- new column -->');
+  });
+
+  it('adding a row inserts CRLF lines', async () => {
+    const ed = await load();
+    ed.addRowAfter(ed.state.model[0]!);
+    expect(mixed(ed.state.src)).toBe(false);
+  });
+
+  it('splitting a column inserts CRLF lines', async () => {
+    const ed = await load();
+    ed.splitCol(ed.state.model[0]!.cols[0]!);
+    expect(mixed(ed.state.src)).toBe(false);
+  });
+
+  it('moving a column leaves no orphaned carriage return behind', async () => {
+    // the cut has to take \r\n as one unit; taking only the \n would leave the
+    // previous line ending in a lone \r
+    const ed = await load();
+    ed.moveCol([0, 1], [1], 0);
+    expect(mixed(ed.state.src)).toBe(false);
+    expect(ed.state.src).toContain('\r\n\t\t<div class="col-3">B</div>');
+  });
+
+  it('deleting a column leaves no orphaned carriage return', async () => {
+    const ed = await load();
+    ed.deleteEl(ed.state.model[0]!.cols[1]!);
+    expect(mixed(ed.state.src)).toBe(false);
+  });
+
+  it('an LF document still gets LF', async () => {
+    const ed = await editor();
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply(CRLF.replace(/\r\n/g, '\n'));
+    expect(ed.state.eol).toBe('\n');
+    ed.addColToRow(ed.state.model[0]!);
+    expect(ed.state.src).not.toContain('\r');
+  });
+});

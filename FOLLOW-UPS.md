@@ -695,6 +695,42 @@ puts its chip in the row's top-edge strip, same as a hidden top-level one —
 so you can still toggle it back, but the strip doesn't show which region it
 was nested in. Only visible when an inner branch is empty/hidden; left as is.
 
+### 8.4 Inserted markup always uses `\n`, even in a CRLF document **[RESOLVED — `detectEol`]**
+
+Fixed: `detectEol(src)` sits next to `detectIndentUnit` in `core/src/edits.ts`
+(CRLF only when it's the document's actual convention — a stray CRLF in a
+mostly-LF file, or vice versa, doesn't flip it), the editor detects it per
+`apply` into `state.eol`, and all five builders join with it instead of `'\n'`.
+`elementCutRange` now takes the `\r` along with the `\n` it already swallowed,
+so a delete or a move no longer leaves the previous line ending in a lone `\r`
+— that second half was the one that actually corrupted the file rather than
+just making the diff noisy. Covered by `detectEol` unit tests, a CRLF cut-range
+test in `core/src/edits.test.ts`, and end-to-end assertions in
+`app-standalone/src/app.test.ts` that add / add-row / split / move / delete all
+leave a CRLF document with no mixed endings (and an LF document with no `\r`).
+Mostly benefits the extension, which reads the editor buffer directly and so
+sees the file's real line endings. *Original report below.*
+
+*What.* The indent unit is now detected from the document (§8.5), but the
+*line ending* still isn't: every builder in `editor/src/edits.ts` (`splitCol`,
+`addColAfter`, `addColToRow`, `addRowAfter`, and `moveCol`'s re-insert)
+hardcodes `'\n'`. In a CRLF file each inserted line therefore ends LF while
+everything around it ends CRLF.
+
+*Why it matters.* Invisible in the editor, loud in `git diff` / review, and
+some formatters will rewrite the whole file on next save. Same class of
+complaint as the tab/space one — "match the document, don't impose a style".
+The parser already asks the compiler for `preserveLineEndings: true`, so this
+is the one place the document's own convention is dropped.
+
+*Suggested direction.* Detect alongside the indent unit — `detectEol(src)`
+returning `'\r\n'` if CRLF lines outnumber LF ones, else `'\n'` — hang it on
+`state.eol` next to `state.indentUnit` (set in the same place in `apply`), and
+have the builders join with it. Cheap; the only care needed is that
+`elementCutRange`'s `cutStart` already swallows a preceding `\n` but not the
+`\r` before it, so a delete/move in a CRLF file leaves a stray `\r` — worth
+checking in the same pass.
+
 ### 8.5 Inserted markup matched neither the file's indent character nor width **[RESOLVED — `detectIndentUnit`]**
 
 Fixed: `detectIndentUnit(src)` in `core/src/edits.ts` infers one level of
