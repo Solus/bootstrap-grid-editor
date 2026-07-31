@@ -1,5 +1,33 @@
 # Change Log
 
+## Unreleased
+
+- Changed: the canvas now follows the editor by default. Undoing with Ctrl+Z,
+  saving with a formatter, switching branches — anything that changes the file
+  under the canvas — refreshes it after a short pause instead of parking it
+  until you press Resync. The old behaviour is still there: set
+  **Bootstrap Grid Visualizer › Live Sync** to off.
+- Fixed: if something else reformats the file while your edit is being applied
+  (a format-on-save, an auto-close-tag extension), the canvas now notices
+  immediately and refreshes itself. Before, it kept a stale copy of the file
+  and the *next* edit was the one that got refused — the usual reason for an
+  "out of sync" you couldn't explain.
+- Fixed: an edit that can't be applied safely no longer leaves the canvas
+  showing a change your file never got. The canvas is refreshed from the
+  editor and tells you the edit didn't land, so you can just do it again —
+  instead of being parked until you resync.
+- Fixed: when the canvas is parked (with Live Sync off) it now looks parked —
+  the header is marked and Resync is highlighted. Previously the only sign was
+  a toast that faded after a couple of seconds.
+- Fixed: moving or deleting an element whose closing tag is missing is now
+  held back, with a note saying why. The canvas can't tell where such an
+  element ends — one missing `</div>` and a delete could take the rest of the
+  file with it — and a file that doesn't parse now says so on the canvas.
+  Width and offset edits keep working, including on the unclosed element
+  itself.
+- Fixed: saving while an edit is being applied can no longer show the canvas a
+  version of the file that's about to change.
+
 ## 0.0.15
 
 - Fixed: making one canvas edit right after another — dragging a second column,

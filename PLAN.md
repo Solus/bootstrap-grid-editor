@@ -276,6 +276,18 @@ session is checked only when every box under it is.
      persist, and immediate + native undo already gives an
      experiment-then-discard workflow. Divergence (user edits under the
      canvas) is guarded; **Resync** pulls the buffer back into the canvas.
+  8. **The buffer is the only source of truth, and the canvas is pulled back
+     to it whenever they could disagree** (added after the seam hardening —
+     FOLLOW-UPS §7.4/§7.5/§9.4). Three rules follow from it: the canvas
+     *follows* an external change by default rather than parking (it holds no
+     unsaved state of its own, so following can't lose work); after each apply
+     the settled buffer is compared with what those edits describe, and
+     anything else — a formatter, another extension — resyncs the canvas
+     instead of confirming; and an edit that can't be applied resyncs too,
+     since the webview has already applied it locally and would otherwise show
+     a change the file never got. Everything in `Session` is serialised
+     through one queue, editor events included, so this ordering is a property
+     of the controller rather than of how VS Code interleaves events.
 
   *Build order:*
   - [x] Core `Edit` type + `applyEdits(src, edits)` + `classEdit`.
