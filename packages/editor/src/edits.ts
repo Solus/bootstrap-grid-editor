@@ -6,7 +6,7 @@
    the span edits are what the host adapter replays outward. */
 
 import {
-  classEdit, classTokens, effectiveAt, definingBp, elementCutRange,
+  canCutElement, classEdit, classTokens, effectiveAt, definingBp, elementCutRange,
   halveWidthTokenStr, halvedWidthTokens, rowChildIndent, setOffsetToken,
   setWidthToken, widthTokenBp,
 } from '@bootstrap-visualizer/core';
@@ -40,6 +40,25 @@ function condKey(el: El): string | null {
 }
 
 const CROSS_BRANCH_MSG = "Can't move a column across an @if branch boundary — switch to that branch first.";
+
+const UNCLOSED_MSG =
+  'This element has no closing tag, so the canvas can’t tell where it ends — ' +
+  'fix the markup and the structural edits come back. Width and offset still work.';
+
+/** Guard for the edits that act on an element's *span* (move, delete, split,
+    insert beside). When the markup didn't parse, the tolerant fallback ends an
+    unclosed element wherever it had to stop — the enclosing close tag, or EOF —
+    so cutting or inserting by that span would touch a part of the file the user
+    never saw on the canvas. Refuse those, with a reason; the class edits, whose
+    spans come from the open tag, stay available (`canCutElement`).
+
+    Every op guards *all* the elements it touches, not just the selected one: a
+    move splices at its destination as much as it cuts at its source. */
+function spansAreSafe(...els: (El | null | undefined)[]): boolean {
+  if (els.every(el => !el || canCutElement(el))) return true;
+  toast(UNCLOSED_MSG, 'warn');
+  return false;
+}
 
 /* ── quick edits (the "Effective at …" steppers) ─────────────────── */
 
@@ -115,6 +134,7 @@ export function changeOffset(node: ColNode, bp: Breakpoint, dir: number): void {
 
 export function splitCol(node: ColNode): void {
   const el = node.el;
+  if (!spansAreSafe(el)) return;      // inserts the new column at el.end
   const tokens = classTokens(el);
   const hasW = tokens.some(t => widthTokenBp(t) != null);
   let firstTokens: string[], secondClasses: string[];
@@ -140,6 +160,7 @@ export function splitCol(node: ColNode): void {
 
 export function addColAfter(node: ColNode): void {
   const el = node.el;
+  if (!spansAreSafe(el)) return;
   const { indent } = elementCutRange(state.src, el);
   const cls = conventionNewColTokens(classTokens(el), rowOfSel()).join(' ');
   const nl = state.eol;
@@ -150,8 +171,10 @@ export function addColAfter(node: ColNode): void {
 
 export function addColToRow(rowNode: RowNode): void {
   const rowEl = rowNode.el;
-  const indent = rowChildIndent(state.src, rowEl, state.indentUnit);
   const lastCol = rowNode.cols[rowNode.cols.length - 1];
+  // the insertion point is the last column's end (or inside the row's open tag)
+  if (!spansAreSafe(rowEl, lastCol?.el)) return;
+  const indent = rowChildIndent(state.src, rowEl, state.indentUnit);
   const cls = conventionNewColTokens(lastCol ? classTokens(lastCol.el) : null, rowNode).join(' ');
   const nl = state.eol;
   const html = nl + indent + '<div class="' + cls + '">' + nl +
@@ -165,6 +188,7 @@ export function addColToRow(rowNode: RowNode): void {
 
 export function addRowAfter(rowNode: RowNode): void {
   const el = rowNode.el;
+  if (!spansAreSafe(el)) return;
   const { indent } = elementCutRange(state.src, el);
   const one = indent + state.indentUnit;
   const two = one + state.indentUnit;
@@ -176,6 +200,9 @@ export function addRowAfter(rowNode: RowNode): void {
 }
 
 export function deleteEl(node: RowNode | ColNode): void {
+  // Without this, deleting an element the parser ended at EOF deletes the rest
+  // of the file — the single most destructive thing a guessed span can do.
+  if (!spansAreSafe(node.el)) return;
   const { cutStart, cutEnd } = elementCutRange(state.src, node.el);
   state.sel = null;
   applyOps([{ start: cutStart, end: cutEnd, text: '' }]);
@@ -220,6 +247,7 @@ export function nudgeRow(dir: number): void {
 function swapSiblings(
   elA: El, elB: El, selPath: NodePath, selKind: 'row' | 'col',
 ): void {
+  if (!spansAreSafe(elA, elB)) return;   // both texts are cut and re-spliced
   const [first, second] = elA.start < elB.start ? [elA, elB] : [elB, elA];
   const rFirst = elementCutRange(state.src, first);
   const rSecond = elementCutRange(state.src, second);
@@ -253,6 +281,13 @@ export function moveCol(srcPath: NodePath, dstRowPath: NodePath, dstIndex: numbe
     : condKey(dstRow.cols[dstRow.cols.length - 1]?.el ?? el);
   if (condKey(el) !== dstKey) { toast(CROSS_BRANCH_MSG, 'warn'); return; }
 
+  // the column is cut from here and spliced in beside the target — every one
+  // of those spans has to be one the parser actually read
+  const target = dstIndex < dstRow.cols.length
+    ? dstRow.cols[dstIndex]!.el
+    : dstRow.cols[dstRow.cols.length - 1]?.el;
+  if (!spansAreSafe(el, dstRow.el, target)) return;
+
   const { cutStart, cutEnd, textStart } = elementCutRange(state.src, el);
   const elText = state.src.slice(textStart, el.end);
 
@@ -260,12 +295,10 @@ export function moveCol(srcPath: NodePath, dstRowPath: NodePath, dstIndex: numbe
   const indent = rowChildIndent(state.src, dstRow.el, state.indentUnit);
   let insertAt: number;
   if (dstIndex < dstRow.cols.length) {
-    const target = dstRow.cols[dstIndex]!.el;
-    insertAt = elementCutRange(state.src, target).cutStart;
+    insertAt = elementCutRange(state.src, target!).cutStart;
   } else {
     // after the last *shown* column (active branch), not the last flattened one
-    const lastActive = dstRow.cols[dstRow.cols.length - 1];
-    insertAt = lastActive ? lastActive.el.end : dstRow.el.contentStart;
+    insertAt = target ? target.end : dstRow.el.contentStart;
   }
   // same-row same-position no-op
   if (insertAt >= cutStart && insertAt <= cutEnd) return;

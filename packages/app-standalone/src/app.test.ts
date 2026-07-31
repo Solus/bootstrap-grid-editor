@@ -508,3 +508,88 @@ describe('canvas edits keep the document’s line endings', () => {
     expect(ed.state.src).not.toContain('\r');
   });
 });
+
+describe('markup the parser had to guess at holds back the destructive edits', () => {
+  /* An unclosed element has an `end` nobody read off the source: the compiler
+     ends it at its open tag (no error reported), and the fallback parser runs
+     it to EOF. Either way a move or a delete by that span touches text the
+     canvas never drew — orphaning the columns inside it, or taking the rest of
+     the file. Those edits are refused; the class edits, whose spans come from
+     the open tag, keep working, because that is the one thing still exact. */
+
+  // no closing </div> for the row: the column is parsed *outside* the row's span
+  const OPEN_ROW = '<div class="row">\n  <div class="col-6">A</div>\n  <div class="col-3">B</div>';
+
+  const load = async () => {
+    const ed = await editor();
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply(OPEN_ROW);
+    return ed;
+  };
+
+  it('the row really is the unclosed one (the premise of these cases)', async () => {
+    const ed = await load();
+    expect(ed.state.model[0]!.el.unclosed).toBe(true);
+    expect(ed.state.model[0]!.cols.every(c => !c.el.unclosed)).toBe(true);
+  });
+
+  it('deleting an unclosed row is refused, and the source is untouched', async () => {
+    const ed = await load();
+    ed.deleteEl(ed.state.model[0]!);
+    expect(ed.state.src).toBe(OPEN_ROW);
+  });
+
+  it('adding a row after an unclosed row is refused', async () => {
+    const ed = await load();
+    ed.addRowAfter(ed.state.model[0]!);
+    expect(ed.state.src).toBe(OPEN_ROW);
+  });
+
+  it('adding a column into an unclosed row is refused', async () => {
+    const ed = await load();
+    ed.addColToRow(ed.state.model[0]!);
+    expect(ed.state.src).toBe(OPEN_ROW);
+  });
+
+  it('the columns inside it are still fully editable', async () => {
+    // the guard is per element, not per file: these closed properly, so their
+    // spans are exact and every edit on them is safe
+    const ed = await load();
+    ed.splitCol(ed.state.model[0]!.cols[0]!);
+    expect(ed.state.src).toContain('<!-- new column -->');
+    expect(ed.state.src).toContain('class="col-3"');
+  });
+
+  it('a width edit on the unclosed element itself still applies', async () => {
+    // its class attribute span was read straight off the open tag — the one
+    // part of an unclosed element the parser did see. So the stepper works on
+    // a column you're in the middle of typing; only cutting it is held back.
+    const ed = await editor();
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply('<div class="row">\n  <div class="col-3">B');
+    const col = ed.state.model[0]!.cols[0]!;
+    expect(col.el.unclosed).toBe(true);
+    ed.quickWidth(col, +1);
+    expect(ed.state.src).toContain('class="col-4"');
+
+    // …but deleting that same column is not
+    const before = ed.state.src;
+    ed.deleteEl(ed.state.model[0]!.cols[0]!);
+    expect(ed.state.src).toBe(before);
+  });
+
+  it('the canvas says the file did not parse', async () => {
+    const ed = await editor();
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    // a closing tag matching nothing open → the tolerant fallback's tree
+    ed.apply('<div class="row"><div class="col-6"><span>x</div></div>');
+    expect(ed.state.root!.degraded).toBe(true);
+    expect(document.querySelector('.parse-degraded')).not.toBeNull();
+
+    ed.apply('<div class="row"><div class="col-6">x</div></div>');
+    expect(document.querySelector('.parse-degraded')).toBeNull();
+  });
+});
