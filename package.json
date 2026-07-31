@@ -11,8 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run test:e2e -w @bootstrap-visualizer/app-standalone",
-    "test:all": "npm run test && npm run test:e2e",
-    "typecheck": "tsc -b && tsc -p packages/core/tsconfig.spec.json && tsc -p packages/editor/tsconfig.json && tsc -p packages/app-standalone/tsconfig.json && tsc -p packages/app-standalone/tsconfig.e2e.json && tsc -p packages/app-extension/tsconfig.host.json && tsc -p packages/app-extension/tsconfig.webview.json"
+    "test:vscode": "npm run test:vscode -w bootstrap-visualizer-extension",
+    "test:all": "npm run test && npm run test:e2e && npm run test:vscode",
+    "typecheck": "tsc -b && tsc -p packages/core/tsconfig.spec.json && tsc -p packages/editor/tsconfig.json && tsc -p packages/app-standalone/tsconfig.json && tsc -p packages/app-standalone/tsconfig.e2e.json && tsc -p packages/app-extension/tsconfig.host.json && tsc -p packages/app-extension/tsconfig.webview.json && tsc -p packages/app-extension/tsconfig.integration.json"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

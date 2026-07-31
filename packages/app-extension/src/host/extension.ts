@@ -9,8 +9,8 @@
    Undo is the editor's native undo. */
 
 import * as vscode from 'vscode';
-import type { ConfigWire, WebviewMessage } from '../shared/protocol.js';
-import { Session } from './session.js';
+import type { ConfigWire, HostMessage, WebviewMessage } from '../shared/protocol.js';
+import { Session, type SessionPorts } from './session.js';
 
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
@@ -75,37 +75,22 @@ function createCanvas(context: vscode.ExtensionContext, initial: vscode.TextEdit
   panel.webview.html = getWebviewHtml(panel.webview, context.extensionUri);
 
   // All sync state/decisions live in Session; this wires VS Code to its ports.
-  const session = new Session({
-    post: msg => void panel.webview.postMessage(msg),
-    reveal: (start, end) => revealInEditor(doc, start, end),
-    applyEdit: async edits => {
-      const edit = new vscode.WorkspaceEdit();
-      for (const e of edits) {
-        edit.replace(doc.uri, new vscode.Range(doc.positionAt(e.start), doc.positionAt(e.end)), e.text);
-      }
-      return vscode.workspace.applyEdit(edit);
-    },
-    docText: () => doc.getText(),
-    warn: message => void vscode.window.showWarningMessage(message),
-    config: readConfig,
-    setConfig: (pref, value) => {
-      const key = pref === 'stretchSheet' ? 'stretchToFit' : 'tintOverfullRows';
-      void vscode.workspace.getConfiguration('bootstrapVisualizer')
-        .update(key, value, vscode.ConfigurationTarget.Global);
-    },
-  });
+  const session = new Session(createSessionPorts(
+    () => doc, msg => void panel.webview.postMessage(msg)));
 
   const disposables: vscode.Disposable[] = [];
 
   // Cancel any pending live-sync refresh when the panel goes away.
   disposables.push({ dispose: () => session.dispose() });
 
+  // Both handlers are fire-and-forget: Session queues the work and owns the
+  // ordering (its `enqueue`), so nothing here needs to wait for it.
   disposables.push(vscode.workspace.onDidSaveTextDocument(saved => {
-    if (saved === doc) session.onSave();
+    if (saved === doc) void session.onSave();
   }));
 
   disposables.push(vscode.workspace.onDidChangeTextDocument(ev => {
-    if (ev.document === doc) session.onDocChange();
+    if (ev.document === doc) void session.onDocChange();
   }));
 
   disposables.push(vscode.window.onDidChangeTextEditorSelection(ev => {
@@ -128,8 +113,41 @@ function createCanvas(context: vscode.ExtensionContext, initial: vscode.TextEdit
     panel,
     bind(editor) {
       doc = editor.document;       // re-point every port/listener at once
-      session.reload();            // resend the new file's source, reset sync
+      void session.reload();       // resend the new file's source, reset sync
       panel.reveal();              // bring the canvas to front, focused
+    },
+  };
+}
+
+/** Everything a `Session` needs from VS Code, in one place.
+
+    `doc()` is called per use rather than captured, so a panel re-pointed at
+    another file re-points every port at once. Exported because it *is* the
+    edits-out seam — the integration suite drives the real thing through this
+    factory (a real `TextDocument`, a real `WorkspaceEdit`) instead of
+    re-describing how offsets reach the buffer and risking that its copy is the
+    one that's right. */
+export function createSessionPorts(
+  doc: () => vscode.TextDocument, post: (msg: HostMessage) => void,
+): SessionPorts {
+  return {
+    post,
+    reveal: (start, end) => revealInEditor(doc(), start, end),
+    applyEdit: async edits => {
+      const d = doc();
+      const edit = new vscode.WorkspaceEdit();
+      for (const e of edits) {
+        edit.replace(d.uri, new vscode.Range(d.positionAt(e.start), d.positionAt(e.end)), e.text);
+      }
+      return vscode.workspace.applyEdit(edit);
+    },
+    docText: () => doc().getText(),
+    warn: message => void vscode.window.showWarningMessage(message),
+    config: readConfig,
+    setConfig: (pref, value) => {
+      const key = pref === 'stretchSheet' ? 'stretchToFit' : 'tintOverfullRows';
+      void vscode.workspace.getConfiguration('bootstrapVisualizer')
+        .update(key, value, vscode.ConfigurationTarget.Global);
     },
   };
 }

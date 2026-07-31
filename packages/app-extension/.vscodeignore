@@ -4,8 +4,11 @@ src/**
 examples/**
 releases/**
 node_modules/**
+test-integration/**
+dist/test-integration/**
 .vscode/**
 .vscode-test/**
+.vscode-test.mjs
 tsconfig*.json
 vite.config.ts
 **/*.map
