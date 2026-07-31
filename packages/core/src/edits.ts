@@ -58,6 +58,22 @@ export function writeClass(src: string, el: El, newTokens: string[]): string {
   return applyEdits(src, [classEdit(src, el, newTokens)]);
 }
 
+/** May this element be moved, deleted, or otherwise edited *by its span*?
+
+    Rewriting a class attribute is always safe: its value span is read straight
+    off the open tag, which the parser saw in full. Cutting an element is not —
+    it trusts `el.end`, and for an unclosed element that is wherever the parser
+    had to stop (its parent's close tag, or the end of the file). Moving such an
+    element would carry along everything the canvas never drew, and deleting it
+    would take the rest of the document with it.
+
+    Only the element's own span matters: a *descendant* with a guessed end is
+    carried as text either way, and an unclosed *ancestor* doesn't make this
+    element's own tags any less real. */
+export function canCutElement(el: El): boolean {
+  return !el.unclosed;
+}
+
 /** Range of `el` including its leading indentation and any title comments
     directly above it, so moves and deletes carry the label along. */
 export function elementCutRange(src: string, el: El): CutRange {
