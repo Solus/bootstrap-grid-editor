@@ -7,10 +7,10 @@
 
    Sync model (PLAN.md §3/§6): the editor document is the source of truth. The
    canvas renders it; canvas edits apply to the buffer as workspace edits. On
-   save the canvas refreshes. If the user edits the document under the canvas,
-   the webview is told it diverged — unless the `liveSync` setting is on, in
-   which case the canvas instead refreshes from the (dirty) buffer after a short
-   debounce (see `onDocChange`).
+   save the canvas refreshes. If the user edits the document under the canvas
+   the canvas follows it after a short debounce (`liveSync`, on by default) —
+   with that setting off, the webview is told it diverged and parks instead
+   (see `onDocChange`).
 
    "In sync" is decided by *content*, not by `doc.version` (see `syncedText`).
    Versions only count that something happened, never what: they can't tell our
@@ -18,8 +18,20 @@
    and advancing one in step with VS Code means guessing how many it bumps per
    `applyEdit` — a guess that was wrong for multi-edit batches (a column drag)
    and refused the next canvas edit as a false divergence. Comparing the buffer
-   to the text the canvas last agreed with answers the actual question. */
+   to the text the canvas last agreed with answers the actual question.
 
+   Two invariants hold the seam together, and every method here exists to keep
+   one of them true:
+   1. **The canvas never shows what the file doesn't have.** Every path that
+      ends without the canvas's edit in the buffer — refused, failed, or
+      applied into a buffer that settled differently — pulls the canvas back
+      to the buffer (`sendSource`). The webview applies its edit locally the
+      moment it posts it, so anything less would leave a phantom on screen.
+   2. **Everything that touches sync state is serialised** (`enqueue`), editor
+      events included. Ordering is then a property of the controller rather
+      than of how VS Code happens to interleave events with our own awaits. */
+
+import { applyEdits } from '@bootstrap-visualizer/core/edits';
 import type { Edit } from '@bootstrap-visualizer/core';
 import type { ConfigWire, HostMessage, WebviewMessage } from '../shared/protocol.js';
 
@@ -37,13 +49,22 @@ export interface SessionPorts {
   setConfig(pref: 'stretchSheet' | 'tintOverfull', value: boolean): void;
 }
 
+/** Shown on the canvas when an edit is refused. It names what happened to the
+    edit (it didn't land) and what was done about it (the canvas now shows the
+    file again) — the user's next action is simply to redo it, not to hunt for
+    a Resync button. */
 export const OUT_OF_SYNC =
-  'The canvas is out of sync with the editor — Resync (or save) first.';
+  'That edit didn’t fit the file as it now reads — the canvas has been ' +
+  'refreshed from the editor. Try it again.';
 export const APPLY_FAILED = 'Could not apply the canvas edit.';
 
 export class Session {
-  /** Our own buffer edits must not read as user divergence. */
-  private applying = false;
+  /** How many canvas edits are mid-apply. A counter, not a flag: a second
+      edit's `finally` must not clear the state while the first is still in
+      flight (it would let our own buffer change read as user divergence).
+      With `enqueue` serialising everything it stays 0 or 1 today, but the
+      counter is what makes that a fact rather than an assumption. */
+  private applyDepth = 0;
   /** The span the canvas last asked us to reveal. Setting the editor
       selection to it echoes a selection change; that echo must not bounce
       back as a caret move (the caret lands on the element's exclusive end,
@@ -54,23 +75,29 @@ export class Session {
       lands. Anything else in the buffer means the user changed it under us.
       `null` until the first send (nothing to compare against yet). */
   private syncedText: string | null = null;
-  /** Serializes message handling. `onDidReceiveMessage` in extension.ts is
-      fire-and-forget — VS Code doesn't wait for one message's handler to
-      finish before delivering the next. Without this queue, two canvas
-      edits fired back-to-back (e.g. clicking "Add column" twice, or two
-      drags) would both start `applyCanvasEdits` concurrently, and the second
-      would read the buffer before the first's `await ports.applyEdit(...)`
-      landed — so it looked out of sync and got refused (issue #1). Chaining
-      through this queue makes each message wait for the previous one's full
-      effect (including the buffer write) before the next is handled. */
+  /** Serializes everything that reads or writes sync state. `onDidReceiveMessage`
+      in extension.ts is fire-and-forget — VS Code doesn't wait for one message's
+      handler to finish before delivering the next. Without this queue, two canvas
+      edits fired back-to-back (e.g. clicking "Add column" twice, two drags, or
+      one key-repeat on the width stepper) would both start `applyCanvasEdits`
+      concurrently, and the second would read the buffer before the first's
+      `await ports.applyEdit(...)` landed — so it looked out of sync and got
+      refused (issue #1).
+
+      The editor-side events (`onSave`, `onDocChange`, the live-sync timer) go
+      through the same queue, not just webview messages: a save landing while an
+      apply is mid-flight used to resend a buffer that was about to change,
+      racing the apply (FOLLOW-UPS §9.4). Queued, it simply runs after and sends
+      the settled text. */
   private queue: Promise<void> = Promise.resolve();
   /** Whether the canvas is currently known to be diverged from the buffer.
       Tracked so we post `diverged` only on the false→true edge: the editor
       fires a change per keystroke, and re-posting on each one made the webview
       re-toast "Resync" on every character typed (the "asks too often"
       friction). Cleared whenever we resend the source (save / discard / reload
-      / failed-apply), which is exactly when the webview drops its own diverged
-      state. */
+      / a refused or drifted edit), which is exactly when the webview drops its
+      own diverged state. Only reachable with `liveSync` off — with it on, an
+      external change refreshes the canvas instead of parking it. */
   private diverged = false;
   /** Pending debounced live-sync refresh (see `onDocChange`). */
   private liveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -84,18 +111,28 @@ export class Session {
 
       Two behaviours, chosen by the `liveSync` setting (read live so toggling it
       takes effect without reopening):
-      - off (default): park the canvas — mark it diverged and let the user save
-        or Resync. Safe and quiet, but blocks canvas edits meanwhile.
-      - on: keep the canvas following the editor — debounce, then resend the
-        (possibly dirty) source so the canvas refreshes. The tolerant parser and
-        `apply()`'s last-good-view guard keep a half-typed buffer from breaking
-        the canvas, and the edit context guards still refuse a canvas edit that
-        races an un-synced change. */
-  onDocChange(): void {
-    // Mid-apply the buffer passes through intermediate states (VS Code can fire
-    // a change per text edit in one batch) — those aren't ours to react to; the
-    // apply itself records the settled text.
-    if (this.applying) return;
+      - on (default): keep the canvas following the editor — debounce, then
+        resend the (possibly dirty) source so the canvas refreshes. The canvas
+        holds no unsaved state of its own — every canvas edit goes straight to
+        the buffer — so following it can never cost the user work, and the
+        editor's own undo stops parking the canvas every time. The tolerant
+        parser and `apply()`'s last-good-view guard keep a half-typed buffer
+        from breaking the canvas, and the edit guards still refuse a canvas
+        edit that races an un-synced change.
+      - off: park the canvas — mark it diverged and let the user save or
+        Resync. Quieter while someone types under the canvas, at the cost of
+        blocking canvas edits meanwhile.
+
+      Like the other editor-event entry points, this returns the queued turn so
+      a caller can wait for it (the tests do); extension.ts fires and forgets. */
+  onDocChange(): Promise<void> {
+    // Queued, so a change fired *during* our own apply (VS Code emits one per
+    // text edit in a batch) is handled after that apply has recorded the
+    // settled text — at which point it reads as ours and not as divergence.
+    return this.enqueue(() => this.handleDocChange());
+  }
+
+  private handleDocChange(): void {
     if (this.ports.docText() === this.syncedText) {
       // The buffer holds exactly what the canvas has: our own write, or a user
       // edit typed and undone back to the same text. Not a divergence — and if
@@ -108,15 +145,14 @@ export class Session {
     this.markDiverged();
   }
 
-  /** Debounce a live-sync refresh, collapsing a typing burst into one resend. */
+  /** Debounce a live-sync refresh, collapsing a typing burst into one resend.
+      The resend is queued like everything else, so one landing on top of an
+      in-flight canvas edit sends the settled buffer rather than racing it. */
   private scheduleLiveResync(): void {
     if (this.liveTimer) clearTimeout(this.liveTimer);
     this.liveTimer = setTimeout(() => {
       this.liveTimer = null;
-      // A canvas edit is mid-flight — its own apply keeps things in step; retry
-      // after it lands so the refresh reflects the final buffer.
-      if (this.applying) { this.scheduleLiveResync(); return; }
-      this.sendSource(true);   // refresh from the buffer, keeping the selection
+      void this.enqueue(() => this.sendSource(true));   // keep the selection
     }, Session.LIVE_DEBOUNCE);
   }
 
@@ -131,17 +167,19 @@ export class Session {
   /** The document was saved → refresh the canvas from source, keeping the
       selection where its path still resolves (a save shouldn't cost you the
       column you had selected). */
-  onSave(): void {
-    this.sendSource(true);
+  onSave(): Promise<void> {
+    return this.enqueue(() => this.sendSource(true));
   }
 
   /** Re-point at the bound document (which a reused panel may have just
       swapped for a different one): drop transient sync state and resend the
-      source, so the canvas shows the new file cleanly. */
-  reload(): void {
-    this.applying = false;
-    this.revealed = null;
-    this.sendSource();
+      source, so the canvas shows the new file cleanly. Queued, so an edit
+      still in flight against the previous document settles first. */
+  reload(): Promise<void> {
+    return this.enqueue(() => {
+      this.revealed = null;
+      this.sendSource();
+    });
   }
 
   /** The editor selection moved to these offsets (start/end of the range and
@@ -151,7 +189,7 @@ export class Session {
     // the editor caret, which fires this event. That's our own side effect,
     // not the user moving the caret — ignore it, or it would bounce back as a
     // selectAt and deselect what the canvas just acted on.
-    if (this.applying) return;
+    if (this.applyDepth > 0) return;
     if (this.revealed && this.revealed.start === start && this.revealed.end === end) {
       this.revealed = null;       // swallow the echo of our own reveal
       return;
@@ -159,15 +197,21 @@ export class Session {
     this.ports.post({ type: 'selectAt', offset: active });
   }
 
-  /** Queue this message behind any still-in-flight ones (see `queue`), then
+  /** Queue this message behind any still-in-flight work (see `queue`), then
       handle it. Returns the settled handling promise, not the queue chain
       itself, so a later caller awaiting a specific message doesn't hang on
-      whatever comes after it — and one message's failure never wedges the
-      queue for the rest. */
+      whatever comes after it. */
   onMessage(msg: WebviewMessage): Promise<void> {
-    const turn = this.queue.then(() => this.handle(msg));
-    this.queue = turn.then(() => undefined, () => undefined);
-    return turn;
+    return this.enqueue(() => this.handle(msg));
+  }
+
+  /** Run `turn` after everything already queued. The chain itself swallows
+      failures, so one turn throwing never wedges the queue for the rest;
+      the returned promise still rejects for whoever awaited that turn. */
+  private enqueue(turn: () => void | Promise<void>): Promise<void> {
+    const done = this.queue.then(turn);
+    this.queue = done.then(() => undefined, () => undefined);
+    return done;
   }
 
   private async handle(msg: WebviewMessage): Promise<void> {
@@ -195,10 +239,13 @@ export class Session {
   }
 
   /** Resend the buffer to the canvas — a full resync. `keepSelection` is set
-      only by a live-sync refresh, so the canvas keeps its selection where the
-      path still resolves; save / discard / reload / load leave it unset and the
-      canvas starts fresh. */
-  private sendSource(keepSelection = false): void {
+      by every resync that happens *under* the user (live refresh, save, a
+      refused or drifted edit), so they don't lose the column they were working
+      on; discard / reload / load leave it unset and the canvas starts fresh.
+      `notice` is toasted on the canvas once the new source is in — set it for
+      a resync the user needs to know about (their edit didn't land), leave it
+      unset for one that just keeps the canvas honest. */
+  private sendSource(keepSelection = false, notice?: string): void {
     // Any immediate resend supersedes a pending live-sync one.
     if (this.liveTimer) { clearTimeout(this.liveTimer); this.liveTimer = null; }
     // Resending the source is exactly a resync: the webview clears its diverged
@@ -207,9 +254,10 @@ export class Session {
     this.diverged = false;
     const text = this.ports.docText();
     this.syncedText = text;      // this is now what the canvas agrees with
-    this.ports.post(keepSelection
-      ? { type: 'setSource', text, keepSelection: true }
-      : { type: 'setSource', text });
+    const msg: Extract<HostMessage, { type: 'setSource' }> = { type: 'setSource', text };
+    if (keepSelection) msg.keepSelection = true;
+    if (notice) msg.notice = notice;
+    this.ports.post(msg);
   }
 
   /** Cancel any pending live-sync refresh (panel closing / re-pointing). */
@@ -224,8 +272,7 @@ export class Session {
     // and every offset here may be stale. (`syncedText` is null only before the
     // first send — nothing to compare against, so let the guards below decide.)
     if (this.syncedText != null && text !== this.syncedText) {
-      this.markDiverged();
-      this.ports.warn(OUT_OF_SYNC);
+      this.refuse();
       return;
     }
     // Second line of defence against a silent offset desync: applying by raw
@@ -239,22 +286,40 @@ export class Session {
       (e.before != null && text.substring(e.start - e.before.length, e.start) !== e.before) ||
       (e.after != null && text.substring(e.end, e.end + e.after.length) !== e.after));
     if (misplaced) {
-      this.markDiverged();
-      this.ports.warn(OUT_OF_SYNC);
+      this.refuse();
       return;
     }
-    this.applying = true;
+    // What the buffer should read once these edits land — the same batch
+    // applied to the same base text, so this is exactly the source the canvas
+    // now holds. Computed *before* the apply, while `text` is still the base.
+    const predicted = applyEdits(text, edits);
+    this.applyDepth++;
     try {
       const ok = await this.ports.applyEdit(edits);
-      if (ok) {
-        // Read the settled buffer back rather than assuming our edits produced
-        // it — this is what the next canvas edit is checked against.
-        this.syncedText = this.ports.docText();
-        this.ports.post({ type: 'applied' });
-      }
-      else { this.ports.warn(APPLY_FAILED); this.sendSource(); }
+      if (!ok) { this.ports.warn(APPLY_FAILED); this.sendSource(true); return; }
+      // Read the settled buffer back rather than assuming our edits produced
+      // it. If something else rewrote the document alongside our edit — a
+      // formatter, auto-close-tag, another extension reacting to the
+      // WorkspaceEdit — the buffer and the canvas now hold different text, and
+      // every offset the canvas computes next is stale. That drift used to go
+      // unnoticed until some later edit was refused by the `old`/context guard
+      // (FOLLOW-UPS §7.5); catching it here keeps the two in step instead, with
+      // nothing for the user to do.
+      const settled = this.ports.docText();
+      if (settled !== predicted) { this.sendSource(true); return; }
+      this.syncedText = settled;
+      this.ports.post({ type: 'applied' });
     } finally {
-      this.applying = false;
+      this.applyDepth--;
     }
+  }
+
+  /** An edit that can't be applied safely: say so on the canvas and pull it
+      back to the buffer. The webview has already applied that edit locally, so
+      resending is what stops the canvas showing a change the file never got
+      (invariant 1) — and it leaves the canvas editable again, rather than
+      parked until the user finds Resync. */
+  private refuse(): void {
+    this.sendSource(true, OUT_OF_SYNC);
   }
 }

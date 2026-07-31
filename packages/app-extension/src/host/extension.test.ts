@@ -302,22 +302,26 @@ describe('event routing is filtered to the panel document', () => {
       { type: 'setSource', text: '<div class="row"></div>' }));
   });
 
-  it('a save of this document refreshes the canvas; another does not', () => {
+  // Editor events are queued inside Session (it owns the ordering), so the
+  // post lands a microtask later — hence waitFor rather than a bare assert.
+  it('a save of this document refreshes the canvas; another does not', async () => {
     const doc = makeDoc('<p>x</p>');
     const { panel } = openWith(doc);
     M.saves.fire(makeDoc('<p>other</p>'));
-    expect(panel.posts.filter(p => p.type === 'setSource')).toHaveLength(0);
     M.saves.fire(doc);
-    expect(panel.posts.filter(p => p.type === 'setSource')).toHaveLength(1);
+    await vi.waitFor(() =>
+      expect(panel.posts.filter(p => p.type === 'setSource')).toHaveLength(1));
   });
 
-  it('a buffer change of this document flags divergence; another does not', () => {
+  it('a buffer change of this document flags divergence; another does not', async () => {
     const doc = makeDoc('<p>x</p>');
+    // divergence is the liveSync-off behaviour; with it on the canvas refreshes
+    M.config.set('liveSync', false);
     const { panel } = openWith(doc);
     M.changes.fire({ document: makeDoc('<p>other</p>') });
-    expect(panel.posts.filter(p => p.type === 'diverged')).toHaveLength(0);
     M.changes.fire({ document: doc });
-    expect(panel.posts.filter(p => p.type === 'diverged')).toHaveLength(1);
+    await vi.waitFor(() =>
+      expect(panel.posts.filter(p => p.type === 'diverged')).toHaveLength(1));
   });
 
   it('a caret move in this document selects at its offset; another does not', () => {
@@ -412,7 +416,7 @@ function runOpenOn(doc: ReturnType<typeof makeDoc>) {
 }
 
 describe('one reusable panel', () => {
-  it('opening again re-points the single panel at the new file', () => {
+  it('opening again re-points the single panel at the new file', async () => {
     const docA = makeDoc('<p>A</p>');
     const { panel } = openWith(docA);
     panel.receive({ type: 'ready' });
@@ -424,15 +428,17 @@ describe('one reusable panel', () => {
     expect(M.panels.length).toBe(1);          // no second panel spawned
     expect(panel.revealCount()).toBe(1);      // the canvas is brought to front
     // the canvas now shows docB
-    expect(panel.posts).toContainEqual(
-      { type: 'setSource', text: '<div class="row">B</div>' });
+    await vi.waitFor(() => expect(panel.posts).toContainEqual(
+      { type: 'setSource', text: '<div class="row">B</div>' }));
 
     // routing now follows docB and no longer docA
     const n = panel.posts.filter(p => p.type === 'setSource').length;
     M.saves.fire(docA);
-    expect(panel.posts.filter(p => p.type === 'setSource').length).toBe(n);       // old file: ignored
     M.saves.fire(docB);
-    expect(panel.posts.filter(p => p.type === 'setSource').length).toBe(n + 1);   // new file: refreshes
+    await vi.waitFor(() =>
+      expect(panel.posts.filter(p => p.type === 'setSource').length).toBe(n + 1));
+    // the old file's save was ignored — only docB's resend arrived
+    expect(panel.posts.filter(p => p.type === 'setSource').length).toBe(n + 1);
   });
 
   it('after the panel is closed, opening builds a fresh one', () => {

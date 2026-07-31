@@ -15,9 +15,10 @@ export interface ConfigWire {
   stretchSheet?: boolean;
   tintOverfull?: boolean;
   dialect?: 'bootstrap5' | 'bootstrap3';
-  /** Host-side behaviour (not a webview render setting): when true, an external
-      editor edit refreshes the canvas after a short debounce instead of parking
-      it until save. Read by the `Session`, not the webview. */
+  /** Host-side behaviour (not a webview render setting): when true (the shipped
+      default), an external editor edit refreshes the canvas after a short
+      debounce instead of parking it until save. Read by the `Session`, not the
+      webview. */
   liveSync?: boolean;
 }
 
@@ -26,14 +27,20 @@ export type HostMessage =
   /** The user's settings, sent once before the first setSource so the canvas
       opens with them applied. */
   | { type: 'config'; config: ConfigWire }
-  /** Full document text — sent on open, on save, and (with liveSync) on a
-      debounced external edit. Clears divergence. `keepSelection` (live-sync
-      refreshes only) tells the canvas to keep its selection where the path
-      still resolves instead of clearing it. */
-  | { type: 'setSource'; text: string; keepSelection?: boolean }
-  /** A canvas edit reached the buffer. The webview already has the edited
-      source locally, so this is only a confirmation (it drives the one-time
-      "press Ctrl+S" cue) — the host tracks what's in sync, not the webview. */
+  /** Full document text — sent on open, on save, on a debounced external
+      edit, and whenever the canvas has to be pulled back to the buffer (a
+      refused edit, or a buffer that settled differently from what the canvas
+      predicted). Clears divergence. `keepSelection` tells the canvas to keep
+      its selection where the path still resolves instead of clearing it;
+      `notice` is a message to toast once the new source is in, for a resync
+      the user should know about (an edit that didn't land). A silent resync
+      leaves it unset. */
+  | { type: 'setSource'; text: string; keepSelection?: boolean; notice?: string }
+  /** A canvas edit reached the buffer *and* the buffer settled on exactly the
+      text those edits describe, so this is only a confirmation (it drives the
+      one-time "press Ctrl+S" cue). When the buffer settled on something else —
+      a formatter or another extension rewrote it alongside our edit — the host
+      sends `setSource` instead, so the canvas can never drift from the file. */
   | { type: 'applied' }
   /** The document changed underneath the canvas (the user edited the editor).
       The webview guards further canvas edits until a save or a discard. */

@@ -32,6 +32,9 @@ export function createWebviewHost(
       // Only canvas edits (edits != null) leave; a full-document replace comes
       // from setSource itself, not from the canvas.
       if (!edits) return;
+      // The batch alone is enough: the host applies the same edits to the same
+      // base text it agreed with, so it can predict what the buffer should read
+      // and check that against what it actually settled on.
       post({ type: 'applyEdits', edits });
     },
 
