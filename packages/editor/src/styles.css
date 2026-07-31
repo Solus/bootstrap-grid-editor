@@ -376,6 +376,25 @@ details.insp-details .insp-title{margin-top:6px}
 .toast.show{display:block}
 .toast.warn{color:var(--amber); border-color:rgba(255,180,84,.5)}
 
+/* ── Out-of-sync state (extension, with live sync turned off) ──────
+   The canvas is showing a file the editor has since changed, and canvas edits
+   are held until it resyncs. That has to stay legible after the toast fades —
+   the state outlives the message. A stripe under the header marks the whole
+   canvas as stale, and the Resync button becomes the obvious way out. */
+body.diverged header{
+  border-bottom-color:var(--amber);
+  box-shadow:inset 0 -2px 0 0 var(--amber);
+}
+body.diverged #resyncBtn{
+  background:var(--amber); border-color:var(--amber); color:#211605; font-weight:600;
+}
+body.diverged #resyncBtn:hover{background:#ffc271}
+body.diverged #resyncBtn::after{
+  content:" — editor changed";
+  font-weight:400;
+}
+body.diverged .pane-canvas{opacity:.72}
+
 /* find field */
 #findBox{
   width:160px; background:var(--ink); border:1px solid var(--line); border-radius:4px;

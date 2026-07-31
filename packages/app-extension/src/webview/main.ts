@@ -49,6 +49,10 @@ window.addEventListener('message', (e: MessageEvent<HostMessage>) => {
       // refresh sets keepSelection so the canvas holds its selection where the
       // path still resolves (apply nulls it only if it no longer does).
       apply(msg.text, { keepSel: msg.keepSelection ?? false, fromSource: true });
+      // A resync the user should know about (an edit that didn't land) says so
+      // *after* the canvas is showing the buffer again, so the message and what
+      // they're looking at agree. A silent refresh carries no notice.
+      if (msg.notice) toast(msg.notice, 'warn');
       break;
     case 'applied':
       if (firstEdit) {              // gentle one-time reminder that it's unsaved

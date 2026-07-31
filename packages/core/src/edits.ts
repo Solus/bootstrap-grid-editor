@@ -3,7 +3,15 @@
    Every operation here changes the smallest span that can express the
    change — a class attribute's value, or an element's text with its
    adjacent title comment. The document is never regenerated: the user's
-   source is preserved byte-for-byte outside the edited span. */
+   source is preserved byte-for-byte outside the edited span.
+
+   This module is also published as its own entry point
+   (`@bootstrap-visualizer/core/edits`) so the extension's **Node host** can
+   reuse `applyEdits` — it predicts what the buffer should read after its own
+   workspace edits — without importing the package index, which reaches the
+   parser and would pull `@angular/compiler` into a bundle that has no use
+   for it (16 kB → 940 kB, measured). Nothing here touches the parser, so the
+   subpath stays dependency-free. */
 
 import { getAttr } from './classes.js';
 import { precedingCommentRange } from './titles.js';
