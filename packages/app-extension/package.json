@@ -112,12 +112,17 @@
     "build:host": "esbuild src/host/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/host/extension.js --sourcemap",
     "watch:host": "npm run build:host -- --watch",
     "build": "npm run build:webview && npm run build:host",
+    "build:tests": "tsc -b ../core && esbuild test-integration/buffer-seam.test.ts --bundle --platform=node --format=cjs --external:vscode --external:mocha --outfile=dist/test-integration/buffer-seam.test.cjs --sourcemap",
+    "test:vscode": "npm run build && npm run build:tests && vscode-test",
     "vsix": "npm run build && npx @vscode/vsce package --no-dependencies --out releases/"
   },
   "devDependencies": {
     "@bootstrap-visualizer/core": "*",
     "@bootstrap-visualizer/editor": "*",
+    "@types/mocha": "^10.0.10",
     "@types/vscode": "^1.96.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
     "esbuild": "^0.24.0",
     "vite": "^5.4.0"
   }
