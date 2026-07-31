@@ -32,11 +32,16 @@ npm run dev     # Vite dev server for the standalone app → http://localhost:51
 ## Test
 
 ```sh
-npm test          # Vitest unit + jsdom boot tests (packages/*/src/**/*.test.ts)
-npm run test:e2e  # Playwright browser tests (needs: npx playwright install chromium)
-npm run test:all  # both
-npm run typecheck # tsc across core, its specs, the app, and the e2e specs
+npm test            # Vitest unit + jsdom boot tests (packages/*/src/**/*.test.ts)
+npm run test:e2e    # Playwright browser tests (needs: npx playwright install chromium)
+npm run test:vscode # the extension's edits against a real VS Code buffer
+npm run test:all    # all three
+npm run typecheck   # tsc across core, its specs, the app, and the e2e specs
 ```
+
+`test:vscode` downloads VS Code on first run (cached in `.vscode-test/`) and
+launches it, so it needs network access and a display — on a headless machine
+run it under `xvfb-run -a`, as CI does.
 
 `npm test` passing does **not** imply the tree typechecks — run `typecheck`
 separately (it is not part of the test command).

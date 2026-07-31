@@ -64,6 +64,13 @@ file is the durable record we review and implement from later.
   pass; if behavior genuinely changes, discuss it first.
 - New behavior comes with new tests in the same change.
 - Run the relevant package's tests before considering a change done.
+- Three layers, and they answer different questions: `npm test` (Vitest,
+  incl. the jsdom app boot), `npm run test:e2e` (Playwright — the
+  interactive surface), and `npm run test:vscode` (a real VS Code, via
+  `@vscode/test-electron` — the only layer where canvas offsets meet a
+  real editor buffer). `npm run test:all` runs all three. The VS Code
+  layer downloads VS Code on first run, so it needs network and a
+  display (CI runs it under `xvfb-run`).
 
 ## Commits
 - **Never commit without an explicit request from the maintainer.** Not
@@ -108,8 +115,20 @@ output and discussing — not by guessing and building on the guess.
 Sessions 1–3 are complete and released (v0.0.1 → v0.0.6): shared-core
 library, parser on `@angular/compiler`, and the VS Code extension with
 CI/CD. `@if`/`@else`/`@else if` and `*ngIf` are now first-class
-toggleable conditional regions (in-row, in-column, and top-level). The
-FOLLOW-UPS `[decide]`/`[verify]` backlog is cleared. Next up (not
-started): Session 4 enrichment — resolving i18n keys, component tags,
-and `formControlName` from the user's project — deferred by choice for
-now in favour of HTML-only work.
+toggleable conditional regions (in-row, in-column, and top-level).
+
+Since then, a robustness pass over canvas editing (unreleased): the
+extension's canvas↔buffer seam can no longer drift (the settled buffer is
+compared with what the edits describe), refused edits resync instead of
+parking, the whole `Session` is serialised, the canvas follows the editor
+by default, and structural edits refuse an element whose closing tag the
+parser never found. This closed FOLLOW-UPS §7.4/§7.5/§9.4 and added
+§3.5/§10/§11 — so the `[decide]`/`[verify]` backlog is **not** empty
+again: §3.5 (the new VS Code integration suite has never actually run —
+this sandbox can't download VS Code; CI is its first run) and §10.1/§10.2
+(class edits rewrite the whole attribute value; selection and collapse
+state don't survive an edit).
+
+Next up (not started): Session 4 enrichment — resolving i18n keys,
+component tags, and `formControlName` from the user's project — deferred
+by choice for now in favour of HTML-only work.
