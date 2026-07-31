@@ -292,6 +292,29 @@ for the app to boot, but it means any assertion depending on real
 geometry is meaningless there. Geometry belongs in Playwright — just
 don't let that stub grow into something load-bearing.
 
+### 3.5 The VS Code integration suite has never been executed **[verify]**
+
+*What it is.* `packages/app-extension/test-integration/buffer-seam.test.ts`
+(via `npm run test:vscode`, `@vscode/test-cli` + `@vscode/test-electron`) is
+the only layer that touches a real `TextDocument` and a real `WorkspaceEdit` —
+it exists to settle §7.5's last assumption, that `positionAt` agrees with the
+character offsets `core` computes. It typechecks and bundles, and the run
+proceeds all the way to VS Code's download step, which the sandbox it was
+written in refuses (403 from the egress proxy for
+`update.code.visualstudio.com`). So **every assertion in that file is
+unexecuted**.
+
+*Why it matters.* An unrun test is not evidence, and this one is carrying the
+weight of a bug that shipped to a user. There's also an ordinary risk that it
+fails on mechanics rather than substance the first time (the tdd `suite`/`test`
+globals, the CJS bundle, the untitled-document lifecycle).
+
+*Suggested direction.* CI runs it under `xvfb-run` on every push
+(`.github/workflows/test.yml`), so the first real run is the next push — watch
+that job, and fix forward there. Anyone with unrestricted network can settle it
+locally in one command: `npm run test:vscode`. Close this entry when a green
+run exists, and record where.
+
 ---
 
 ## 4. Brittleness and maintenance
@@ -426,7 +449,31 @@ disposal detaches every listener. What remains genuinely uncovered is only
 the real-Electron layer (an actual `WorkspaceEdit` reaching a real buffer),
 which mostly exercises VS Code itself — still deferred, as below.
 
-### 7.4 `applyEdits` isn't serialized — a concurrent-edit race can false-diverge **[verify]**
+### 7.4 `applyEdits` isn't serialized — a concurrent-edit race can false-diverge **[RESOLVED — the whole controller is serial now]**
+
+**Fixed.** `Session.enqueue` chains *every* entry point — webview messages and
+the editor-side events (`onSave`, `onDocChange`, the live-sync timer, `reload`)
+— so nothing observes the buffer mid-apply. `applying` became `applyDepth`, a
+counter, so an overlapping apply can't clear the flag early. `onSave` /
+`onDocChange` / `reload` now return their queued turn, which is also how the
+tests await them. Covered by new `session.test.ts` cases (a save fired
+mid-apply sends the buffer the apply produced; a live refresh queued behind an
+apply sees the settled text).
+
+The version-based mechanics this entry describes are gone entirely — §9.7
+replaced them with content identity before this fix landed, so the specific
+"predicted `baseVersion` vs a still-N `docVersion`" symptom below is no longer
+reachable. What remained, and is now closed, was the underlying
+non-serialisation.
+
+**One part of this entry stands, unchanged and by design:** "out of sync" fires
+on any document change the canvas didn't author, so a formatter or another
+extension touching the buffer is a legitimate divergence. Since auto-follow is
+now the default (§9.6) that resolves itself instead of blocking, and a change
+that lands *alongside* our own edit is caught by the settled-buffer comparison
+(§7.5).
+
+*(Original entry below, kept for the reasoning.)*
 
 *What it is.* The extension's out-of-sync guard is version-based
 (`session.ts:114`): a canvas edit carries the `baseVersion` it was computed
@@ -477,7 +524,40 @@ belong in the pure `Session` controller, so they're unit-testable
 (`session.test.ts`) without Electron. Cross-check against §7.3's note that the
 real-buffer layer stays uncovered.
 
-### 7.5 Column resize occasionally corrupts a class in the extension — guarded, root cause unconfirmed **[verify]**
+### 7.5 Column resize occasionally corrupts a class in the extension — guarded, drift now caught at the source **[RESOLVED in code; one verification still owed]**
+
+**Fixed — the drift can no longer accumulate.** The leading hypothesis below
+(the webview's local source and the buffer drifting apart because something
+else rewrote the document alongside our `WorkspaceEdit`) is now checked
+directly instead of being caught two edits later. `applyCanvasEdits` computes
+`predicted = applyEdits(text, edits)` — the same batch on the same base text,
+so exactly what the canvas now holds — and compares it to the buffer that
+actually settled. If they differ, the canvas is resent (`sendSource(true)`)
+rather than confirmed, so it can never carry a stale source into the next
+edit's offsets. Unit-covered and mutation-checked (`session.test.ts`, "a buffer
+that settles differently from the edit resyncs the canvas"; reverting the
+comparison fails exactly that case).
+
+`core/edits.ts` is published as its own entry point
+(`@bootstrap-visualizer/core/edits`) so the Node host can reuse `applyEdits`
+without pulling `@angular/compiler` into its bundle — measured: importing the
+package index took the host bundle from 16 kB to 942 kB; the subpath keeps it
+at 19 kB.
+
+**Still owed — the caveat below, about `positionAt` agreeing with our char
+offsets, is now *testable* but has not been *run*.** The integration suite
+(`packages/app-extension/test-integration/buffer-seam.test.ts`, run by
+`npm run test:vscode`) exercises exactly it against a real `TextDocument`:
+class edit, multi-edit column move, CRLF, an astral character before the edit
+point, a foreign edit racing ours, and a formatter mutating the buffer right
+after our apply. It typechecks and bundles, but **it has never executed** — the
+sandbox this was written in blocks the VS Code download
+(`update.code.visualstudio.com`, 403 at the egress proxy). CI runs it under
+`xvfb-run` on every push, so its first real run is there. Until that run is
+green, treat the `positionAt` assumption as *asserted but unconfirmed* — see
+§3.5.
+
+*(Original entry below, kept for the analysis.)*
 
 *Symptom (reported).* In the extension, resizing e.g. `<div class="col-sm-2">`
 sometimes wrote broken HTML like `<div class=col-sm-42">` — the opening quote
@@ -809,7 +889,17 @@ stale edit is still refused; the queue survives a throwing handler); the
 test harness's `applyEdit` was made genuinely async to model the real
 round-trip the synchronous mock had been hiding.
 
-### 9.4 `onSave`/`onDocChange` bypass the message queue **[verify]**
+### 9.4 `onSave`/`onDocChange` bypass the message queue **[RESOLVED — folded into the same queue]**
+
+**Fixed.** The decision this entry asked for was made the strict way: editor
+events fold into `Session.enqueue` alongside webview messages, so the whole
+controller is serial and ordering is a property of the code rather than of how
+VS Code interleaves events with our awaits. The narrow window described below
+(a save resending a buffer that's about to change) is closed rather than argued
+to be benign, and the new `session.test.ts` "editor events are serialised with
+canvas edits" cases pin it.
+
+*(Original entry below.)*
 
 *What.* The 9.3 fix serializes the *webview message* stream, but
 `onSave` and `onDocChange` (fired from VS Code editor events, not webview
@@ -839,11 +929,24 @@ two `applyCanvasEdits` refusal paths route through `markDiverged` too, so the
 flag stays accurate across a refused stale/misplaced edit. Covered by new
 `session.test.ts` cases (a burst flags once; a save/discard re-arms it).
 
-### 9.6 Auto-resync on external edits instead of blocking **[IMPLEMENTED — opt-in `liveSync`]**
+### 9.6 Auto-resync on external edits instead of blocking **[IMPLEMENTED — `liveSync`, now the default]**
 
-**Update (maintainer reversed the earlier decline):** shipped as an **opt-in**
-setting `bootstrapVisualizer.liveSync` (default **off** — save-to-sync stays the
-default). When on, `Session.onDocChange` debounces (~400 ms) and calls
+**Update 2 — the default flipped to on.** `bootstrapVisualizer.liveSync`
+now defaults to **true**. The argument that settled it: in the extension the
+canvas holds no unsaved state of its own — every canvas edit goes straight to
+the buffer — so following the buffer can never cost the user work, which makes
+parking a cost with no matching benefit. It was also punishing the *documented*
+undo path: undo in the extension is the editor's own undo (PLAN.md decision
+§6), which arrives as an external document change and therefore parked the
+canvas every single time. Covered by "the editor's own undo does not park the
+canvas" in `session.test.ts`. Park-and-warn stays available by setting it to
+false, and now has a visible state to go with it (`.diverged` styling in
+`packages/editor/src/styles.css` — before this it set a body class that no
+stylesheet defined, so the only signal was a toast that faded).
+
+**Update 1 (maintainer reversed the earlier decline):** shipped as an
+**opt-in** setting `bootstrapVisualizer.liveSync` (default **off** at the
+time — save-to-sync was the default). When on, `Session.onDocChange` debounces (~400 ms) and calls
 `sendSource(keepSelection=true)` instead of `markDiverged`, so the canvas
 follows the (dirty) editor and never parks. Safe because: the tolerant parser +
 `apply()`'s last-good-view guard keep a half-typed buffer from breaking the
@@ -955,3 +1058,119 @@ still stand behind this as the byte-level safety net.
   buffer that's about to change. It's now self-correcting — the apply overwrites
   `syncedText` with the settled buffer — so the window costs at most one stale
   render, not a false divergence.
+
+*(Last bullet superseded: §9.4 is closed — editor events share the queue, so
+`onSave` can no longer race an in-flight apply at all.)*
+
+---
+
+## 10. Edit granularity and view state
+
+*Both surfaced while hardening the canvas↔buffer seam (§7.4/§7.5/§9.4). Neither
+is a correctness bug — edits land where they should — but both make editing feel
+less precise than it is, and both were deliberately left out of that change to
+keep it reviewable.*
+
+### 10.1 A class edit rewrites the whole attribute value **[decide]**
+
+*What it is.* `classEdit` (`packages/core/src/edits.ts`) replaces the class
+attribute's entire *value span* with `newTokens.join(' ')`, even when one token
+changed. Verified: `writeClass`/`classEdit` take the token list from
+`setWidthToken`/`setOffsetToken` and re-serialise all of it.
+
+*Why it matters.* The value is rebuilt, so the author's own whitespace inside it
+is not preserved: a class list wrapped across several lines (common on Angular
+elements with a dozen utility classes) collapses onto one line the first time
+you touch the width. That contradicts what the surgical-edit rule promises the
+user — "we change what you changed" — and it makes each undo step and each
+`WorkspaceEdit` larger than the edit really is. It also widens the window in
+which a concurrent edit to the same attribute conflicts.
+
+*Suggested direction.* Diff old tokens against new and emit token-level spans:
+replace the changed token in place, insert a new one before the closing quote
+(with one separating space), delete a removed one together with one adjacent
+separator. `classEdit` already returns an `Edit`, so the signature would become
+`Edit[]`; `applyEdits` orders a batch already. The 157-case contract asserts
+*resulting source*, mostly via `writeClass`, so most of it should hold
+unchanged — which is exactly the safety net that makes this worth doing. Watch
+the no-attribute and unquoted-value branches, which stay whole-span.
+
+### 10.2 Selection and collapse state don't survive an edit **[decide]**
+
+*What it is.* Selection is a path (`state.sel.path`, `[rowIdx, colIdx, …]`) and
+is re-resolved against a freshly built model after every apply. Two consequences,
+both verified in the code:
+- `moveCol` and `deleteEl` (`packages/editor/src/edits.ts`) set `state.sel =
+  null` outright, so the column you just dragged is deselected the moment it
+  lands — the inspector empties and a follow-up nudge needs a re-click.
+- A path that still resolves may resolve to a *different* element after an
+  external change (a live-sync refresh keeps the selection by path), so the
+  inspector can quietly describe something other than what the user selected.
+
+Row collapse has the same shape of problem: `computeRowIds`
+(`packages/editor/src/render.ts`) keys it on a hash of the row's exact source
+text plus an occurrence counter, so editing anything inside a collapsed row
+changes its identity and silently re-expands it — and `state.collapsed`
+accumulates keys that can never match again.
+
+*Why it matters.* It reads as the canvas losing your place. It's most visible
+exactly when someone is working quickly, which is the workflow the seam work was
+meant to protect.
+
+*Suggested direction.* Anchor identity to a source offset rather than a path or
+a content hash: an edit batch is a list of spans, so an offset can be mapped
+through it (shift by the net delta of every edit that starts before it). Then
+after an apply, re-select via the existing `nodeAtOffset` (`core/model.ts`) at
+the mapped offset — which would also let `moveCol` keep the moved column
+selected instead of clearing. For collapse, key on the same mapped-offset
+identity, and drop keys that no longer resolve so the set stops growing.
+
+---
+
+## 11. Parse fidelity
+
+### 11.1 An unclosed element's span is a guess, and structural edits trusted it **[RESOLVED — `El.unclosed` + a per-element guard]**
+
+*What it was.* Every structural edit (move, delete, split, insert-beside) cuts
+and splices by `el.end`. That offset is only meaningful when the parser actually
+found a closing tag, and there are two everyday ways it doesn't:
+
+- **The compiler path, with no error reported.** Verified against
+  `@angular/compiler`: `<div class="row"><div class="col-6">x</div>` parses
+  **clean** — `errors` is empty, so nothing fell back — and the row's span is
+  `[0, 17)`, its open tag and nothing else. Its own column sits *outside* it.
+  Deleting that row would have spliced out `<div class="row">` alone and
+  orphaned the column; moving it would have carried the open tag away from its
+  contents. No warning anywhere, from a parse that reported no problem.
+- **The fallback path.** On a real parse error (a closing tag matching nothing
+  open, say) `parseTemplateLegacy` runs, and anything still open at EOF gets
+  `end = src.length`. Deleting such a row deletes the rest of the file.
+
+The extension's `old`/`before`/`after` guard did *not* protect against this: it
+verifies the text at the offsets, not that the offsets mean what the canvas
+drew. The text matches perfectly — it's the span that's wrong.
+
+*Fixed.* `El.unclosed` marks every element whose end the parser had to guess
+(both legacy cases, plus the compiler-path safety net), and `RootEl.degraded`
+marks a tree that came from the fallback at all. `canCutElement`
+(`packages/core/src/edits.ts`) is the rule; `spansAreSafe` in
+`packages/editor/src/edits.ts` guards every structural op against *all* the
+elements it touches — a move checks its destination as well as its source — and
+explains the refusal in a toast. The canvas shows a standing notice while the
+tree is degraded (`renderParseNotice`), so a best-effort structure is never
+mistaken for the real one.
+
+**Deliberately still allowed on an unclosed element: width and offset edits.**
+Its class attribute value span was read straight off the open tag, which the
+parser did see, so those stay exact — you can keep using the steppers on a
+column you're in the middle of typing. Only cutting is held back. Covered in
+`parser.test.ts` (both paths, plus no false positives on void/self-closing
+elements or well-formed documents) and in `app.test.ts` (each structural op
+refused and the source byte-identical; the width edit still applying;
+mutation-checked).
+
+*Residual, worth knowing.* The guard is per element by design: an unclosed
+*descendant* is carried as text either way, and an unclosed *ancestor* doesn't
+make this element's own tags less real. If a case turns up where a wrong
+*nesting* (rather than a wrong end) drives a bad edit, that's a different guard
+and this entry doesn't cover it.
