@@ -395,6 +395,17 @@ body.diverged #resyncBtn::after{
 }
 body.diverged .pane-canvas{opacity:.72}
 
+/* ── Degraded parse ────────────────────────────────────────────────
+   The file didn't parse, so the canvas is showing the fallback parser's
+   best guess. Sits above the scrolling canvas, so it can't scroll away
+   from a structure the user might otherwise read as fact. */
+.parse-degraded{
+  flex:0 0 auto;
+  padding:7px 14px; font-size:12px; line-height:1.5;
+  color:var(--amber); background:var(--amber-dim);
+  border-bottom:1px solid rgba(255,180,84,.45);
+}
+
 /* find field */
 #findBox{
   width:160px; background:var(--ink); border:1px solid var(--line); border-radius:4px;

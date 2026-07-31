@@ -53,6 +53,11 @@ interface Ctx {
   occ: Map<string, number>;
 }
 
+function degraded(root: RootEl): RootEl {
+  root.degraded = true;
+  return root;
+}
+
 function newRoot(src: string): RootEl {
   return {
     tag: '#root', attrs: [], children: [], start: 0, end: src.length,
@@ -70,13 +75,16 @@ export function parseTemplate(src: string): RootEl {
       preserveLineEndings: true,
     });
   } catch {
-    return parseTemplateLegacy(src);
+    return degraded(parseTemplateLegacy(src));
   }
   // On a parse error the compiler yields no usable nodes, whereas the
   // hand-rolled parser recovered a partial tree. Malformed templates (an
-  // unclosed tag, a stray `@` in text) must stay tolerant, so fall back.
+  // unclosed tag, a stray `@` in text) must stay tolerant, so fall back —
+  // flagged, because a best-effort tree is not the same claim as a parsed one
+  // and the frontends need to be able to say so (and to hold back the edits
+  // that would trust a guessed span).
   if (parsed.errors && parsed.errors.length) {
-    return parseTemplateLegacy(src);
+    return degraded(parseTemplateLegacy(src));
   }
   const root = newRoot(src);
   const ctx: Ctx = { root, occ: new Map() };
@@ -199,6 +207,13 @@ function buildEl(node: TmplAstElement, parent: El, src: string, ctx: Ctx): El {
     selfClosing: open ? open.selfClosing : false,
     parent,
   };
+  // A clean compiler parse shouldn't produce one of these — an unclosed tag is
+  // an error and takes us down the legacy path instead — but an element with no
+  // closing tag that isn't void or self-closing has an end we didn't read from
+  // the source, so mark it rather than let a structural edit trust it.
+  if (!hasClose && !el.selfClosing && !VOID_TAGS.has(el.tag.toLowerCase())) {
+    el.unclosed = true;
+  }
   el.children = collectElements(node.children as unknown as Node[], el, src, ctx);
   return el;
 }
@@ -292,6 +307,7 @@ export function parseTemplateLegacy(src: string): RootEl {
         while (stack.length - 1 > k) {
           const inner = stack.pop()!;
           inner.contentEnd = i; inner.end = i;
+          inner.unclosed = true;      // ends where its parent did, not where the author said
         }
         const el = stack.pop()!;
         el.contentEnd = i;
@@ -314,9 +330,13 @@ export function parseTemplateLegacy(src: string): RootEl {
     }
     i = parsed.end;
   }
+  // Never closed at all: these swallow the rest of the file. Flagged so a
+  // structural edit can't cut or move a span that runs to EOF (see
+  // `canCutElement`) — the canvas draws the element, but its end is a guess.
   while (stack.length > 1) {
     const el = stack.pop()!;
     el.contentEnd = src.length; el.end = src.length;
+    el.unclosed = true;
   }
   return root;
 }

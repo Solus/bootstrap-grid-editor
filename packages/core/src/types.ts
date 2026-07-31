@@ -35,6 +35,13 @@ export interface El {
   contentStart: number;
   contentEnd: number;
   selfClosing?: boolean;
+  /** No closing tag was found for this element, so `end` is where the parser
+      had to give up — the enclosing element's close tag, or the end of the
+      file — not where the author ended it. The text is still rendered (the
+      canvas stays useful on a file being typed), but the span is a guess, and
+      anything that *moves or removes* the element by that span would take a
+      part of the file the canvas never showed. See `canCutElement`. */
+  unclosed?: boolean;
   parent: El | null;
   /** The chain of `@if` branches this element sits inside, **outermost
       first** — set on the top-level elements of each branch (the parser
@@ -57,6 +64,12 @@ export interface CondTag {
 export interface RootEl extends El {
   tag: '#root';
   condRegions: Record<string, CondRegionMeta>;
+  /** The template didn't parse cleanly and this tree came from the tolerant
+      fallback parser: the structure is a best-effort reading, not the compiler's
+      answer. Nesting can be wrong where tags don't match up, so a frontend
+      should say so rather than present the canvas as fact. Absent on a clean
+      parse. */
+  degraded?: boolean;
 }
 
 /* ── conditional regions (@if / @else) ───────────────────────────── */

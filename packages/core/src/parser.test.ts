@@ -108,6 +108,94 @@ describe('legacy fallback on parse errors', () => {
   });
 });
 
+describe('a degraded parse says so, and names the spans it guessed', () => {
+  /* The fallback parser recovers a tree from markup the compiler rejects. That
+     tree is useful — the canvas keeps working on a file being typed — but an
+     element it never found a closing tag for ends wherever the parser had to
+     stop, which is not where the author ended it. Both facts have to be
+     *legible* downstream: the frontend says the view is best-effort, and the
+     structural edits refuse the spans that were guessed (canCutElement). */
+
+  it('a clean parse is not flagged', () => {
+    const root = parseTemplate('<div class="row"><div class="col-6">x</div></div>');
+    expect(root.degraded).toBeFalsy();
+  });
+
+  it('a template the compiler rejects is flagged degraded', () => {
+    // a closing tag that matches nothing open: the compiler errors, so this
+    // tree comes from the fallback
+    const root = parseTemplate('<div class="row"><div class="col-6"><span>x</div></div>');
+    expect(root.degraded).toBe(true);
+  });
+
+  it('an element the compiler auto-closed at EOF is marked unclosed', () => {
+    // This one is *not* degraded — @angular/compiler accepts an element left
+    // open at the end of the file without an error. It just ends it early: the
+    // row's span covers its open tag and nothing else, so its own column sits
+    // outside it. Deleting or moving that row by its span would splice out the
+    // open tag alone and orphan the column — worse markup than we started with,
+    // from a parse that reported no problem. Hence the flag.
+    const s = '<div class="row"><div class="col-6">x</div>';
+    const root = parseTemplate(s);
+    const row = root.children[0]!;
+    expect(root.degraded).toBeFalsy();
+    expect(row.unclosed).toBe(true);
+    expect(row.end).toBe('<div class="row">'.length);
+    expect(row.children[0]!.start).toBeGreaterThanOrEqual(row.end);   // child outside parent
+    expect(row.children[0]!.unclosed).toBeFalsy();                    // the col closed properly
+  });
+
+  it('elements the fallback never closed run to EOF and are marked unclosed', () => {
+    // The fallback's own end-of-input unwind: everything still open gets
+    // `end = src.length`. A delete by that span takes the rest of the file.
+    const s = '<div class="row">x</p>\n<div class="col-6">y';
+    const root = parseTemplate(s);
+    const row = root.children[0]!;
+    expect(root.degraded).toBe(true);
+    expect(row.end).toBe(s.length);
+    expect(row.unclosed).toBe(true);
+    expect(row.children[0]!.unclosed).toBe(true);
+  });
+
+  it('an element closed implicitly by an outer tag is marked unclosed', () => {
+    const s = '<div class="row"><div class="col-6"><span>x</div></div>';
+    const root = parseTemplate(s);
+    const col = root.children[0]!.children[0]!;
+    expect(col.unclosed).toBeFalsy();                 // its own </div> was found
+    expect(col.children[0]!.tag).toBe('span');
+    expect(col.children[0]!.unclosed).toBe(true);     // ended at the col's close
+  });
+
+  it('void and self-closing elements are not mistaken for unclosed', () => {
+    // the flag gates structural edits, so a false positive would block edits
+    // on perfectly good markup
+    const root = parseTemplate(
+      '<div class="row"><br><input type="text"><my-comp/><div class="col">x</div></div>');
+    const kids = root.children[0]!.children;
+    expect(kids.map(k => k.tag)).toEqual(['br', 'input', 'my-comp', 'div']);
+    expect(kids.every(k => !k.unclosed)).toBe(true);
+  });
+
+  it('nothing in a well-formed document is flagged, at any depth', () => {
+    const s = [
+      '<div class="container">',
+      '  <div class="row">',
+      '    <div class="col-6"><input><span>a</span></div>',
+      '    @if (x) { <div class="col-6">b</div> }',
+      '  </div>',
+      '</div>',
+    ].join('\n');
+    const root = parseTemplate(s);
+    const flagged: string[] = [];
+    (function walk(el: { tag: string; unclosed?: boolean; children: never[] }) {
+      if (el.unclosed) flagged.push(el.tag);
+      el.children.forEach(walk);
+    })(root as never);
+    expect(root.degraded).toBeFalsy();
+    expect(flagged).toEqual([]);
+  });
+});
+
 describe('@if region tagging', () => {
   // find every element in the tree that carries a cond tag (innermost one —
   // the enclosing chain is asserted separately, in the nesting cases)

@@ -198,6 +198,7 @@ export function render(): void {
     state._rowIds = computeRowIds();
     computeFind();
     renderRuler();
+    renderParseNotice();
     renderCanvas();
     renderInspector();
     renderHeader();
@@ -221,6 +222,29 @@ export function renderHeader(): void {
   // the bp width is a proportion cue, not a semantic constraint — stretch
   // lets the sheet use however much panel the user has given the canvas
   sheet.style.maxWidth = state.stretchSheet ? '100%' : SHEET_WIDTH[state.bp] + 'px';
+}
+
+/** The strip that says the canvas is reading a file that didn't parse.
+
+    A degraded tree comes from the tolerant fallback parser: the elements are
+    real but the *nesting* is a best guess wherever tags don't match up, so the
+    canvas must not present it as fact. The banner is built here rather than in
+    either frontend's HTML, so the `REQUIRED_EDITOR_IDS` contract (FOLLOW-UPS
+    §4.2) doesn't grow a member that only one state needs; it sits above
+    `.canvas-scroll` so it stays put while the canvas scrolls. */
+function renderParseNotice(): void {
+  const pane = sheet.closest('.pane-canvas') ?? rowsHost.parentElement;
+  if (!pane) return;
+  const existing = pane.querySelector<HTMLElement>('.parse-degraded');
+  if (!state.root?.degraded) { existing?.remove(); return; }
+  if (existing) return;                       // already shown; nothing changes
+  const el = document.createElement('div');
+  el.className = 'parse-degraded';
+  el.textContent =
+    'This file doesn’t parse — the canvas is a best-effort reading of it. ' +
+    'Width and offset edits still apply; moving or deleting an element whose ' +
+    'closing tag is missing is held back.';
+  pane.insertBefore(el, pane.querySelector('.canvas-scroll') ?? sheet);
 }
 
 function renderRuler(): void {
