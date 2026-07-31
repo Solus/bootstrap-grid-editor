@@ -1,6 +1,6 @@
 # Change Log
 
-## Unreleased
+## 0.0.16
 
 - Changed: the canvas now follows the editor by default. Undoing with Ctrl+Z,
   saving with a formatter, switching branches — anything that changes the file
