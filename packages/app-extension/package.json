@@ -79,9 +79,9 @@
         },
         "bootstrapVisualizer.liveSync": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "scope": "application",
-          "markdownDescription": "Keep the canvas in sync with the editor **as you type** (after a short pause), instead of only when you save. When off (the default), editing the file under the canvas parks it until you save or press Resync. Canvas edits are always verified before they touch the file, so a half-typed buffer can't corrupt it."
+          "markdownDescription": "Keep the canvas in sync with the editor **as you type** (after a short pause). On by default: canvas edits go straight to the buffer, so following the editor can never lose your work, and the editor's own undo no longer parks the canvas. Turn it off to have the canvas hold still while you type and wait for a save or **Resync** instead. Either way, canvas edits are verified against the file before they touch it, so a half-typed buffer can't corrupt it."
         }
       }
     },

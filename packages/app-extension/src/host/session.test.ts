@@ -6,7 +6,16 @@ import type { HostMessage } from '../shared/protocol.js';
    and simulates the buffer. `applyEdit` really splices the edits into the text,
    so `docText()` afterwards is what a real buffer would hold — which is exactly
    what the session's in-sync check reads. `setText` stands for the user editing
-   the document in the editor. */
+   the document in the editor.
+
+   `liveSync` defaults to **true**, matching the shipped setting default: an
+   external change refreshes the canvas. The cases that exercise park-and-warn
+   pass `liveSync: false` explicitly.
+
+   Every editor-event entry point (`onSave`, `onDocChange`, `reload`) returns
+   its queued turn, so these tests await it the same way they await a message.
+   Nothing in Session runs synchronously with the event any more — that
+   serialisation is the point (FOLLOW-UPS §9.4). */
 function harness(opts: { text?: string; liveSync?: boolean } = {}) {
   const posts: HostMessage[] = [];
   const reveals: Array<[number, number]> = [];
@@ -41,7 +50,7 @@ function harness(opts: { text?: string; liveSync?: boolean } = {}) {
     docText: () => text,
     warn: m => warns.push(m),
     config: () => ({ breakpoint: 'lg' as const, tintOverfull: true,
-      ...(opts.liveSync !== undefined ? { liveSync: opts.liveSync } : {}) }),
+      liveSync: opts.liveSync ?? true }),
     setConfig: (pref, value) => configWrites.push([pref, value]),
   });
 
@@ -66,7 +75,7 @@ describe('Session — source in', () => {
     await h.session.onMessage({ type: 'ready' });
     // config must precede setSource so the canvas seeds before its first render
     expect(h.posts).toEqual([
-      { type: 'config', config: { breakpoint: 'lg', tintOverfull: true } },
+      { type: 'config', config: { breakpoint: 'lg', tintOverfull: true, liveSync: true } },
       { type: 'setSource', text: '<p>hi</p>' },
     ]);
   });
@@ -77,9 +86,9 @@ describe('Session — source in', () => {
     expect(h.configWrites).toEqual([['stretchSheet', true]]);
   });
 
-  it('save refreshes from source, keeping the selection', () => {
+  it('save refreshes from source, keeping the selection', async () => {
     const h = harness();
-    h.session.onSave();
+    await h.session.onSave();
     // keepSelection: a save shouldn't drop the column you had selected
     expect(h.posts).toEqual([
       { type: 'setSource', text: expect.any(String), keepSelection: true },
@@ -159,10 +168,15 @@ describe('Session — edits out', () => {
       type: 'applyEdits',
       edits: [{ start: 11, end: 14, text: 'col-sm-4', old: 'col' }],
     });
-    expect(h.types()).toContain('diverged');
-    expect(h.warns).toContain(OUT_OF_SYNC);
     expect(h.applyCount()).toBe(0);              // nothing applied
     expect(h.posts.some(p => p.type === 'applied')).toBe(false);
+    // and the canvas is pulled back to the buffer, told why: the webview
+    // already applied that edit locally, so leaving it parked would leave a
+    // change on screen the file never got
+    expect(h.posts).toContainEqual({
+      type: 'setSource', text: '<div class="col-sm-2">x</div>',
+      keepSelection: true, notice: OUT_OF_SYNC,
+    });
   });
 
   it('refuses a misplaced insertion via its context (anti-corruption)', async () => {
@@ -175,10 +189,58 @@ describe('Session — edits out', () => {
       type: 'applyEdits',
       edits: [{ start: 8, end: 8, text: '<new/>', before: '</div>', after: '\n  <div' }],
     });
-    expect(h.types()).toContain('diverged');
-    expect(h.warns).toContain(OUT_OF_SYNC);
     expect(h.applyCount()).toBe(0);              // nothing applied
     expect(h.posts.some(p => p.type === 'applied')).toBe(false);
+    expect(h.posts).toContainEqual({
+      type: 'setSource', text: '<div class="row"><div class="col">x</div></div>',
+      keepSelection: true, notice: OUT_OF_SYNC,
+    });
+  });
+
+  it('after a refusal the canvas is editable again — the next edit applies', async () => {
+    // The whole point of resyncing instead of parking: one edit that didn't fit
+    // must not cost the user their session. The resend puts the canvas back on
+    // the buffer, and the edit they retry against *that* lands.
+    const h = harness({ text: '<p>a</p>' });
+    await h.session.onMessage({ type: 'ready' });
+    await h.session.onMessage({
+      type: 'applyEdits', edits: [{ start: 0, end: 3, text: '<b>', old: '<i>' }],
+    });
+    expect(h.applyCount()).toBe(0);
+
+    await h.session.onMessage({
+      type: 'applyEdits', edits: [{ start: 0, end: 3, text: '<b>', old: '<p>' }],
+    });
+    expect(h.posts).toContainEqual({ type: 'applied' });
+    expect(h.text()).toBe('<b>a</p>');
+  });
+
+  it('a buffer that settles differently from the edit resyncs the canvas', async () => {
+    // Something else rewrote the document alongside our edit — a formatter, an
+    // auto-close-tag extension, anything reacting to the WorkspaceEdit. The
+    // canvas holds the text *it* predicted, which the buffer no longer matches.
+    // Left alone the two drift until some later edit is refused (FOLLOW-UPS
+    // §7.5); instead the canvas is put back on the buffer straight away.
+    const h = harness({ text: '<p>a</p>' });
+    await h.session.onMessage({ type: 'ready' });
+    h.duringApply(() => h.setText('<p>  formatted  </p>'));
+    await h.session.onMessage({ type: 'applyEdits', edits: [{ start: 3, end: 4, text: 'b' }] });
+
+    expect(h.posts.some(p => p.type === 'applied')).toBe(false);
+    expect(h.posts).toContainEqual(
+      { type: 'setSource', text: '<p>  formatted  </p>', keepSelection: true });
+  });
+
+  it('an unchanged buffer after our own edit is not drift', async () => {
+    // The everyday case must stay silent: the buffer settles on exactly what
+    // the edits describe, so it confirms rather than resyncing.
+    const h = harness({ text: '<p>a</p>' });
+    await h.session.onMessage({ type: 'ready' });
+    await h.session.onMessage({ type: 'applyEdits', edits: [{ start: 3, end: 4, text: 'b' }] });
+
+    expect(h.posts).toContainEqual({ type: 'applied' });
+    expect(h.posts.filter(p => p.type === 'setSource')).toHaveLength(1);   // just the ready one
+    expect(h.text()).toBe('<p>b</p>');
   });
 
   it('applies an insertion whose context still matches', async () => {
@@ -195,15 +257,16 @@ describe('Session — edits out', () => {
     expect(h.warns).toHaveLength(0);
   });
 
-  it('refuses an edit once the user has changed the buffer (guard-and-warn)', async () => {
+  it('refuses an edit once the user has changed the buffer (guard-and-resync)', async () => {
     const h = harness({ text: '<p>a</p>' });
     await h.session.onMessage({ type: 'ready' });   // canvas is in sync with <p>a</p>
     h.setText('<p>ab</p>');                         // the user types in the editor
     await h.session.onMessage({ type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'x' }] });
-    expect(h.types()).toContain('diverged');
-    expect(h.warns).toContain(OUT_OF_SYNC);
     expect(h.applyCount()).toBe(0);                 // nothing applied
     expect(h.posts.some(p => p.type === 'applied')).toBe(false);
+    expect(h.posts).toContainEqual({
+      type: 'setSource', text: '<p>ab</p>', keepSelection: true, notice: OUT_OF_SYNC,
+    });
   });
 
   it('reports a failed apply and re-sends the source', async () => {
@@ -288,8 +351,7 @@ describe('Session — back-to-back canvas edits (issue #1)', () => {
     await Promise.all([first, second]);
 
     expect(h.posts.filter(p => p.type === 'applied')).toHaveLength(1);
-    expect(h.types()).toContain('diverged');
-    expect(h.warns).toContain(OUT_OF_SYNC);
+    expect(h.posts.some(p => p.type === 'setSource' && p.notice === OUT_OF_SYNC)).toBe(true);
   });
 
   it('a queued message still runs after an earlier one throws', async () => {
@@ -303,94 +365,98 @@ describe('Session — back-to-back canvas edits (issue #1)', () => {
   });
 });
 
-describe('Session — divergence', () => {
-  it('a user document change flags divergence', () => {
-    const h = harness({ text: '<p>a</p>' });
-    h.session.onSave();               // in sync with <p>a</p>
+describe('Session — divergence (liveSync off: park and warn)', () => {
+  it('a user document change flags divergence', async () => {
+    const h = harness({ text: '<p>a</p>', liveSync: false });
+    await h.session.onSave();               // in sync with <p>a</p>
     h.setText('<p>ab</p>');
-    h.session.onDocChange();
+    await h.session.onDocChange();
     expect(h.posts.filter(p => p.type === 'diverged')).toHaveLength(1);
   });
 
-  it('a burst of changes flags divergence only once (no per-keystroke re-toast)', () => {
+  it('a burst of changes flags divergence only once (no per-keystroke re-toast)', async () => {
     // The editor fires onDidChangeTextDocument per keystroke. We must post
     // `diverged` on the false→true edge only, or the webview re-toasts "Resync"
     // on every character typed — the friction issue #1's reporter hit.
-    const h = harness({ text: 'a' });
-    h.session.onSave();
-    for (let i = 0; i < 5; i++) { h.setText('a' + 'x'.repeat(i + 1)); h.session.onDocChange(); }
+    const h = harness({ text: 'a', liveSync: false });
+    await h.session.onSave();
+    for (let i = 0; i < 5; i++) {
+      h.setText('a' + 'x'.repeat(i + 1));
+      await h.session.onDocChange();
+    }
     expect(h.posts.filter(p => p.type === 'diverged')).toHaveLength(1);
   });
 
-  it('typing and undoing back to the same text returns to sync', () => {
+  it('typing and undoing back to the same text returns to sync', async () => {
     // Content identity, not version counting: the buffer holds exactly what the
     // canvas has again, so the canvas un-parks (the resend clears the webview's
     // warning) instead of staying stuck until a save.
-    const h = harness({ text: '<p>a</p>' });
-    h.session.onSave();
+    const h = harness({ text: '<p>a</p>', liveSync: false });
+    await h.session.onSave();
     h.setText('<p>ax</p>');
-    h.session.onDocChange();                     // parked
+    await h.session.onDocChange();               // parked
     expect(h.posts.filter(p => p.type === 'diverged')).toHaveLength(1);
 
     h.setText('<p>a</p>');                       // the user deletes the x again
-    h.session.onDocChange();
+    await h.session.onDocChange();
     expect(h.posts.filter(p => p.type === 'setSource')).toHaveLength(2);   // save + un-park
 
     // and canvas edits work again
     h.setText('<p>a</p>');
-    h.session.onDocChange();
+    await h.session.onDocChange();
     expect(h.posts.filter(p => p.type === 'diverged')).toHaveLength(1);    // not re-flagged
   });
 
-  it('an in-sync buffer change while not parked posts nothing', () => {
-    const h = harness({ text: 'a' });
-    h.session.onSave();
-    h.session.onDocChange();          // buffer unchanged (e.g. a no-op formatting pass)
+  it('an in-sync buffer change while not parked posts nothing', async () => {
+    const h = harness({ text: 'a', liveSync: false });
+    await h.session.onSave();
+    await h.session.onDocChange();    // buffer unchanged (e.g. a no-op formatting pass)
     expect(h.posts.filter(p => p.type !== 'setSource')).toHaveLength(0);
   });
 
-  it('a resync re-arms divergence: changes after a save flag it again', () => {
-    const h = harness({ text: 'a' });
-    h.setText('ab'); h.session.onDocChange();   // first episode → 1 diverged
-    h.session.onSave();                         // resync: webview clears diverged, so do we
-    h.setText('abc'); h.session.onDocChange();  // fresh edit → new episode → another diverged
+  it('a resync re-arms divergence: changes after a save flag it again', async () => {
+    const h = harness({ text: 'a', liveSync: false });
+    h.setText('ab'); await h.session.onDocChange();   // first episode → 1 diverged
+    await h.session.onSave();                        // resync: webview clears diverged, so do we
+    h.setText('abc'); await h.session.onDocChange(); // fresh edit → new episode → another diverged
     expect(h.posts.filter(p => p.type === 'diverged')).toHaveLength(2);
   });
 
-  it('a refused edit re-arms after the resync it triggers', async () => {
-    // A refused applyEdits both warns and flags divergence; a following buffer
-    // change while still diverged must not re-post, but a change after the user
-    // resyncs (discard) must.
-    const h = harness({ text: '<p>a</p>' });
+  it('a refused edit resyncs rather than parking, and divergence re-arms after it', async () => {
+    // A refusal used to park the canvas as diverged. It now resends the buffer,
+    // so the canvas is immediately usable again — and because that resend is a
+    // resync, a *later* external change is a fresh episode and flags once.
+    const h = harness({ text: '<p>a</p>', liveSync: false });
     await h.session.onMessage({ type: 'ready' });
     h.setText('<p>ab</p>');
     await h.session.onMessage({ type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'x' }] });
+    expect(h.posts.some(p => p.type === 'diverged')).toBe(false);
+    expect(h.posts.some(p => p.type === 'setSource' && p.notice === OUT_OF_SYNC)).toBe(true);
+
     h.setText('<p>abc</p>');
-    h.session.onDocChange();          // still diverged → swallowed
+    await h.session.onDocChange();
     expect(h.posts.filter(p => p.type === 'diverged')).toHaveLength(1);
-    await h.session.onMessage({ type: 'discard' });   // resync
-    h.setText('<p>abcd</p>');
-    h.session.onDocChange();          // re-armed → posts again
-    expect(h.posts.filter(p => p.type === 'diverged')).toHaveLength(2);
   });
 
   it('our own apply is not divergence (change fires while applying)', async () => {
-    const h = harness({ text: 'ab' });
+    const h = harness({ text: 'ab', liveSync: false });
     await h.session.onMessage({ type: 'ready' });
-    h.duringApply(() => h.session.onDocChange());   // the buffer change our edit causes
+    let change: Promise<void> | null = null;
+    h.duringApply(() => { change = h.session.onDocChange(); });   // the change our edit causes
     await h.session.onMessage({ type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'x' }] });
+    await change;                 // queued behind the apply, so it sees the settled buffer
     expect(h.posts.some(p => p.type === 'diverged')).toBe(false);
     expect(h.posts.some(p => p.type === 'applied')).toBe(true);
   });
 
   it('a change delivered after our apply settles is not divergence either', async () => {
-    // Belt and braces on the `applying` window: even if the editor delivers the
-    // change event late (after applyEdit resolved), the buffer now equals what
-    // we recorded, so it can't read as the user editing under us.
-    const h = harness({ text: 'ab' });
+    // Belt and braces: even if the editor delivers the change event late (after
+    // applyEdit resolved), the buffer now equals what we recorded, so it can't
+    // read as the user editing under us.
+    const h = harness({ text: 'ab', liveSync: false });
     await h.session.onMessage({ type: 'ready' });
     await h.session.onMessage({ type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'x' }] });
-    h.session.onDocChange();
+    await h.session.onDocChange();
     expect(h.posts.some(p => p.type === 'diverged')).toBe(false);
   });
 
@@ -405,46 +471,98 @@ describe('Session — divergence', () => {
   });
 });
 
-describe('Session — live sync (opt-in)', () => {
-  it('off by default: an external change parks the canvas, no auto refresh', () => {
-    const h = harness({ text: 'a' });                 // no liveSync → off
-    h.setText('ab');
-    h.session.onDocChange();
-    expect(h.types()).toEqual(['diverged']);
-    expect(h.posts.some(p => p.type === 'setSource')).toBe(false);
-  });
-
-  it('on: an external change refreshes the canvas after a debounce, keeping the selection', () => {
+describe('Session — live sync (on by default)', () => {
+  it('an external change refreshes the canvas after a debounce, keeping the selection', async () => {
     vi.useFakeTimers();
-    const h = harness({ liveSync: true, text: '<p>x</p>' });
+    const h = harness({ text: '<p>x</p>' });
     h.setText('<p>xy</p>');
-    h.session.onDocChange();
+    await h.session.onDocChange();
     expect(h.posts).toHaveLength(0);     // debounced — nothing yet
-    vi.advanceTimersByTime(500);
+    await vi.advanceTimersByTimeAsync(500);
     expect(h.posts).toContainEqual(
       { type: 'setSource', text: '<p>xy</p>', keepSelection: true });
     expect(h.posts.some(p => p.type === 'diverged')).toBe(false);   // never parked
   });
 
-  it('on: a typing burst collapses into a single refresh', () => {
+  it('a typing burst collapses into a single refresh', async () => {
     vi.useFakeTimers();
-    const h = harness({ liveSync: true, text: 'a' });
-    h.setText('ab'); h.session.onDocChange();
-    vi.advanceTimersByTime(100);
-    h.setText('abc'); h.session.onDocChange();
-    vi.advanceTimersByTime(100);
-    h.setText('abcd'); h.session.onDocChange();
-    vi.advanceTimersByTime(500);
+    const h = harness({ text: 'a' });
+    h.setText('ab'); await h.session.onDocChange();
+    await vi.advanceTimersByTimeAsync(100);
+    h.setText('abc'); await h.session.onDocChange();
+    await vi.advanceTimersByTimeAsync(100);
+    h.setText('abcd'); await h.session.onDocChange();
+    await vi.advanceTimersByTimeAsync(500);
     expect(h.posts.filter(p => p.type === 'setSource')).toHaveLength(1);
   });
 
-  it('a save cancels a pending live refresh (no duplicate resync)', () => {
+  it('a save cancels a pending live refresh (no duplicate resync)', async () => {
     vi.useFakeTimers();
-    const h = harness({ liveSync: true, text: 'a' });
+    const h = harness({ text: 'a' });
     h.setText('ab');
-    h.session.onDocChange();             // schedules a live refresh
-    h.session.onSave();                  // immediate resync — supersedes it
-    vi.advanceTimersByTime(500);
+    await h.session.onDocChange();       // schedules a live refresh
+    await h.session.onSave();            // immediate resync — supersedes it
+    await vi.advanceTimersByTimeAsync(500);
     expect(h.posts.filter(p => p.type === 'setSource')).toHaveLength(1);
+  });
+
+  it('the editor\'s own undo does not park the canvas', async () => {
+    // Undo in the extension *is* the editor's undo (PLAN.md decision §6), so it
+    // arrives here as an external document change. With auto-follow on it
+    // refreshes the canvas — the reason this is the default.
+    vi.useFakeTimers();
+    const h = harness({ text: '<p>ab</p>' });
+    await h.session.onMessage({ type: 'ready' });
+    await h.session.onMessage({ type: 'applyEdits', edits: [{ start: 4, end: 4, text: 'c' }] });
+    h.setText('<p>ab</p>');              // Ctrl+Z in the editor
+    await h.session.onDocChange();
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(h.posts.some(p => p.type === 'diverged')).toBe(false);
+    expect(h.posts).toContainEqual(
+      { type: 'setSource', text: '<p>ab</p>', keepSelection: true });
+  });
+
+  it('off: an external change parks the canvas, no auto refresh', async () => {
+    const h = harness({ text: 'a', liveSync: false });
+    h.setText('ab');
+    await h.session.onDocChange();
+    expect(h.types()).toEqual(['diverged']);
+    expect(h.posts.some(p => p.type === 'setSource')).toBe(false);
+  });
+});
+
+describe('Session — editor events are serialised with canvas edits', () => {
+  /* FOLLOW-UPS §9.4: onSave/onDocChange used to run outside the message queue,
+     so a save landing mid-apply could resend a buffer that was about to change.
+     They share the queue now, so their view of the buffer is always settled. */
+
+  it('a save fired mid-apply sends the buffer the apply produced', async () => {
+    const h = harness({ text: 'ab' });
+    await h.session.onMessage({ type: 'ready' });
+    let saved: Promise<void> | null = null;
+    h.duringApply(() => { saved = h.session.onSave(); });
+    await h.session.onMessage({ type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'x' }] });
+    await saved;
+
+    const sends = h.posts.filter(p => p.type === 'setSource');
+    expect(sends[sends.length - 1]).toEqual(
+      { type: 'setSource', text: 'xab', keepSelection: true });
+  });
+
+  it('a live refresh queued behind an apply reflects the applied edit', async () => {
+    vi.useFakeTimers();
+    const h = harness({ text: 'ab' });
+    await h.session.onMessage({ type: 'ready' });
+    let changed: Promise<void> | null = null;
+    h.duringApply(() => { changed = h.session.onDocChange(); });
+    await h.session.onMessage({ type: 'applyEdits', edits: [{ start: 0, end: 0, text: 'x' }] });
+    await changed;
+    await vi.advanceTimersByTimeAsync(500);
+
+    // the change was our own, so there is nothing to refresh and nothing to park
+    expect(h.posts.some(p => p.type === 'diverged')).toBe(false);
+    expect(h.posts.filter(p => p.type === 'setSource')).toHaveLength(1);   // ready only
+    expect(h.text()).toBe('xab');
   });
 });
