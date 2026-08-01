@@ -29,6 +29,7 @@ vi.mock('vscode', () => {
     };
   };
   const saves = mkEvent(), changes = mkEvent(), selections = mkEvent();
+  const configChanges = mkEvent();
   const commands = new Map<string, (...a: unknown[]) => unknown>();
   const serializers = new Map<string, { deserializeWebviewPanel(p: unknown, s: unknown): Thenable<void> }>();
   const infoMsgs: string[] = [];
@@ -41,6 +42,7 @@ vi.mock('vscode', () => {
     activeTextEditor: undefined as unknown,
     visibleTextEditors: [] as unknown[],
     applyHook: null as (() => void) | null,
+    workspaceFolders: undefined as unknown,
     applyResult: true,
   };
 
@@ -118,14 +120,16 @@ vi.mock('vscode', () => {
       ) => { serializers.set(viewType, s); return { dispose: () => serializers.delete(viewType) }; },
     },
     workspace: {
+      get workspaceFolders() { return state.workspaceFolders; },
       onDidSaveTextDocument: saves.on,
       onDidChangeTextDocument: changes.on,
+      onDidChangeConfiguration: configChanges.on,
       applyEdit: (e: WorkspaceEdit) => {
         applied.push(e);
         if (state.applyResult) state.applyHook?.();
         return Promise.resolve(state.applyResult);
       },
-      getConfiguration: (_section: string) => ({
+      getConfiguration: (_section: string, _resource?: unknown) => ({
         get: (key: string) => config.get(key),
         update: (key: string, value: unknown, target: unknown) => {
           configWrites.push({ key, value, target });
@@ -139,20 +143,21 @@ vi.mock('vscode', () => {
     ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
     Range, Selection, WorkspaceEdit, Uri,
     __mock: {
-      state, saves, changes, selections, commands, serializers, infoMsgs, warnMsgs, panels, applied,
-      config, configWrites,
+      state, saves, changes, selections, configChanges, commands, serializers,
+      infoMsgs, warnMsgs, panels, applied, config, configWrites,
       reset() {
         // dispose any live panel first so extension.ts's module-level `active`
         // canvas clears (its onDidDispose sets active = null) — otherwise the
         // next test would reuse a stale panel instead of creating one
         (panels as FakePanel[]).forEach(p => p.dispose());
-        saves.clear(); changes.clear(); selections.clear();
+        saves.clear(); changes.clear(); selections.clear(); configChanges.clear();
         commands.clear(); serializers.clear();
         infoMsgs.length = 0; warnMsgs.length = 0;
         panels.length = 0; applied.length = 0;
         config.clear(); configWrites.length = 0;
         state.activeTextEditor = undefined;
         state.visibleTextEditors = [];
+        state.workspaceFolders = undefined;
         state.applyHook = null;
         state.applyResult = true;
       },
@@ -168,10 +173,12 @@ interface MockApi {
   state: {
     activeTextEditor: unknown; visibleTextEditors: unknown[];
     applyHook: (() => void) | null; applyResult: boolean;
+    workspaceFolders: unknown;
   };
   saves: { fire(e: unknown): void; count(): number };
   changes: { fire(e: unknown): void; count(): number };
   selections: { fire(e: unknown): void; count(): number };
+  configChanges: { fire(e: unknown): void; count(): number };
   commands: Map<string, (...a: unknown[]) => unknown>;
   serializers: Map<string, { deserializeWebviewPanel(p: unknown, s: unknown): Thenable<void> }>;
   infoMsgs: string[]; warnMsgs: string[];
@@ -396,11 +403,60 @@ describe('user settings', () => {
 
   it('a canvas view-toggle writes back to global user settings', async () => {
     const { panel } = openWith(makeDoc('<p>x</p>'));
-    panel.receive({ type: 'setConfig', pref: 'tintOverfull', value: true });
+    panel.receive({ type: 'setConfig', change: { pref: 'tintOverfull', value: true } });
     // handled on a microtask now (onMessage serializes through a queue)
     await vi.waitFor(() => expect(M.configWrites).toContainEqual(
       { key: 'tintOverfullRows', value: true, target: 1 }));   // 1 = ConfigurationTarget.Global
     expect(M.config.get('tintOverfullRows')).toBe(true);
+  });
+
+  it('seeds the canvas with the class convention', async () => {
+    M.config.set('newRowClasses', 'clearfix form-group');
+    M.config.set('newColumnClasses', 'px-2');
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    panel.receive({ type: 'ready' });
+    await vi.waitFor(() => expect(panel.posts.some(p => p.type === 'config')).toBe(true));
+    const cfg = panel.posts.find(p => p.type === 'config') as { config: unknown };
+    expect(cfg.config).toMatchObject({
+      newRowClasses: 'clearfix form-group', newColumnClasses: 'px-2',
+    });
+  });
+
+  it('the class convention is written to the workspace, not the user, when there is one', async () => {
+    // it's a property of the project's markup, and it's resource-scoped — a
+    // global write would lose to a committed .vscode/settings.json
+    M.state.workspaceFolders = [{ uri: {} }];
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    panel.receive({ type: 'setConfig', change: { pref: 'newRowClasses', value: 'clearfix' } });
+    await vi.waitFor(() => expect(M.configWrites).toContainEqual(
+      { key: 'newRowClasses', value: 'clearfix', target: 2 }));   // 2 = Workspace
+  });
+
+  it('falls back to user settings for the convention with no workspace open', async () => {
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    panel.receive({ type: 'setConfig', change: { pref: 'newColumnClasses', value: 'px-2' } });
+    await vi.waitFor(() => expect(M.configWrites).toContainEqual(
+      { key: 'newColumnClasses', value: 'px-2', target: 1 }));    // 1 = Global
+  });
+
+  it('a convention edited in settings reaches an already-open panel', async () => {
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    panel.receive({ type: 'ready' });
+    await vi.waitFor(() => expect(panel.posts.some(p => p.type === 'config')).toBe(true));
+    M.config.set('newRowClasses', 'clearfix');
+    M.configChanges.fire({ affectsConfiguration: (s: string) => s.endsWith('newRowClasses') });
+    const msg = panel.posts.find(p => p.type === 'classConvention') as { config: unknown };
+    expect(msg.config).toMatchObject({ newRowClasses: 'clearfix' });
+  });
+
+  it('an unrelated settings change does not disturb an open panel', async () => {
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    panel.receive({ type: 'ready' });
+    await vi.waitFor(() => expect(panel.posts.some(p => p.type === 'config')).toBe(true));
+    // re-seeding the whole config would yank the breakpoint the user has since
+    // changed on the canvas — only the convention is live
+    M.configChanges.fire({ affectsConfiguration: (s: string) => s.endsWith('defaultBreakpoint') });
+    expect(panel.posts.some(p => p.type === 'classConvention')).toBe(false);
   });
 });
 

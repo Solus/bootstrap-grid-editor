@@ -20,7 +20,7 @@ function harness(opts: { text?: string; liveSync?: boolean } = {}) {
   const posts: HostMessage[] = [];
   const reveals: Array<[number, number]> = [];
   const warns: string[] = [];
-  const configWrites: Array<[string, boolean]> = [];
+  const configWrites: Array<[string, boolean | string]> = [];
   let text = opts.text ?? '<div class="row"><div class="col">x</div></div>';
   let applyOk = true;
   let applyCount = 0;
@@ -51,7 +51,7 @@ function harness(opts: { text?: string; liveSync?: boolean } = {}) {
     warn: m => warns.push(m),
     config: () => ({ breakpoint: 'lg' as const, tintOverfull: true,
       liveSync: opts.liveSync ?? true }),
-    setConfig: (pref, value) => configWrites.push([pref, value]),
+    setConfig: change => { configWrites.push([change.pref, change.value]); },
   });
 
   return {
@@ -82,7 +82,8 @@ describe('Session — source in', () => {
 
   it('setConfig routes a canvas view-toggle back to the host', async () => {
     const h = harness();
-    await h.session.onMessage({ type: 'setConfig', pref: 'stretchSheet', value: true });
+    await h.session.onMessage(
+      { type: 'setConfig', change: { pref: 'stretchSheet', value: true } });
     expect(h.configWrites).toEqual([['stretchSheet', true]]);
   });
 

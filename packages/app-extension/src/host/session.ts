@@ -33,7 +33,9 @@
 
 import { applyEdits } from '@bootstrap-visualizer/core/edits';
 import type { Edit } from '@bootstrap-visualizer/core';
-import type { ConfigWire, HostMessage, WebviewMessage } from '../shared/protocol.js';
+import type {
+  ConfigWire, HostMessage, PrefChange, WebviewMessage,
+} from '../shared/protocol.js';
 
 /** Everything the session needs from its VS Code environment. */
 export interface SessionPorts {
@@ -45,8 +47,8 @@ export interface SessionPorts {
   warn(message: string): void;
   /** The user's settings to seed the canvas with at open. */
   config(): ConfigWire;
-  /** Persist a sticky view toggle the user flipped in the canvas. */
-  setConfig(pref: 'stretchSheet' | 'tintOverfull', value: boolean): void;
+  /** Persist a sticky setting the user changed in the canvas. */
+  setConfig(change: PrefChange): void;
 }
 
 /** Shown on the canvas when an edit is refused. It names what happened to the
@@ -164,6 +166,14 @@ export class Session {
     this.ports.post({ type: 'diverged' });
   }
 
+  /** The user's class convention changed in settings while the panel is open →
+      push just that to the canvas. Not queued: it touches no sync state and no
+      document text, so it has nothing to order against. */
+  onClassConventionChange(): void {
+    const { newRowClasses, newColumnClasses } = this.ports.config();
+    this.ports.post({ type: 'classConvention', config: { newRowClasses, newColumnClasses } });
+  }
+
   /** The document was saved → refresh the canvas from source, keeping the
       selection where its path still resolves (a save shouldn't cost you the
       column you had selected). */
@@ -223,7 +233,7 @@ export class Session {
         this.sendSource();
         break;
       case 'setConfig':
-        this.ports.setConfig(msg.pref, msg.value);
+        this.ports.setConfig(msg.change);
         break;
       case 'reveal':
         this.revealed = { start: msg.start, end: msg.end };

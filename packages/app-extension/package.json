@@ -77,6 +77,18 @@
           "scope": "application",
           "markdownDescription": "Class style for **new** columns when a file has no grid classes to detect from. A file that already uses one dialect always keeps it."
         },
+        "bootstrapVisualizer.newRowClasses": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "Extra classes on every row the canvas **creates**, added after `row` — e.g. `clearfix form-group` writes `<div class=\"row clearfix form-group\">`. A project convention, so it can be committed in the workspace's `.vscode/settings.json`. Grid classes (`col-*`, `offset-*`) and `row` itself are ignored here — the canvas writes those."
+        },
+        "bootstrapVisualizer.newColumnClasses": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "markdownDescription": "Extra classes on every column the canvas **creates**, added after the computed `col-*` classes — e.g. `px-2` writes `<div class=\"col-md-6 px-2\">`. A project convention, so it can be committed in the workspace's `.vscode/settings.json`. Grid classes are ignored here; widths and offsets come from the inspector's steppers."
+        },
         "bootstrapVisualizer.liveSync": {
           "type": "boolean",
           "default": true,
