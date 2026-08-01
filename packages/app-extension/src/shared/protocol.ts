@@ -15,6 +15,10 @@ export interface ConfigWire {
   stretchSheet?: boolean;
   tintOverfull?: boolean;
   dialect?: 'bootstrap5' | 'bootstrap3';
+  /** Extra classes every row / column the canvas *creates* carries, on top of
+      the grid classes it computes (e.g. `clearfix form-group`). */
+  newRowClasses?: string;
+  newColumnClasses?: string;
   /** Host-side behaviour (not a webview render setting): when true (the shipped
       default), an external editor edit refreshes the canvas after a short
       debounce instead of parking it until save. Read by the `Session`, not the
@@ -27,6 +31,11 @@ export type HostMessage =
   /** The user's settings, sent once before the first setSource so the canvas
       opens with them applied. */
   | { type: 'config'; config: ConfigWire }
+  /** The class convention changed in the user's settings while the panel was
+      open. Deliberately *not* a second `config`: re-seeding the whole open
+      config would yank the breakpoint and view toggles back from under someone
+      who has changed them on the canvas since. */
+  | { type: 'classConvention'; config: ConfigWire }
   /** Full document text — sent on open, on save, on a debounced external
       edit, and whenever the canvas has to be pulled back to the buffer (a
       refused edit, or a buffer that settled differently from what the canvas
@@ -62,6 +71,14 @@ export type WebviewMessage =
   | { type: 'reveal'; start: number; end: number }
   /** Reset the canvas to the current buffer (discard divergence). */
   | { type: 'discard' }
-  /** The user flipped a sticky view toggle (stretch/tint) in the canvas —
-      write it back to their settings so it's remembered. */
-  | { type: 'setConfig'; pref: 'stretchSheet' | 'tintOverfull'; value: boolean };
+  /** The user changed a sticky setting in the canvas (a view toggle, or the
+      class convention) — write it back to their settings so it's
+      remembered. */
+  | { type: 'setConfig'; change: PrefChange };
+
+/** A setting the canvas can write back. Structurally the editor package's
+    `PrefChange`; redeclared here because `shared`/`host` must not import the
+    DOM editor package (same reason `ConfigWire` mirrors `OpenConfig`). */
+export type PrefChange =
+  | { pref: 'stretchSheet' | 'tintOverfull'; value: boolean }
+  | { pref: 'newRowClasses' | 'newColumnClasses'; value: string };

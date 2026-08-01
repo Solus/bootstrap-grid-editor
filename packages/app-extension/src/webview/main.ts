@@ -6,9 +6,9 @@
 
 import '@bootstrap-visualizer/editor/styles.css';
 import {
-  apply, applyOpenConfig, assertRequiredIds, REQUIRED_EDITOR_IDS, selectAtOffset,
-  setHost, toast, wireBreakpointSwitch, wireCanvasBackground, wireDragSurface,
-  wireKeyboardNav,
+  apply, applyOpenConfig, assertRequiredIds, readClassConvention, REQUIRED_EDITOR_IDS,
+  renderInspector, selectAtOffset, setHost, toast, wireBreakpointSwitch,
+  wireCanvasBackground, wireDragSurface, wireKeyboardNav,
 } from '@bootstrap-visualizer/editor';
 import { createWebviewHost, type SyncState } from './webview-host.js';
 import type { HostMessage, WebviewMessage } from '../shared/protocol.js';
@@ -41,6 +41,12 @@ window.addEventListener('message', (e: MessageEvent<HostMessage>) => {
     case 'config':
       // arrives once, before the first setSource → seeds the canvas defaults
       applyOpenConfig(msg.config);
+      break;
+    case 'classConvention':
+      // the user edited the convention in settings while the panel was open —
+      // only that, so nothing else they've changed on the canvas is disturbed
+      readClassConvention(msg.config);
+      renderInspector();
       break;
     case 'setSource':
       sync.diverged = false;

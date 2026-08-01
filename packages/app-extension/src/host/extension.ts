@@ -9,7 +9,9 @@
    Undo is the editor's native undo. */
 
 import * as vscode from 'vscode';
-import type { ConfigWire, HostMessage, WebviewMessage } from '../shared/protocol.js';
+import type {
+  ConfigWire, HostMessage, PrefChange, WebviewMessage,
+} from '../shared/protocol.js';
 import { Session, type SessionPorts } from './session.js';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -93,6 +95,10 @@ function createCanvas(context: vscode.ExtensionContext, initial: vscode.TextEdit
     if (ev.document === doc) void session.onDocChange();
   }));
 
+  disposables.push(vscode.workspace.onDidChangeConfiguration(ev => {
+    if (isLiveSetting(ev)) session.onClassConventionChange();
+  }));
+
   disposables.push(vscode.window.onDidChangeTextEditorSelection(ev => {
     if (ev.textEditor.document !== doc) return;
     const sel = ev.textEditor.selection;
@@ -143,24 +149,60 @@ export function createSessionPorts(
     },
     docText: () => doc().getText(),
     warn: message => void vscode.window.showWarningMessage(message),
-    config: readConfig,
-    setConfig: (pref, value) => {
-      const key = pref === 'stretchSheet' ? 'stretchToFit' : 'tintOverfullRows';
-      void vscode.workspace.getConfiguration('bootstrapVisualizer')
-        .update(key, value, vscode.ConfigurationTarget.Global);
+    config: () => readConfig(doc().uri),
+    setConfig: change => {
+      void vscode.workspace.getConfiguration('bootstrapVisualizer', doc().uri)
+        .update(SETTING_KEY[change.pref], change.value, writeTarget(change.pref));
     },
   };
 }
 
+/** Canvas preference → the settings key that stores it. An exhaustive map, not
+    a conditional: a new preference then fails to compile until it has a home,
+    instead of silently writing to the wrong key. */
+const SETTING_KEY: Record<PrefChange['pref'], string> = {
+  stretchSheet: 'stretchToFit',
+  tintOverfull: 'tintOverfullRows',
+  newRowClasses: 'newRowClasses',
+  newColumnClasses: 'newColumnClasses',
+};
+
+/** Where a canvas-written setting goes. The view toggles are personal, so they
+    stay user-global. The class convention describes the *project's* markup, so
+    it belongs to the workspace when there is one — and it has to: it's
+    `resource`-scoped, so a value committed in `.vscode/settings.json` would
+    shadow a global write and the field would appear not to stick. */
+function writeTarget(pref: PrefChange['pref']): vscode.ConfigurationTarget {
+  const perProject = pref === 'newRowClasses' || pref === 'newColumnClasses';
+  return perProject && vscode.workspace.workspaceFolders?.length
+    ? vscode.ConfigurationTarget.Workspace
+    : vscode.ConfigurationTarget.Global;
+}
+
+/** The settings whose changes reach an already-open canvas. Only the class
+    convention: the others seed the canvas at open, and re-applying them
+    mid-session would yank the breakpoint or a view toggle back from under
+    someone who changed it on the canvas. The convention has to be live because
+    the canvas *writes* it too — a panel holding a stale copy would clobber an
+    edit made in settings.json. */
+export function isLiveSetting(e: { affectsConfiguration(section: string): boolean }): boolean {
+  return e.affectsConfiguration('bootstrapVisualizer.newRowClasses') ||
+    e.affectsConfiguration('bootstrapVisualizer.newColumnClasses');
+}
+
 /** The user's settings, read fresh at panel open. Defaults here mirror the
     package.json contribution defaults (and the canvas built-ins). */
-function readConfig(): ConfigWire {
-  const c = vscode.workspace.getConfiguration('bootstrapVisualizer');
+function readConfig(resource?: vscode.Uri): ConfigWire {
+  // Scoped to the document: the class convention is `resource`-scoped, so a
+  // project's committed .vscode/settings.json is what its own templates get.
+  const c = vscode.workspace.getConfiguration('bootstrapVisualizer', resource);
   return {
     breakpoint: c.get<ConfigWire['breakpoint']>('defaultBreakpoint'),
     stretchSheet: c.get<boolean>('stretchToFit'),
     tintOverfull: c.get<boolean>('tintOverfullRows'),
     dialect: c.get<ConfigWire['dialect']>('dialect'),
+    newRowClasses: c.get<string>('newRowClasses'),
+    newColumnClasses: c.get<string>('newColumnClasses'),
     liveSync: c.get<boolean>('liveSync'),
   };
 }

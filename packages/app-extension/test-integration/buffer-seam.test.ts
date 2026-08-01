@@ -75,6 +75,25 @@ suite('the buffer seam — canvas offsets reaching a real document', () => {
     assert.ok(posts.some(p => p.type === 'applied'), 'the edit was confirmed');
   });
 
+  test('a row appended at the very end of the document lands byte-exact', async () => {
+    // The offset the "Add row" entry point introduces and no other edit does:
+    // an insert *at* doc length. positionAt(text.length) is the one boundary
+    // where an off-by-one silently writes inside the last tag instead of after
+    // it — and a template with no rows yet is exactly when a user reaches for
+    // this button.
+    const text = '<form>\n  <p>nothing here yet</p>\n</form>\n';
+    const { doc, session } = await openWith(text);
+    await session.onMessage({ type: 'ready' });
+
+    const row = '<div class="row">\n  <div class="col">\n    <!-- new column -->\n  </div>\n</div>';
+    await session.onMessage({
+      type: 'applyEdits',
+      edits: stamp(text, [{ start: text.length, end: text.length, text: row }]),
+    });
+
+    assert.strictEqual(doc.getText(), text + row);
+  });
+
   test('a column move (cut + insert in one batch) lands byte-exact', async () => {
     // The shape that broke the old version handshake: two spans in one
     // WorkspaceEdit, both computed against the *original* text. VS Code has to
