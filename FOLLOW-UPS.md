@@ -1064,6 +1064,110 @@ still stand behind this as the byte-level safety net.
 
 ---
 
+### 9.8 The class convention is the first `resource`-scoped setting **[decide]**
+
+*What it is.* `bootstrapVisualizer.newRowClasses` / `.newColumnClasses`
+(`packages/app-extension/package.json`) ship with `"scope": "resource"`, unlike
+the five settings before them (all `application` — §9.1). A markup convention
+is a property of the codebase, not of the person, so a repo can commit it to
+`.vscode/settings.json` and everyone editing that project gets it.
+
+*Why it matters.* Two consequences follow, both deliberate but neither obvious:
+`readConfig` now takes the bound document's URI
+(`packages/app-extension/src/host/extension.ts`), so a multi-root workspace can
+give two folders different conventions; and the canvas's own write-back goes to
+`ConfigurationTarget.Workspace` when a folder is open (`writeTarget`), because
+a Global write would be shadowed by a committed workspace value and the field
+would silently appear not to stick. That means typing in the inspector field
+edits a file in the user's repo — correct for a shared convention, but the
+first time this extension writes anything into a project.
+
+*Suggested direction.* Leave it; revisit if someone wants a personal
+convention that survives across projects (a per-user default the workspace
+value overrides). If we ever add one, the seam is `writeTarget`.
+
+### 9.9 Only two settings are live; the rest are still read once **[decide]**
+
+*What it is.* `onDidChangeConfiguration` (`extension.ts`, gated by
+`isLiveSetting`) forwards *only* the two class-convention settings to an open
+panel, as a `classConvention` message. The other five are still read once at
+panel open (§9.1).
+
+*Why it matters.* It's an asymmetry someone will trip on ("I changed the
+dialect and nothing happened"). The convention had to be live for a specific
+reason — the panel *writes* it too, so a panel holding a stale copy would
+clobber an edit made in settings.json — and re-seeding the whole `OpenConfig`
+mid-session would instead yank the breakpoint and view toggles back from under
+someone who changed them on the canvas. Hence a separate message rather than a
+second `config`.
+
+*Suggested direction.* If the others should be live too, each needs its own
+answer to "what if the user has since changed it on the canvas?" — dialect and
+`liveSync` are safe to re-apply, breakpoint and the view toggles are not.
+
+### 9.10 One convention per document, not named presets **[decide]**
+
+*What it is.* There is exactly one row convention and one column convention.
+A document with two kinds of row (a form row and a plain layout row) can't
+express both.
+
+*Why it matters.* It's the obvious next request, and it's a UI decision, not a
+data one: `newRowClassList()` / `newColClassList()`
+(`packages/editor/src/state.ts`) already take everything they need as
+parameters, so presets would be a picker beside each create action plus a list
+editor in settings — no change to how the markup is built.
+
+*Suggested direction.* Wait for a real second convention before building it.
+
+### 9.11 A `d-*` utility in the column convention hides every new column **[verify]**
+
+*What it is.* `parseExtraClasses` (`packages/core/src/scaffold.ts`) drops grid
+tokens but deliberately keeps display utilities, so `d-none` in the column
+convention is written verbatim — and `isHiddenAt` (`packages/core/src/classes.ts`)
+then gives every created column zero grid width (§8.1), i.e. it appears on the
+canvas as hidden.
+
+*Why it matters.* It surprises rather than corrupts: the class is exactly what
+the user asked for, and the canvas is telling the truth about it. But nothing
+warns, and the inspector's preview shows the class list, not its effect.
+
+*Suggested direction.* Probably a hint in the convention section when the
+tokens include a `d-*` that hides at the current breakpoint. Filtering it out
+would be wrong — it's a legitimate thing to want.
+
+### 9.12 `addRowAtEnd` appends at end-of-file when a document has no rows **[decide]**
+
+*What it is.* With no top-level row to anchor to, "Add row" inserts at
+`state.src.length` (`packages/editor/src/edits.ts`). For a template wrapped in
+a `<form>` or a `<div class="container">`, the row lands *after* the wrapper,
+not inside it — the user then has to move it.
+
+*Why it matters.* It's the first-use path for the feature that exists to let
+someone start a page from scratch, so the dumb rule is on show at exactly the
+wrong moment. It's a deliberate choice: any smarter rule is a heuristic about
+which element was "meant", and a wrong guess writes into a container the user
+didn't intend. The toast says where the row went.
+
+*Suggested direction.* If this proves annoying, the least-guessy improvement is
+to offer the choice rather than infer it — e.g. insert into the innermost
+element that already contains block content, but say so and make it undoable in
+one step (it already is).
+
+### 9.13 A row added after a conditional last row lands inside that branch **[decide]**
+
+*What it is.* `addRowAtEnd` delegates to `addRowAfter(lastTopLevelRow)`. If
+that row sits inside an `@if` branch, the new row is written inside the branch's
+braces.
+
+*Why it matters.* Consistent with `addColToRow`, which deliberately inserts
+after the last *shown* column so a conditional row adds into the active branch
+(`packages/editor/src/edits.ts`). But "add a row to the document" reads like a
+top-level action, and landing inside a conditional is a surprise the canvas
+does show (the row draws inside the branch box) but doesn't announce.
+
+*Suggested direction.* Leave the behaviour; consider naming the branch in the
+toast when the insertion point is inside one.
+
 ## 10. Edit granularity and view state
 
 *Both surfaced while hardening the canvas↔buffer seam (§7.4/§7.5/§9.4). Neither
@@ -1126,6 +1230,24 @@ selected instead of clearing. For collapse, key on the same mapped-offset
 identity, and drop keys that no longer resolve so the set stops growing.
 
 ---
+
+### 10.3 The inspector is rebuilt wholesale on every render **[chore]**
+
+*What it is.* `renderInspector` (`packages/editor/src/inspector.ts`) starts
+with `inspector.innerHTML = ''` and rebuilds every control. Checkboxes and
+steppers don't notice; the class-convention text fields do — a live-sync
+refresh while someone is typing would take the caret away mid-word. Handled
+for now by remembering the focused field and its selection range around the
+wipe (`rememberFieldFocus` / `restoreFieldFocus`).
+
+*Why it matters.* That's a targeted patch over a general problem: any future
+control with internal state (a text field, an open dropdown, a scroll
+position) needs its own version of the same save/restore. Related to §10.2 —
+same root cause, that view state lives in the DOM the renderer discards.
+
+*Suggested direction.* If a third piece of DOM state shows up, stop patching
+and make the inspector update in place (or key its sections) instead of
+rebuilding.
 
 ## 11. Parse fidelity
 
