@@ -3,11 +3,12 @@
    reaches the document. */
 
 import {
-  BPS, applyEdits, buildModel, classTokens, classValue, definingBp,
-  detectEol, detectIndentUnit, isColTokens, parseTemplate, usesBs3, widthTokenBp,
+  BPS, ROW_CLASS, applyEdits, buildModel, classTokens, classValue, definingBp,
+  detectEol, detectIndentUnit, isColTokens, mergeClasses, parseExtraClasses,
+  parseTemplate, usesBs3, widthTokenBp,
 } from '@bootstrap-visualizer/core';
 import type {
-  Breakpoint, ColNode, Edit, El, NodePath, RootEl, RowNode,
+  Breakpoint, ColNode, Edit, El, ExtraClasses, NodePath, RootEl, RowNode, Scaffold,
 } from '@bootstrap-visualizer/core';
 import { toast } from './dom.js';
 import { render } from './render.js';
@@ -50,6 +51,11 @@ export interface AppState {
   /** The document's line ending (`\n` or `\r\n`), detected alongside
       `indentUnit` and used by every builder that inserts a new line. */
   eol: string;
+  /** The user's class convention: extra classes every row / column the canvas
+      *creates* carries, on top of the grid classes it computes. Parsed from
+      the setting; `raw` is what the user typed, echoed back into the field. */
+  newRowClasses: ExtraClasses & { raw: string };
+  newColClasses: ExtraClasses & { raw: string };
   find: string;
   findMatches: Selection[];
   findIdx: number | null;
@@ -80,6 +86,8 @@ export const state: AppState = {
   docBs3: false,
   indentUnit: '  ',
   eol: '\n',
+  newRowClasses: { raw: '', tokens: [], dropped: [] },
+  newColClasses: { raw: '', tokens: [], dropped: [] },
   find: '',
   findMatches: [],
   findIdx: null,
@@ -115,15 +123,22 @@ export interface Host {
       that element's span (standalone: textarea selection + highlight band;
       extension: editor.revealRange), or null when selection is cleared. */
   revealSource(el: El | null): void;
-  /** Persist a sticky view preference the user toggled in the canvas
-      (stretch/tint), so it's remembered next open. Optional: the standalone
+  /** Persist a preference the user set in the canvas (the view toggles, the
+      class convention), so it's remembered next open. Optional: the standalone
       has nowhere to persist to and omits it; the extension writes it to the
       user's VS Code settings. */
-  persistViewPref?(pref: ViewPref, value: boolean): void;
+  persistPref?(change: PrefChange): void;
 }
 
-/** The view toggles that double as remembered settings. */
+/** The canvas controls that double as remembered settings: the two view
+    toggles (booleans) and the class convention fields (strings). Carried as a
+    discriminated union so a key and a value of the wrong type can't be paired
+    — the host maps these straight onto settings. */
 export type ViewPref = 'stretchSheet' | 'tintOverfull';
+export type ClassPref = 'newRowClasses' | 'newColumnClasses';
+export type PrefChange =
+  | { pref: ViewPref; value: boolean }
+  | { pref: ClassPref; value: string };
 
 /** Settings the host seeds the canvas with at open (extension only). All
     optional — an absent field keeps the built-in default. */
@@ -133,6 +148,9 @@ export interface OpenConfig {
   tintOverfull?: boolean;
   /** Dialect for *new* classes when a file has none to detect from. */
   dialect?: 'bootstrap5' | 'bootstrap3';
+  /** Class convention for created rows / columns (see `state.newRowClasses`). */
+  newRowClasses?: string;
+  newColumnClasses?: string;
 }
 
 /** Default dialect for a file with no grid classes (set by config; BS5 unless
@@ -146,6 +164,17 @@ export function applyOpenConfig(cfg: OpenConfig): void {
   if (cfg.stretchSheet != null) state.stretchSheet = cfg.stretchSheet;
   if (cfg.tintOverfull != null) state.tintOverfull = cfg.tintOverfull;
   if (cfg.dialect) dialectDefault = cfg.dialect === 'bootstrap3';
+  readClassConvention(cfg);
+}
+
+/** Take just the class convention out of a config. Split from
+    `applyOpenConfig` because the convention is the one setting that can also
+    arrive *mid-session* (the user edits it in settings while the canvas is
+    open) — and re-running the whole open config then would yank the
+    breakpoint and view toggles back from under them. */
+export function readClassConvention(cfg: OpenConfig): void {
+  if (cfg.newRowClasses != null) setClassConvention('row', cfg.newRowClasses, false);
+  if (cfg.newColumnClasses != null) setClassConvention('col', cfg.newColumnClasses, false);
 }
 
 let host: Host | null = null;
@@ -154,7 +183,35 @@ export function setHost(h: Host): void { host = h; }
 /** Set a sticky view preference and tell the host to remember it. */
 export function persistViewPref(pref: ViewPref, value: boolean): void {
   state[pref] = value;
-  host?.persistViewPref?.(pref, value);
+  host?.persistPref?.({ pref, value });
+}
+
+/** Set the class convention for created rows or columns. `persist` is false
+    when the value *came from* the host (open config, or a settings change), so
+    it isn't written straight back. */
+export function setClassConvention(
+  kind: 'row' | 'col', raw: string, persist = true,
+): void {
+  const key = kind === 'row' ? 'newRowClasses' : 'newColClasses';
+  if (state[key].raw === raw) return;
+  state[key] = { raw, ...parseExtraClasses(raw) };
+  if (persist) {
+    host?.persistPref?.({
+      pref: kind === 'row' ? 'newRowClasses' : 'newColumnClasses', value: raw,
+    });
+  }
+}
+
+/** Does this host remember preferences at all? The standalone doesn't, and
+    the inspector says so rather than implying the field is sticky. */
+export function canPersistPrefs(): boolean {
+  return !!host?.persistPref;
+}
+
+/** The document's whitespace, as the markup builders in core want it.
+    `indent` is the indent of the block being inserted. */
+export function scaffoldAt(indent: string): Scaffold {
+  return { eol: state.eol, indent, indentUnit: state.indentUnit };
 }
 
 export function canApplyEdit(): { ok: true } | { ok: false; reason: string } {
@@ -382,6 +439,28 @@ export function conventionNewColTokens(
   const tier = dominantTier(rowNode) || state.bp;
   if (state.docBs3) return [`col-${tier}-6`];
   return [tier === 'xs' ? 'col' : `col-${tier}`];
+}
+
+/** Full class list for a brand-new column: the computed width tokens, then
+    the user's column convention. */
+export function newColClassList(
+  refTokens: string[] | null, rowNode: RowNode | ColNode | null,
+): string[] {
+  return mergeClasses(conventionNewColTokens(refTokens, rowNode), state.newColClasses.tokens);
+}
+
+/** Full class list for a brand-new row: the canonical `row` (so the canvas
+    can always see what it created), then the user's row convention. */
+export function newRowClassList(): string[] {
+  return mergeClasses([ROW_CLASS], state.newRowClasses.tokens);
+}
+
+/** The single column a brand-new row is created with: full width, in the
+    document's dialect (Bootstrap 3 has no bare `col`), plus the column
+    convention. Not `conventionNewColTokens` — that one sizes a *sibling* of
+    existing columns, which for a fresh one-column row would be too narrow. */
+export function newRowColClassList(): string[] {
+  return mergeClasses(state.docBs3 ? ['col-xs-12'] : ['col'], state.newColClasses.tokens);
 }
 
 /* Re-exported so callers don't need a second import for the common case. */

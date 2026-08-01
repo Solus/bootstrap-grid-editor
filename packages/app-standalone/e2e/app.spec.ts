@@ -1018,3 +1018,46 @@ test.describe('scroll into view', () => {
     await expect(page.locator('.g-row.selected')).toBeInViewport({ timeout: 10_000 });
   });
 });
+
+test.describe('building structure from the canvas', () => {
+  test('a column can be given a nested row', async ({ page }) => {
+    const col = colWithClass(page, 'col-md-4 col-lg-3');
+    const nestedBefore = await col.locator('.g-row').count();
+    await col.click();
+    await page.locator('#inspector').getByText('Add row inside').click();
+    await expect(col.locator('.g-row')).toHaveCount(nestedBefore + 1);
+    expect(await source(page)).toContain('<!-- new column -->');
+  });
+
+  test('with nothing selected, Add row appends one to the document', async ({ page }) => {
+    const before = await page.locator('.rows-host > .g-row').count();
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('Escape');                                    // deselect
+    await expect(page.locator('#inspector')).toContainText('Start here');
+    await page.locator('#inspector').getByRole('button', { name: 'Add row', exact: true }).click();
+    await expect(page.locator('.rows-host > .g-row')).toHaveCount(before + 1);
+  });
+
+  test('the class convention reaches the markup the canvas writes', async ({ page }) => {
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('Escape');
+    await page.locator('input[data-conv="row"]').fill('clearfix form-group');
+    await page.locator('input[data-conv="row"]').blur();
+    await expect(page.locator('#inspector')).toContainText('row clearfix form-group');
+
+    await page.locator('#inspector').getByRole('button', { name: 'Add row', exact: true }).click();
+    expect(await source(page)).toContain('<div class="row clearfix form-group">');
+  });
+
+  test('a grid class in the convention is ignored, not written', async ({ page }) => {
+    await page.locator('input[data-conv="col"]').fill('col-md-6 px-2');
+    await page.locator('input[data-conv="col"]').blur();
+    await expect(page.locator('#inspector')).toContainText('Ignored: col-md-6');
+
+    await colWithClass(page, 'col-md-4 col-lg-3').click();
+    await page.locator('#inspector').getByText('Add column after').click();
+    const src = await source(page);
+    expect(src).toContain('<div class="col-md-4 col-lg-3 px-2">');
+    expect(src).not.toContain('col-md-4 col-lg-3 col-md-6');
+  });
+});

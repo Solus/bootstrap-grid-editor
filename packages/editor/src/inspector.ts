@@ -8,15 +8,19 @@ import {
 } from '@bootstrap-visualizer/core';
 import type { ColNode, RowNode, WidthValue } from '@bootstrap-visualizer/core';
 import { escapeHtml, inspector } from './dom.js';
-import { persistViewPref, resolvePath, state } from './state.js';
+import {
+  canPersistPrefs, newColClassList, newRowClassList, persistViewPref, resolvePath,
+  rowOfSel, setClassConvention, state,
+} from './state.js';
 import { render } from './render.js';
 import {
-  addColAfter, addColToRow, addRowAfter, changeOffset, deleteEl, nudgeCol,
-  nudgeRow, quickOffset, quickWidth, splitCol, stepWidth,
+  addColAfter, addColToRow, addRowAfter, addRowAtEnd, addRowToCol, changeOffset,
+  deleteEl, nudgeCol, nudgeRow, quickOffset, quickWidth, splitCol, stepWidth,
 } from './edits.js';
 
 export function renderInspector(): void {
   const node = state.sel && resolvePath(state.sel.path);
+  rememberFieldFocus();
   inspector.innerHTML = '';
   if (!node) {
     const d = document.createElement('div');
@@ -24,9 +28,22 @@ export function renderInspector(): void {
     d.innerHTML = 'Select a column or row on the canvas.' +
       '<br><br>Drag a column onto the amber slots to move it — within a row or into another row.';
     inspector.appendChild(d);
+    const as = sec('Start here');
+    const act = document.createElement('div');
+    act.className = 'insp-actions';
+    as.appendChild(act);
+    actBtn(act, 'Add row', () => addRowAtEnd());
+    const hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = state.model.length
+      ? 'Adds a row after the last one in the document.'
+      : 'Adds the first row at the end of the document — then build it out from there.';
+    as.appendChild(hint);
   } else if (node.kind === 'col') renderColInspector(node);
   else renderRowInspector(node);
   renderViewSection();
+  renderConventionSection();
+  restoreFieldFocus();
 }
 
 function renderViewSection(): void {
@@ -39,6 +56,85 @@ function renderViewSection(): void {
   vs.appendChild(viewOpt('Stretch to fit',
     'Let the sheet use the whole canvas panel instead of the breakpoint\'s representative width — proportions are unchanged',
     () => state.stretchSheet, v => persistViewPref('stretchSheet', v)));
+}
+
+/* ── the class convention for created rows / columns ─────────────── */
+
+/** Extra classes every row and column the canvas *creates* carries. The canvas
+    computes the grid classes; this is the rest of what the project's markup
+    always has on them (`clearfix form-group`), so a page can be built without
+    going back to fix every class attribute by hand. */
+function renderConventionSection(): void {
+  const cs = sec('New rows & columns');
+  cs.appendChild(convField('row', 'Extra classes on new rows', state.newRowClasses.raw));
+  cs.appendChild(convField('col', 'Extra classes on new columns', state.newColClasses.raw));
+
+  const prev = document.createElement('div');
+  prev.className = 'insp-kv';
+  // built by calling the same functions the edits call — never a second
+  // implementation of what gets written
+  prev.innerHTML = 'next row <b>' + escapeHtml(newRowClassList().join(' ')) + '</b>' +
+    ' · next column <b>' +
+    escapeHtml(newColClassList(null, rowOfSel()).join(' ')) + '</b>';
+  cs.appendChild(prev);
+
+  const ignored = [...state.newRowClasses.dropped, ...state.newColClasses.dropped];
+  if (ignored.length) {
+    const warn = document.createElement('div');
+    warn.className = 'hint';
+    warn.textContent = 'Ignored: ' + [...new Set(ignored)].join(', ') +
+      ' — grid classes are computed from the column, and `row` is always written.';
+    cs.appendChild(warn);
+  }
+  if (!canPersistPrefs()) {
+    const hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = 'Applies to this session only — not saved.';
+    cs.appendChild(hint);
+  }
+}
+
+function convField(kind: 'row' | 'col', label: string, value: string): HTMLElement {
+  const wrap = document.createElement('label');
+  wrap.className = 'conv-field';
+  const t = document.createElement('span');
+  t.textContent = label;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = value;
+  input.placeholder = kind === 'row' ? 'e.g. clearfix form-group' : 'e.g. px-2';
+  input.dataset.conv = kind;
+  // Commit on change (blur/Enter), not per keystroke: each commit is a write to
+  // the user's settings, and with the settings watcher live a per-character
+  // write would echo straight back into the field being typed in.
+  input.addEventListener('change', () => {
+    setClassConvention(kind, input.value);
+    render();
+  });
+  wrap.append(t, input);
+  return wrap;
+}
+
+/* The inspector is rebuilt wholesale on every render, which a text field
+   notices and a checkbox doesn't: a live-sync refresh mid-typing would take
+   the caret away. Remember where it was and put it back. */
+let pendingFocus: { conv: string; start: number; end: number } | null = null;
+
+function rememberFieldFocus(): void {
+  const el = document.activeElement;
+  pendingFocus = el instanceof HTMLInputElement && el.dataset.conv
+    ? { conv: el.dataset.conv, start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 }
+    : null;
+}
+
+function restoreFieldFocus(): void {
+  if (!pendingFocus) return;
+  const { conv, start, end } = pendingFocus;
+  pendingFocus = null;
+  const input = inspector.querySelector<HTMLInputElement>(`input[data-conv="${conv}"]`);
+  if (!input) return;
+  input.focus();
+  input.setSelectionRange(start, end);
 }
 
 function viewOpt(
@@ -221,6 +317,7 @@ function renderColInspector(node: ColNode): void {
   as.appendChild(act);
   actBtn(act, 'Split in two', () => splitCol(node));
   actBtn(act, 'Add column after', () => addColAfter(node));
+  actBtn(act, 'Add row inside', () => addRowToCol(node));
   actBtn(act, '◀ Move', () => nudgeCol(-1));
   actBtn(act, 'Move ▶', () => nudgeCol(+1));
   const del = actBtn(act, 'Delete', () => deleteEl(node));

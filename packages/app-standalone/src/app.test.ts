@@ -182,13 +182,32 @@ describe('open config + sticky view prefs', () => {
   it('flipping a sticky pref asks the host to persist it', async () => {
     const ed = await editor();
     const { standaloneHost } = await import('./standalone-host.js');
-    const writes: Array<[string, boolean]> = [];
-    ed.setHost({ ...standaloneHost, persistViewPref: (p, v) => writes.push([p, v]) });
+    const writes: Array<[string, boolean | string]> = [];
+    ed.setHost({ ...standaloneHost, persistPref: c => writes.push([c.pref, c.value]) });
     ed.persistViewPref('stretchSheet', true);
     expect(writes).toEqual([['stretchSheet', true]]);
     expect(ed.state.stretchSheet).toBe(true);
     ed.setHost(standaloneHost);          // restore the real host
     ed.state.stretchSheet = false;       // and the mutated state
+  });
+
+  it('setting a class convention asks the host to persist it too', async () => {
+    const ed = await editor();
+    const { standaloneHost } = await import('./standalone-host.js');
+    const writes: Array<[string, boolean | string]> = [];
+    ed.setHost({ ...standaloneHost, persistPref: c => writes.push([c.pref, c.value]) });
+    ed.setClassConvention('row', 'clearfix form-group');
+    ed.setClassConvention('col', 'px-2');
+    expect(writes).toEqual([
+      ['newRowClasses', 'clearfix form-group'],
+      ['newColumnClasses', 'px-2'],
+    ]);
+    // a value that arrives *from* the host isn't written straight back
+    ed.setClassConvention('row', 'mb-3', false);
+    expect(writes).toHaveLength(2);
+    ed.setHost(standaloneHost);
+    ed.setClassConvention('row', '');
+    ed.setClassConvention('col', '');
   });
 });
 
@@ -313,6 +332,39 @@ describe('selection drives the inspector', () => {
     row.click();
     const insp = document.querySelector('#inspector')!;
     expect(insp.textContent).toContain('Add row after');
+  });
+
+  it('a column can gain a row of its own', () => {
+    document.querySelector<HTMLElement>('.g-col')!.click();
+    expect(document.querySelector('#inspector')!.textContent).toContain('Add row inside');
+  });
+
+  it('offers a starting point with nothing selected', async () => {
+    const ed = await editor();
+    ed.clearSelection();
+    const insp = document.querySelector('#inspector')!;
+    expect(insp.textContent).toContain('Add row');
+  });
+
+  it('shows the class convention and what the next insert will write', async () => {
+    const ed = await editor();
+    ed.clearSelection();
+    ed.setClassConvention('row', 'clearfix', false);
+    ed.renderInspector();
+    const insp = document.querySelector('#inspector')!;
+    const field = insp.querySelector<HTMLInputElement>('input[data-conv="row"]')!;
+    expect(field.value).toBe('clearfix');
+    expect(insp.textContent).toContain('row clearfix');
+    // the standalone can't remember it, and says so rather than implying it can
+    expect(insp.textContent).toContain('not saved');
+
+    // typing in the field and committing updates the convention
+    field.value = 'clearfix form-group';
+    field.dispatchEvent(new Event('change'));
+    expect(ed.state.newRowClasses.tokens).toEqual(['clearfix', 'form-group']);
+
+    ed.setClassConvention('row', '', false);
+    ed.renderInspector();
   });
 });
 
@@ -591,5 +643,162 @@ describe('markup the parser had to guess at holds back the destructive edits', (
 
     ed.apply('<div class="row"><div class="col-6">x</div></div>');
     expect(document.querySelector('.parse-degraded')).toBeNull();
+  });
+});
+
+describe('the class convention rides along on everything the canvas creates', () => {
+  const SRC = [
+    '<div class="row">',
+    '  <div class="col-6">A</div>',
+    '</div>',
+  ].join('\n');
+
+  /** Load SRC with a convention set; the caller resets it. */
+  const load = async (row: string, col: string) => {
+    const ed = await editor();
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.setClassConvention('row', row, false);
+    ed.setClassConvention('col', col, false);
+    ed.apply(SRC);
+    return ed;
+  };
+
+  const reset = (ed: EditorApi) => {
+    ed.setClassConvention('row', '', false);
+    ed.setClassConvention('col', '', false);
+  };
+
+  it('adds the row convention after the row class, not instead of it', async () => {
+    const ed = await load('clearfix form-group', '');
+    ed.addRowAfter(ed.state.model[0]!);
+    expect(ed.state.src).toContain('<div class="row clearfix form-group">');
+    reset(ed);
+  });
+
+  it('adds the column convention after the computed width classes', async () => {
+    const ed = await load('', 'px-2');
+    ed.addColToRow(ed.state.model[0]!);
+    expect(ed.state.src).toContain('<div class="col-6 px-2">');
+    reset(ed);
+  });
+
+  it('carries the convention through add-after, split and add-row-inside', async () => {
+    const ed = await load('clearfix', 'px-2');
+
+    ed.addColAfter(ed.state.model[0]!.cols[0]!);
+    expect(ed.state.src).toContain('<div class="col-6 px-2">');
+
+    ed.splitCol(ed.state.model[0]!.cols[0]!);
+    expect(ed.state.src).toContain('<div class="col-3 px-2">');
+
+    ed.addRowToCol(ed.state.model[0]!.cols[0]!);
+    expect(ed.state.src).toContain('<div class="row clearfix">');
+    reset(ed);
+  });
+
+  it('ignores anything that would fight the canvas or break the file', async () => {
+    const ed = await load('row col-6 clearfix', 'col-md-4 offset-2 a"b px-2');
+    ed.addRowAfter(ed.state.model[0]!);
+    expect(ed.state.src).toContain('<div class="row clearfix">');
+    expect(ed.state.src).toContain('<div class="col px-2">');
+    // and the result is still a grid the canvas can read: two rows, one column each
+    expect(ed.state.model).toHaveLength(2);
+    expect(ed.state.model[1]!.cols).toHaveLength(1);
+    reset(ed);
+  });
+
+  it('reports what it ignored', async () => {
+    const ed = await load('row px-2', '');
+    expect(ed.state.newRowClasses.tokens).toEqual(['px-2']);
+    expect(ed.state.newRowClasses.dropped).toEqual(['row']);
+    reset(ed);
+  });
+
+  it('seeds from the host config at open', async () => {
+    const ed = await editor();
+    ed.applyOpenConfig({ newRowClasses: 'clearfix', newColumnClasses: 'px-2' });
+    expect(ed.state.newRowClasses.tokens).toEqual(['clearfix']);
+    expect(ed.state.newColClasses.tokens).toEqual(['px-2']);
+    reset(ed);
+  });
+});
+
+describe('rows can be added to a column and to the document', () => {
+  const CONTAINER = [
+    '<div class="row">',
+    '  <div class="col-6">',
+    '    <div class="row">',
+    '      <div class="col">A</div>',
+    '    </div>',
+    '  </div>',
+    '</div>',
+  ].join('\n');
+
+  const load = async (src: string) => {
+    const ed = await editor();
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply(src);
+    return ed;
+  };
+
+  it('appends a nested row after the column\'s last one', async () => {
+    const ed = await load(CONTAINER);
+    ed.addRowToCol(ed.state.model[0]!.cols[0]!);
+    expect(ed.state.model[0]!.cols[0]!.nestedRows).toHaveLength(2);
+    // inside the column, not after it
+    expect(ed.state.src.indexOf('<div class="row">', 1))
+      .toBeLessThan(ed.state.src.lastIndexOf('</div>'));
+    // indented like the row it follows
+    expect(ed.state.src).toContain('\n    <div class="row">\n      <div class="col">');
+  });
+
+  it('puts a row into a content column after the content already there', async () => {
+    const ed = await load('<div class="row">\n  <div class="col-6">A</div>\n</div>');
+    ed.addRowToCol(ed.state.model[0]!.cols[0]!);
+    const col = ed.state.model[0]!.cols[0]!;
+    expect(col.nestedRows).toHaveLength(1);
+    expect(ed.state.src.indexOf('A')).toBeLessThan(ed.state.src.indexOf('class="row"', 20));
+  });
+
+  it('refuses a column with no closing tag to put a row inside', async () => {
+    const ed = await load('<div class="row">\n  <input class="col-6">\n</div>');
+    const before = ed.state.src;
+    ed.addRowToCol(ed.state.model[0]!.cols[0]!);
+    expect(ed.state.src).toBe(before);
+    expect(document.querySelector('.toast.warn')!.textContent).toContain('no closing tag');
+  });
+
+  it('adds a row after the last top-level one', async () => {
+    const ed = await load(CONTAINER);
+    ed.addRowAtEnd();
+    expect(ed.state.model).toHaveLength(2);
+    expect(ed.state.src.trimEnd().endsWith('</div>')).toBe(true);
+  });
+
+  it('starts the grid in a document that has none', async () => {
+    const ed = await load('<form>\n  <p>nothing here yet</p>\n</form>\n');
+    expect(ed.state.model).toHaveLength(0);
+    ed.addRowAtEnd();
+    expect(ed.state.model).toHaveLength(1);
+    expect(ed.state.model[0]!.cols).toHaveLength(1);
+    // appended at the end of the file, and no blank first line
+    expect(ed.state.src.startsWith('<form>')).toBe(true);
+  });
+
+  it('starts the grid in an empty document', async () => {
+    const ed = await load('');
+    ed.addRowAtEnd();
+    expect(ed.state.src.startsWith('<div class="row">')).toBe(true);
+    expect(ed.state.model).toHaveLength(1);
+  });
+
+  it('gives a new row a full-width column in the document\'s dialect', async () => {
+    const ed = await load('<div class="row">\n  <div class="col-xs-6">A</div>\n</div>');
+    expect(ed.state.docBs3).toBe(true);
+    ed.addRowAfter(ed.state.model[0]!);
+    // Bootstrap 3 has no bare `col`
+    expect(ed.state.src).toContain('<div class="col-xs-12">');
   });
 });
