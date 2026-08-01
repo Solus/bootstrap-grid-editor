@@ -1,5 +1,23 @@
 # Change Log
 
+## Unreleased
+
+- Added: **new rows and columns can follow your project's class convention.**
+  Set **Bootstrap Grid Visualizer › New Row Classes** to `clearfix form-group`
+  and every row the canvas creates is written
+  `<div class="row clearfix form-group">`; **New Column Classes** does the same
+  for columns, after the width classes the canvas computes. Both are editable
+  in the inspector's *New rows & columns* section, take effect the moment you
+  change them, and are workspace-scoped — commit them in `.vscode/settings.json`
+  and everyone on the project gets them. Grid classes typed into either field
+  are ignored, so a convention can never fight the canvas.
+- Added: **Add row inside**, on a selected column — nested rows can now be
+  created from the canvas instead of only columns.
+- Added: **Add row** with nothing selected, including on a template that has no
+  grid at all, so a page can be built from scratch rather than only rearranged.
+- Fixed: a new row created in a Bootstrap 3 document now gets a `col-xs-12`
+  column instead of a bare `col`, which means nothing in Bootstrap 3.
+
 ## 0.0.16
 
 - Changed: the canvas now follows the editor by default. Undoing with Ctrl+Z,
