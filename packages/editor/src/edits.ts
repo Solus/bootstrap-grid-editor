@@ -6,15 +6,16 @@
    the span edits are what the host adapter replays outward. */
 
 import {
-  canCutElement, classEdit, classTokens, effectiveAt, definingBp, elementCutRange,
-  halveWidthTokenStr, halvedWidthTokens, rowChildIndent, setOffsetToken,
-  setWidthToken, widthTokenBp,
+  canCutElement, childIndent, classEdit, classTokens, effectiveAt, definingBp,
+  elementCutRange, halveWidthTokenStr, halvedWidthTokens, mergeClasses, newColMarkup,
+  newRowMarkup, rowChildIndent, setOffsetToken, setWidthToken, widthTokenBp,
 } from '@bootstrap-visualizer/core';
 import type {
   Breakpoint, ColNode, Edit, El, NodePath, RowNode, WidthValue,
 } from '@bootstrap-visualizer/core';
 import {
-  applyOps, conventionNewColTokens, fallbackTier, resolvePath, rowOfSel, state,
+  applyOps, conventionNewColTokens, fallbackTier, newColClassList, newRowClassList,
+  newRowColClassList, resolvePath, rowOfSel, scaffoldAt, state,
 } from './state.js';
 import { toast } from './dom.js';
 
@@ -146,10 +147,10 @@ export function splitCol(node: ColNode): void {
     firstTokens = tokens;
     secondClasses = conventionNewColTokens(null, rowOfSel());
   }
+  // the half is a newly created column, so it carries the convention too
+  secondClasses = mergeClasses(secondClasses, state.newColClasses.tokens);
   const { indent } = elementCutRange(state.src, el);
-  const nl = state.eol;
-  const newColHtml = nl + indent + '<div class="' + secondClasses.join(' ') + '">' + nl +
-    indent + state.indentUnit + '<!-- new column -->' + nl + indent + '</div>';
+  const newColHtml = newColMarkup(secondClasses, scaffoldAt(indent));
   // insert the new column after the original, and (if it has widths) halve
   // the original's classes — both against the original source; applyEdits
   // orders them, so no length-delta juggling is needed
@@ -162,10 +163,7 @@ export function addColAfter(node: ColNode): void {
   const el = node.el;
   if (!spansAreSafe(el)) return;
   const { indent } = elementCutRange(state.src, el);
-  const cls = conventionNewColTokens(classTokens(el), rowOfSel()).join(' ');
-  const nl = state.eol;
-  const html = nl + indent + '<div class="' + cls + '">' + nl +
-    indent + state.indentUnit + '<!-- new column -->' + nl + indent + '</div>';
+  const html = newColMarkup(newColClassList(classTokens(el), rowOfSel()), scaffoldAt(indent));
   applyOps([{ start: el.end, end: el.end, text: html }]);
 }
 
@@ -175,10 +173,8 @@ export function addColToRow(rowNode: RowNode): void {
   // the insertion point is the last column's end (or inside the row's open tag)
   if (!spansAreSafe(rowEl, lastCol?.el)) return;
   const indent = rowChildIndent(state.src, rowEl, state.indentUnit);
-  const cls = conventionNewColTokens(lastCol ? classTokens(lastCol.el) : null, rowNode).join(' ');
-  const nl = state.eol;
-  const html = nl + indent + '<div class="' + cls + '">' + nl +
-    indent + state.indentUnit + '<!-- new column -->' + nl + indent + '</div>';
+  const cls = newColClassList(lastCol ? classTokens(lastCol.el) : null, rowNode);
+  const html = newColMarkup(cls, scaffoldAt(indent));
   // insert after the last *shown* column so a conditional row adds into the
   // active branch (rowEl.children is every flattened branch); for a plain row
   // this is the same as the last child.
@@ -190,13 +186,52 @@ export function addRowAfter(rowNode: RowNode): void {
   const el = rowNode.el;
   if (!spansAreSafe(el)) return;
   const { indent } = elementCutRange(state.src, el);
-  const one = indent + state.indentUnit;
-  const two = one + state.indentUnit;
-  const nl = state.eol;
-  const html = nl + nl + indent + '<div class="row">' + nl +
-    one + '<div class="col">' + nl + two + '<!-- new column -->' + nl + one + '</div>' + nl +
-    indent + '</div>';
+  const html = newRowMarkup(newRowClassList(), newRowColClassList(),
+                            scaffoldAt(indent), { lead: 'blank-line' });
   applyOps([{ start: el.end, end: el.end, text: html }]);
+}
+
+/** Add a nested row *inside* a column — the other half of "add column to a
+    row", and what lets a page be built downward from an empty column instead
+    of only sideways from an existing row. */
+export function addRowToCol(colNode: ColNode): void {
+  const el = colNode.el;
+  const lastRow = colNode.nestedRows[colNode.nestedRows.length - 1];
+  // the insertion point is the last nested row's end, or the column's own
+  // content end — both are spans the parser has to have got right
+  if (!spansAreSafe(el, lastRow?.el)) return;
+  // a void or self-closing element (<input class="col-6" />) has no inside
+  if (el.selfClosing || el.end === el.openEnd) {
+    toast('<' + el.tag + '> has no closing tag to put a row inside.', 'warn');
+    return;
+  }
+  // append after the last *shown* nested row so a conditional column adds into
+  // the active branch; with none, go in as the column's last child — after any
+  // content it already has, never before it
+  const at = lastRow ? lastRow.el.end : el.contentEnd;
+  const indent = lastRow
+    ? elementCutRange(state.src, lastRow.el).indent
+    : childIndent(state.src, el, state.indentUnit);
+  const html = newRowMarkup(newRowClassList(), newRowColClassList(), scaffoldAt(indent),
+                            { lead: lastRow ? 'blank-line' : 'newline' });
+  applyOps([{ start: at, end: at, text: html }]);
+}
+
+/** Add a row at the end of the document — the entry point for a template that
+    has no grid yet, or for adding to the bottom without selecting first. */
+export function addRowAtEnd(): void {
+  const last = state.model[state.model.length - 1];
+  if (last) { addRowAfter(last); return; }
+  // Nothing to anchor to: append at the end of the file. For a template that
+  // is a fragment (the usual case) that's exactly right; for one wrapped in a
+  // <form> the row lands after the wrapper, where the user can see it and move
+  // it — better than guessing which element was meant.
+  const src = state.src;
+  const lead = src === '' || src.endsWith('\n') ? 'none' : 'newline';
+  const html = newRowMarkup(newRowClassList(), newRowColClassList(),
+                            scaffoldAt(''), { lead });
+  applyOps([{ start: src.length, end: src.length, text: html }]);
+  toast('Added a row at the end of the document.');
 }
 
 export function deleteEl(node: RowNode | ColNode): void {

@@ -141,6 +141,16 @@ textarea#src{
   cursor:pointer; user-select:none;
 }
 .view-opt:hover{color:var(--text)}
+.conv-field{
+  display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted);
+  margin-bottom:6px;
+}
+.conv-field input{
+  font-family:var(--mono); font-size:11px; padding:4px 6px;
+  background:var(--panel2, #131a24); color:var(--text);
+  border:1px solid var(--line); border-radius:4px;
+}
+.conv-field input:focus{outline:none; border-color:var(--accent, #4a9eff)}
 #dropHint{
   display:none; position:fixed; inset:8px; z-index:50; pointer-events:none;
   background:rgba(14,19,27,.85); border:3px dashed var(--amber); border-radius:10px;
