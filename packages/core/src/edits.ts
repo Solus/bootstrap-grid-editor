@@ -97,13 +97,18 @@ export function elementCutRange(src: string, el: El): CutRange {
   return { cutStart, cutEnd: el.end, textStart: anchor, indent };
 }
 
-/** Indent to use for children of a row: copied from its first element
-    child, else the row's own indent plus one level (`unit`). */
-export function rowChildIndent(src: string, rowEl: El, unit?: string): string {
-  const first = rowEl.children[0];
+/** Indent to use for a new child of `el`: copied from its first element
+    child, else the element's own indent plus one level (`unit`). */
+export function childIndent(src: string, el: El, unit?: string): string {
+  const first = el.children[0];
   if (first) return elementCutRange(src, first).indent;
-  return elementCutRange(src, rowEl).indent + (unit ?? detectIndentUnit(src));
+  return elementCutRange(src, el).indent + (unit ?? detectIndentUnit(src));
 }
+
+/** `childIndent` under its original name — a row's columns are what it was
+    written for, and the callers that insert columns still read better this
+    way. */
+export const rowChildIndent = childIndent;
 
 /* Leading whitespace of every line that has content on it. */
 const INDENTED_LINE = /^[ \t]+(?=\S)/gm;

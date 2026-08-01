@@ -9,3 +9,4 @@ export * from './classes.js';
 export * from './model.js';
 export * from './titles.js';
 export * from './edits.js';
+export * from './scaffold.js';
