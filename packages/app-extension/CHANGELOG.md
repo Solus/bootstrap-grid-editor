@@ -1,6 +1,6 @@
 # Change Log
 
-## Unreleased
+## 0.1.0
 
 - Added: **new rows and columns can follow your project's class convention.**
   Set **Bootstrap Grid Visualizer › New Row Classes** to `clearfix form-group`
