@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classTokens, setWidthToken } from './classes.js';
+import { classTokens, setOffsetToken, setWidthToken } from './classes.js';
 import {
   applyEdits, classEdit, detectEol, detectIndentUnit, elementCutRange,
   rowChildIndent, splice, writeClass,
@@ -192,13 +192,53 @@ describe('applyEdits / classEdit (span-edit batch, added Session 3)', () => {
     expect(applyEdits(s, edits)).toBe('[BB]--[AA]');
   });
 
-  it('classEdit targets the class value span; writeClass is applyEdits of it', () => {
+  it('classEdit targets the changed token span; writeClass is applyEdits of it', () => {
     const s = `<div class="row"><div class="col-6">x</div></div>`;
     const el = buildModel(parseTemplate(s))[0]!.cols[0]!.el;
-    const e = classEdit(s, el, ['col-4']);
+    const edits = classEdit(s, el, ['col-4']);
+    expect(edits.length).toBe(1);
+    const e = edits[0]!;
     expect(s.slice(e.start, e.end)).toBe('col-6');
     expect(e.text).toBe('col-4');
-    expect(applyEdits(s, [e])).toBe(writeClass(s, el, ['col-4']));
+    expect(applyEdits(s, edits)).toBe(writeClass(s, el, ['col-4']));
+  });
+});
+
+describe('classEdit is token-level: unchanged tokens and their whitespace survive', () => {
+  const colOf = (s: string) => buildModel(parseTemplate(s))[0]!.cols[0]!.el;
+
+  it('changing a width leaves a multi-line class list untouched around it', () => {
+    // The class list wraps across lines; nudging the width must not reflow it.
+    const s = `<div class="row"><div class="col-md-6\n  px-2\n  text-center">x</div></div>`;
+    const el = colOf(s);
+    const edits = classEdit(s, el, setWidthToken(classTokens(el), 'md', 8));
+    expect(edits.length).toBe(1);
+    expect(writeClass(s, el, setWidthToken(classTokens(el), 'md', 8)))
+      .toBe(`<div class="row"><div class="col-md-8\n  px-2\n  text-center">x</div></div>`);
+  });
+
+  it('adding a token appends it without rewriting the others', () => {
+    const s = `<div class="row"><div class="col-md-6\n  px-2">x</div></div>`;
+    const el = colOf(s);
+    const tokens = setOffsetToken(classTokens(el), 'md', 3);
+    expect(writeClass(s, el, tokens))
+      .toBe(`<div class="row"><div class="col-md-6\n  px-2 offset-md-3">x</div></div>`);
+  });
+
+  it('removing a token drops it and one separator, keeping the rest', () => {
+    const s = `<div class="row"><div class="col-md-6 offset-md-3\n  px-2">x</div></div>`;
+    const el = colOf(s);
+    const tokens = setOffsetToken(classTokens(el), 'md', 0);   // remove the offset
+    expect(writeClass(s, el, tokens))
+      .toBe(`<div class="row"><div class="col-md-6\n  px-2">x</div></div>`);
+  });
+
+  it('an unchanged token in the middle is not part of any edit', () => {
+    const s = `<div class="row"><div class="a  col-6  b">x</div></div>`;
+    const el = colOf(s);
+    // Irregular double spaces around the untouched neighbours must be preserved.
+    expect(writeClass(s, el, ['a', 'col-4', 'b']))
+      .toBe(`<div class="row"><div class="a  col-4  b">x</div></div>`);
   });
 });
 

@@ -74,7 +74,7 @@ export function quickWidth(node: ColNode, dir: number): void {
   if (next === cur) return;
   const bp = definingBp(node.spec.width, state.bp) || fallbackTier(node, rowOfSel());
   const tokens = setWidthToken(classTokens(node.el), bp, next, state.docBs3);
-  applyOps([classEdit(state.src, node.el, tokens)]);
+  applyOps(classEdit(state.src, node.el, tokens));
 }
 
 export function quickOffset(node: ColNode, dir: number): void {
@@ -87,7 +87,7 @@ export function quickOffset(node: ColNode, dir: number): void {
   // the column (or the closest to it) — never invents a new tier's -0 token.
   const bp = definingBp(node.spec.offset, state.bp) || fallbackTier(node, rowOfSel());
   const tokens = setOffsetToken(classTokens(node.el), bp, next, state.docBs3);
-  applyOps([classEdit(state.src, node.el, tokens)]);
+  applyOps(classEdit(state.src, node.el, tokens));
 }
 
 /* ── explicit per-breakpoint edits (the "All breakpoints" grids) ──── */
@@ -114,7 +114,7 @@ export function stepWidth(
     next = steps[i]!;
   }
   const tokens = setWidthToken(classTokens(node.el), bp, next, state.docBs3);
-  applyOps([classEdit(state.src, node.el, tokens)]);
+  applyOps(classEdit(state.src, node.el, tokens));
 }
 
 export function changeOffset(node: ColNode, bp: Breakpoint, dir: number): void {
@@ -128,7 +128,7 @@ export function changeOffset(node: ColNode, bp: Breakpoint, dir: number): void {
   const keepZero = next === 0 && inheritsNonzero;
   const tokens = setOffsetToken(classTokens(node.el), bp,
                                 next === 0 ? 0 : next, state.docBs3, keepZero);
-  applyOps([classEdit(state.src, node.el, tokens)]);
+  applyOps(classEdit(state.src, node.el, tokens));
 }
 
 /* ── structural edits ────────────────────────────────────────────── */
@@ -155,7 +155,7 @@ export function splitCol(node: ColNode): void {
   // the original's classes — both against the original source; applyEdits
   // orders them, so no length-delta juggling is needed
   const edits: Edit[] = [{ start: el.end, end: el.end, text: newColHtml }];
-  if (hasW) edits.push(classEdit(state.src, el, firstTokens));
+  if (hasW) edits.push(...classEdit(state.src, el, firstTokens));
   applyOps(edits);
 }
 

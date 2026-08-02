@@ -251,7 +251,7 @@ export function attachResize(
         const bp = definingBp(colNode.spec.width, state.bp)
                 || fallbackTier(colNode, resolvePath(path.slice(0, -1)));
         const tokens = setWidthToken(classTokens(colNode.el), bp, st.cur, state.docBs3);
-        applyOps([classEdit(state.src, colNode.el, tokens)]);
+        applyOps(classEdit(state.src, colNode.el, tokens));
       } else {
         render();
       }

@@ -33,29 +33,146 @@ export function applyEdits(src: string, edits: Edit[]): string {
   return out;
 }
 
-/** The span edit that sets `el`'s class attribute value to `newTokens`,
-    adding the attribute if it's missing. An unquoted value is replaced
-    *with* quotes, since the new value may contain spaces. */
-export function classEdit(src: string, el: El, newTokens: string[]): Edit {
-  const val = newTokens.join(' ');
+/** The edits that set `el`'s class attribute value to `newTokens`, adding the
+    attribute if it's missing.
+
+    On a quoted value these are **token-level**: unchanged tokens — and the
+    author's whitespace around them, including newlines in a class list wrapped
+    across lines — are left byte-for-byte alone; only the tokens that actually
+    changed get a span. That keeps the surgical-edit promise ("we change what you
+    changed") and keeps each undo step and each `WorkspaceEdit` as small as the
+    edit really is. Returns a batch because a change can touch more than one
+    place (e.g. a token replaced at the front and another removed at the back);
+    `applyEdits` orders it. An unquoted value can't hold spaces, so a multi-token
+    result is replaced *with* quotes as one span. */
+export function classEdit(src: string, el: El, newTokens: string[]): Edit[] {
   const a = getAttr(el, 'class');
-  if (a && a.valueStart >= 0) {
-    return a.quote === ''
-      ? { start: a.valueStart, end: a.valueEnd, text: '"' + val + '"' }
-      : { start: a.valueStart, end: a.valueEnd, text: val };
+
+  // No class attribute — insert one before '>' (or '/>').
+  if (!a || a.valueStart < 0) {
+    let pos = el.openEnd - 1;                    // at '>'
+    if (src[el.openEnd - 2] === '/') pos = el.openEnd - 2;
+    const lead = /\s/.test(src[pos - 1]!) ? '' : ' ';
+    return [{ start: pos, end: pos, text: `${lead}class="${newTokens.join(' ')}"` }];
   }
-  // no class attribute — insert before '>' (or '/>')
-  let pos = el.openEnd - 1;                    // at '>'
-  if (src[el.openEnd - 2] === '/') pos = el.openEnd - 2;
-  const lead = /\s/.test(src[pos - 1]!) ? '' : ' ';
-  return { start: pos, end: pos, text: `${lead}class="${val}"` };
+
+  // Unquoted value: requote as a whole (see above).
+  if (a.quote === '') {
+    return [{ start: a.valueStart, end: a.valueEnd, text: '"' + newTokens.join(' ') + '"' }];
+  }
+
+  // Emptying the list clears the whole value in one span (also drops any stray
+  // whitespace between the quotes).
+  if (newTokens.length === 0) {
+    return a.valueEnd > a.valueStart
+      ? [{ start: a.valueStart, end: a.valueEnd, text: '' }]
+      : [];
+  }
+
+  const old = tokenSpans(src, a.valueStart, a.valueEnd);
+
+  // An empty (or whitespace-only) value takes the new list wholesale.
+  if (old.length === 0) {
+    return [{ start: a.valueStart, end: a.valueEnd, text: newTokens.join(' ') }];
+  }
+
+  return diffTokenSpans(old, newTokens);
+}
+
+interface TokenSpan { text: string; start: number; end: number; }
+
+/** The non-whitespace runs of `src[start, end)`, as absolute spans. */
+function tokenSpans(src: string, start: number, end: number): TokenSpan[] {
+  const out: TokenSpan[] = [];
+  const value = src.slice(start, end);
+  for (const m of value.matchAll(/\S+/g)) {
+    out.push({ text: m[0], start: start + m.index, end: start + m.index + m[0].length });
+  }
+  return out;
+}
+
+/** Diff the existing token spans against the desired token list and emit the
+    smallest set of edits that transforms one into the other, touching only
+    changed tokens. Uses an LCS alignment, so runs of unchanged tokens (and the
+    whitespace between them) are never in an edit range. */
+function diffTokenSpans(old: TokenSpan[], neu: string[]): Edit[] {
+  const n = old.length, m = neu.length;
+
+  // LCS length table: dp[i][j] = LCS of old[i..], neu[j..].
+  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i]![j] = old[i]!.text === neu[j]
+        ? dp[i + 1]![j + 1]! + 1
+        : Math.max(dp[i + 1]![j]!, dp[i]![j + 1]!);
+    }
+  }
+
+  // Turn the alignment into a flat op list (eq keeps a token, del removes one,
+  // ins adds one). `k` indexes old for eq/del, neu for ins.
+  type Op = { t: 'eq' | 'del' | 'ins'; k: number };
+  const ops: Op[] = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (old[i]!.text === neu[j]!) { ops.push({ t: 'eq', k: i }); i++; j++; }
+    else if (dp[i + 1]![j]! >= dp[i]![j + 1]!) { ops.push({ t: 'del', k: i }); i++; }
+    else { ops.push({ t: 'ins', k: j }); j++; }
+  }
+  while (i < n) { ops.push({ t: 'del', k: i }); i++; }
+  while (j < m) { ops.push({ t: 'ins', k: j }); j++; }
+
+  // Group consecutive non-eq ops into change blocks. `leftEnd` is the end of the
+  // unchanged token before the block (−1 at the value's start); the eq op after
+  // it (if any) gives the right bound. Unchanged runs are never in an edit.
+  const edits: Edit[] = [];
+  let leftEnd = -1;
+  for (let k = 0; k < ops.length; ) {
+    if (ops[k]!.t === 'eq') { leftEnd = old[ops[k]!.k]!.end; k++; continue; }
+    const removed: TokenSpan[] = [];
+    const inserted: string[] = [];
+    for (; k < ops.length && ops[k]!.t !== 'eq'; k++) {
+      if (ops[k]!.t === 'del') removed.push(old[ops[k]!.k]!);
+      else inserted.push(neu[ops[k]!.k]!);
+    }
+    const rightStart = k < ops.length ? old[ops[k]!.k]!.start : -1;
+    edits.push(...blockEdit(removed, inserted, leftEnd, rightStart));
+    if (removed.length) leftEnd = removed[removed.length - 1]!.end;
+  }
+  return edits;
+}
+
+/** One change block → its edit(s). `leftEnd`/`rightStart` are the offsets just
+    outside the block (an unchanged token's edge, or −1 when the block is at the
+    value's edge). Whitespace is taken from the block's own side so the
+    surviving neighbour keeps exactly one separator. */
+function blockEdit(
+  removed: TokenSpan[], inserted: string[], leftEnd: number, rightStart: number,
+): Edit[] {
+  const text = inserted.join(' ');
+  if (removed.length && inserted.length) {
+    // Replace the removed run in place.
+    return [{ start: removed[0]!.start, end: removed[removed.length - 1]!.end, text }];
+  }
+  if (removed.length) {
+    // Pure removal: drop the tokens and one adjacent separator, preferring the
+    // one before them so `a b c` minus `b` becomes `a c`, not `a  c`.
+    const start = leftEnd >= 0 ? leftEnd : removed[0]!.start;
+    const end = leftEnd >= 0 ? removed[removed.length - 1]!.end
+              : rightStart >= 0 ? rightStart
+              : removed[removed.length - 1]!.end;
+    return [{ start, end, text: '' }];
+  }
+  // Pure insertion: splice next to a neighbour with a single separating space.
+  if (leftEnd >= 0) return [{ start: leftEnd, end: leftEnd, text: ' ' + text }];
+  if (rightStart >= 0) return [{ start: rightStart, end: rightStart, text: text + ' ' }];
+  return [];   // no neighbours — caller handles the empty-value case
 }
 
 /** Replace the class attribute's value on `el` and return the new source.
     Thin wrapper over classEdit for callers that want the whole string
     (and the ported test suite). */
 export function writeClass(src: string, el: El, newTokens: string[]): string {
-  return applyEdits(src, [classEdit(src, el, newTokens)]);
+  return applyEdits(src, classEdit(src, el, newTokens));
 }
 
 /** May this element be moved, deleted, or otherwise edited *by its span*?

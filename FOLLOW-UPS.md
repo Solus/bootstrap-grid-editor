@@ -292,7 +292,17 @@ for the app to boot, but it means any assertion depending on real
 geometry is meaningless there. Geometry belongs in Playwright — just
 don't let that stub grow into something load-bearing.
 
-### 3.5 The VS Code integration suite has never been executed **[verify]**
+### 3.5 The VS Code integration suite has never been executed **[RESOLVED — first green run]**
+
+*Resolved.* Ran green locally (`npm run test:vscode`, VS Code 1.131.0 downloaded
+and launched) — **9 passing**, including the buffer-seam offset checks the entry
+was carrying. First real execution of the suite; it exercised (and validated)
+the §10.1 token-level class edits against a real document. CI still hasn't run it
+(private-repo Actions minutes are exhausted — see the go-public path), so the
+standing arrangement below is the fallback until then.
+
+*(original entry)*
+
 
 *What it is.* `packages/app-extension/test-integration/buffer-seam.test.ts`
 (via `npm run test:vscode`, `@vscode/test-cli` + `@vscode/test-electron`) is
@@ -1175,12 +1185,28 @@ is a correctness bug — edits land where they should — but both make editing 
 less precise than it is, and both were deliberately left out of that change to
 keep it reviewable.*
 
-### 10.1 A class edit rewrites the whole attribute value **[decide]**
+### 10.1 A class edit rewrites the whole attribute value **[RESOLVED — token-level edits]**
 
-*What it is.* `classEdit` (`packages/core/src/edits.ts`) replaces the class
+*Resolved.* `classEdit` (`packages/core/src/edits.ts`) now returns `Edit[]` and
+diffs the existing token spans against the desired list with an LCS alignment,
+emitting a span only for the tokens that actually changed. Runs of unchanged
+tokens — and the author's whitespace around them, newlines in a wrapped class
+list included — are never in an edit range; a change that touches both ends of
+the list yields two edits with the middle left alone. Unquoted values still
+requote whole (they can't hold spaces), and emptying the list clears the value
+in one span. Callers updated (`writeClass`, `editor/src/edits.ts`,
+`editor/src/dnd.ts`). The 157-case contract held unchanged (single-space inputs
+serialise identically), four new whitespace-preservation cases were added in
+`edits.test.ts`, and it was verified at the real buffer seam by
+`test-integration/buffer-seam.test.ts` ("a class edit rewrites exactly the class
+value"). All three layers green: 383 unit, 9 integration, 208 e2e.
+
+*(original entry)*
+
+*What it was.* `classEdit` (`packages/core/src/edits.ts`) replaced the class
 attribute's entire *value span* with `newTokens.join(' ')`, even when one token
-changed. Verified: `writeClass`/`classEdit` take the token list from
-`setWidthToken`/`setOffsetToken` and re-serialise all of it.
+changed. Verified: `writeClass`/`classEdit` took the token list from
+`setWidthToken`/`setOffsetToken` and re-serialised all of it.
 
 *Why it matters.* The value is rebuilt, so the author's own whitespace inside it
 is not preserved: a class list wrapped across several lines (common on Angular
