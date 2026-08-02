@@ -13,7 +13,7 @@
       <label app-i18n="demo.editor.code"></label>
       <text-input formControlName="code"></text-input>
     </div>
-    <div class="col-md-8 col-lg-6">
+    <div class="col-md-8 col-lg-6" *ngIf="!compactMode">
       <label app-i18n="demo.editor.name"></label>
       <text-input formControlName="name"></text-input>
     </div>
