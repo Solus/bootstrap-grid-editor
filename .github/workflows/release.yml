@@ -10,6 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    # Hoisted from secrets so the publish steps can gate on them in an `if`
+    # (secrets aren't addressable in a step `if`; job-level env is). Absent
+    # secrets → the publish steps skip, and a tag still cuts a GitHub Release.
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
     steps:
       - uses: actions/checkout@v5
 
@@ -31,11 +37,23 @@ jobs:
             exit 1
           fi
 
+      # Full gate before anything is built or published — a Marketplace version
+      # can never be replaced or unpublished, so the publish must depend on all
+      # three test layers passing on the tagged commit, not just the unit tests.
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Unit tests
+      - name: Unit tests (Vitest + jsdom)
         run: npm test
+
+      - name: Integration tests (real VS Code)
+        run: xvfb-run -a npm run test:vscode
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: End-to-end tests (Playwright)
+        run: npm run test:e2e
 
       - name: Build standalone single-file HTML
         run: npm run build:single
@@ -48,6 +66,18 @@ jobs:
           mkdir -p artifacts
           cp packages/app-standalone/dist-single/index.html "artifacts/bootstrap-visualizer-${GITHUB_REF_NAME}.html"
           cp packages/app-extension/releases/*.vsix artifacts/
+
+      # Publish the already-built .vsix (via --packagePath, never a rebuilt one)
+      # so the Marketplace, Open VSX, and the GitHub Release carry identical bits.
+      # Guarded on the PAT: a tag without secrets (interim private release, a
+      # fork) still cuts a GitHub Release without attempting to publish.
+      - name: Publish to VS Code Marketplace
+        if: env.VSCE_PAT != ''
+        run: npx @vscode/vsce publish --no-dependencies --packagePath artifacts/*.vsix
+
+      - name: Publish to Open VSX
+        if: env.OVSX_PAT != ''
+        run: npx ovsx publish artifacts/*.vsix -p "$OVSX_PAT"
 
       # Release notes = this version's section from the extension CHANGELOG,
       # so the changes are written once (CHANGELOG shows in VS Code too).

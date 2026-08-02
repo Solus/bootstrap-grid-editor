@@ -1,0 +1,46 @@
+<!-- Admin dashboard — a clean, recognisable layout that reads well on the
+     canvas: a header, a row of KPI cards, a wide chart beside a sidebar, and a
+     full-width table. A good "hero" screenshot for the listing. -->
+<div class="container-fluid">
+
+  <!--PAGE-HEADER-->
+  <div class="row">
+    <div class="col-12">
+      <app-page-header [title]="'Dashboard'" (refresh)="onRefresh()"></app-page-header>
+    </div>
+  </div>
+
+  <!-- KPI cards: two-up on phones, four-up from large screens -->
+  <div class="row">
+    <div class="col-6 col-lg-3">
+      <stat-card label="Revenue" [value]="stats.revenue"></stat-card>
+    </div>
+    <div class="col-6 col-lg-3">
+      <stat-card label="Orders" [value]="stats.orders"></stat-card>
+    </div>
+    <div class="col-6 col-lg-3">
+      <stat-card label="Customers" [value]="stats.customers"></stat-card>
+    </div>
+    <div class="col-6 col-lg-3">
+      <stat-card label="Refunds" [value]="stats.refunds"></stat-card>
+    </div>
+  </div>
+
+  <!-- Main chart beside a narrower activity sidebar -->
+  <div class="row">
+    <div class="col-12 col-lg-8">
+      <revenue-chart [series]="chartData"></revenue-chart>
+    </div>
+    <div class="col-12 col-lg-4">
+      <activity-feed [events]="recent"></activity-feed>
+    </div>
+  </div>
+
+  <!--RECENT-ORDERS-->
+  <div class="row">
+    <div class="col-12">
+      <orders-table [rows]="orders"></orders-table>
+    </div>
+  </div>
+
+</div>

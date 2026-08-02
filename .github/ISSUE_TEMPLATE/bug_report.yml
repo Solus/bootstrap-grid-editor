@@ -1,0 +1,77 @@
+name: Bug report
+description: Something the visualizer got wrong — a misread grid, a bad edit, a crash.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The single most useful thing you can give us is a
+        **minimal template snippet that reproduces it** — almost every bug here is a
+        parsing or an edit-placement bug, and both are hard to act on without the markup.
+
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Minimal template that reproduces it
+      description: The smallest HTML/Angular template that shows the problem. Paste the markup itself, not a screenshot.
+      render: html
+      placeholder: |
+        <div class="row">
+          <div class="col-md-6">…</div>
+          <div class="col-md-6">…</div>
+        </div>
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did the canvas show or write? If an edit went wrong, include the before/after of the affected lines.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: input
+    id: ext-version
+    attributes:
+      label: Extension version
+      description: Extensions view → Bootstrap Grid Visualizer → the version shown. Or the .vsix filename.
+      placeholder: 0.2.0
+    validations:
+      required: true
+
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VS Code version
+      description: Help → About (or Code → About). Include the OS.
+      placeholder: 1.96.0 — Windows 11
+    validations:
+      required: true
+
+  - type: dropdown
+    id: livesync
+    attributes:
+      label: Was live sync on?
+      description: Setting "Bootstrap Grid Visualizer › Live Sync" (on by default). It changes the whole edit path, so it matters for reproducing.
+      options:
+        - "On (default)"
+        - "Off"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots of the canvas, the dialect (Bootstrap 3/4/5), or other context.
+    validations:
+      required: false

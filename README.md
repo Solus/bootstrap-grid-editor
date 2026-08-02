@@ -18,7 +18,9 @@ npm workspaces monorepo:
 - **`packages/app-standalone`** — the browser UI (vanilla TS + Vite over
   `core`). Builds to a normal static site or a single self-contained HTML
   file.
-- **`packages/app-extension`** — the VS Code extension (not yet built).
+- **`packages/app-extension`** — the VS Code extension (canvas as a webview
+  panel, edits applied to the editor buffer). See its
+  [README](./packages/app-extension/README.md).
 - **`prototype/`** — the original single-file prototype (the reference
   implementation) and its extracted test suite.
 

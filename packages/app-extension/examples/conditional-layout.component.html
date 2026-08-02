@@ -1,0 +1,65 @@
+<!-- Conditional layouts — the visualizer treats @if / @else if / @else and
+     *ngIf as first-class, toggleable regions: top-level (whole rows), in-row
+     (columns), and on a single column. Toggle a branch on the canvas to preview
+     each variant without editing. A good screenshot for control flow. -->
+<div class="container">
+
+  <!--HEADER-->
+  <div class="row">
+    <div class="col-12">
+      <app-page-header [title]="'Account'"></app-page-header>
+    </div>
+  </div>
+
+  <!-- Top-level @if / @else: the whole row differs for signed-in vs signed-out -->
+  @if (isSignedIn) {
+  <div class="row">
+    <div class="col-md-8">
+      <profile-summary [user]="user"></profile-summary>
+    </div>
+    <div class="col-md-4">
+      <account-actions (signOut)="onSignOut()"></account-actions>
+    </div>
+  </div>
+  } @else {
+  <div class="row">
+    <div class="col-md-6 offset-md-3">
+      <sign-in-form (submit)="onSignIn()"></sign-in-form>
+    </div>
+  </div>
+  }
+
+  <!-- In-row @if / @else if / @else: the columns beside the meter change by plan -->
+  <div class="row">
+    <div class="col-md-4">
+      <usage-meter [usage]="usage"></usage-meter>
+    </div>
+    @if (plan === 'pro') {
+    <div class="col-md-8">
+      <pro-features></pro-features>
+    </div>
+    } @else if (plan === 'team') {
+    <div class="col-md-5">
+      <team-features></team-features>
+    </div>
+    <div class="col-md-3">
+      <seat-manager [seats]="seats"></seat-manager>
+    </div>
+    } @else {
+    <div class="col-md-8">
+      <upgrade-prompt (upgrade)="onUpgrade()"></upgrade-prompt>
+    </div>
+    }
+  </div>
+
+  <!-- Classic *ngIf on a single column: the tips rail appears only when enabled -->
+  <div class="row">
+    <div class="col-lg-9">
+      <activity-feed [events]="events"></activity-feed>
+    </div>
+    <div class="col-lg-3" *ngIf="showTips">
+      <tips-panel></tips-panel>
+    </div>
+  </div>
+
+</div>

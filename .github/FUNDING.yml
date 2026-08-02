@@ -1,0 +1,3 @@
+# Shows a "Sponsor" button on the repo. Activates once GitHub Sponsors is
+# enabled on the account; harmless before then.
+github: [Solus]

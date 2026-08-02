@@ -1,0 +1,68 @@
+<!-- A clean signup form — label/control pairs at a range of widths, a nested
+     city/state/zip row, and a right-aligned action pair via an offset. Select a
+     column here to show the inspector's width/offset steppers in a screenshot. -->
+<form class="container" [formGroup]="form">
+
+  <!--HEADER-->
+  <div class="row">
+    <div class="col-12">
+      <legend class="group-title">Create your account</legend>
+    </div>
+  </div>
+
+  <!-- First / last name, side by side from md up -->
+  <div class="row">
+    <div class="col-md-6">
+      <label>First name</label>
+      <text-input formControlName="firstName"></text-input>
+    </div>
+    <div class="col-md-6">
+      <label>Last name</label>
+      <text-input formControlName="lastName"></text-input>
+    </div>
+  </div>
+
+  <!-- Full-width email -->
+  <div class="row">
+    <div class="col-12">
+      <label>Email</label>
+      <text-input formControlName="email" type="email"></text-input>
+    </div>
+  </div>
+
+  <!--ADDRESS-->
+  <div class="row">
+    <div class="col-md-8">
+      <label>Street address</label>
+      <text-input formControlName="street"></text-input>
+    </div>
+    <div class="col-md-4">
+      <label>Apt / Suite</label>
+      <text-input formControlName="unit"></text-input>
+    </div>
+  </div>
+
+  <!-- City spans wider than state and zip -->
+  <div class="row">
+    <div class="col-6 col-md-5">
+      <label>City</label>
+      <text-input formControlName="city"></text-input>
+    </div>
+    <div class="col-6 col-md-3">
+      <label>State</label>
+      <select-input formControlName="state"></select-input>
+    </div>
+    <div class="col-12 col-md-4">
+      <label>ZIP</label>
+      <text-input formControlName="zip"></text-input>
+    </div>
+  </div>
+
+  <!-- Right-aligned actions: a 4-wide column pushed over by an offset of 4 -->
+  <div class="row">
+    <div class="col-md-4 offset-md-4">
+      <button class="btn btn-primary w-100" [disabled]="form.invalid" (click)="onSubmit()">Sign up</button>
+    </div>
+  </div>
+
+</form>

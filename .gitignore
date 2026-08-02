@@ -7,3 +7,7 @@ dist-single/
 test-results/
 playwright-report/
 releases/*.vsix
+packages/app-extension/examples/sanitized-template-new.html
+
+# Local brainstorming, not part of the repo
+PUBLISHING.md

@@ -1,7 +1,11 @@
 name: Test
 
 on:
+  # Tags are handled by release.yml, which runs this same suite as its gate —
+  # excluded here so a release tag doesn't run every layer twice in parallel.
   push:
+    tags-ignore:
+      - 'v*'
   pull_request:
 
 jobs:

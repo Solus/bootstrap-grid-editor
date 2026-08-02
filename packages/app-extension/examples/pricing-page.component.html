@@ -1,0 +1,34 @@
+<!-- Marketing / pricing page — three feature tiers that reflow across
+     breakpoints (1-up → 2-up → 3-up). Switch the canvas breakpoint on this one
+     to show responsive behaviour in a screenshot. Bootstrap 5 offsets centre
+     the hero and the call-to-action. -->
+<div class="container">
+
+  <!-- Centred hero: 8 wide, offset 2 to sit in the middle -->
+  <div class="row">
+    <div class="col-lg-8 offset-lg-2">
+      <hero-banner [headline]="page.headline" [subhead]="page.subhead"></hero-banner>
+    </div>
+  </div>
+
+  <!-- Feature tiers: full width on phones, half on tablets, thirds on desktop -->
+  <div class="row">
+    <div class="col-12 col-sm-6 col-lg-4">
+      <plan-card name="Starter" [price]="plans.starter"></plan-card>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-4">
+      <plan-card name="Team" [price]="plans.team" [featured]="true"></plan-card>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-4">
+      <plan-card name="Enterprise" [price]="plans.enterprise"></plan-card>
+    </div>
+  </div>
+
+  <!-- Centred call-to-action -->
+  <div class="row">
+    <div class="col-md-6 offset-md-3">
+      <cta-panel (contact)="onContact()"></cta-panel>
+    </div>
+  </div>
+
+</div>
