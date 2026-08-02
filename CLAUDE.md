@@ -73,14 +73,20 @@ file is the durable record we review and implement from later.
   display (CI runs it under `xvfb-run`).
 
 ## Commits
-- **Never commit without an explicit request from the maintainer.** Not
-  after finishing a task, not "to be safe", not because the tree is
-  green. Do the work, report it, and leave it staged-or-unstaged for
-  review. Only run `git commit` when asked to. (Applies to `git commit`
-  specifically; branching or staging to keep the tree tidy is fine.)
-- When a commit *is* requested: small, focused commits with clear
-  messages (imperative mood: "Add colSpec dialect detection", not "added
-  stuff").
+- **In a local/interactive session, never commit without an explicit
+  request from the maintainer.** Not after finishing a task, not "to be
+  safe", not because the tree is green. Do the work, report it, and leave
+  it staged-or-unstaged for review. Only run `git commit` when asked to.
+  (Applies to `git commit` specifically; branching or staging to keep the
+  tree tidy is fine.)
+- **Exception — Claude Code on the web:** those sessions run on a
+  designated branch, an end-of-session hook requires a clean tree, and the
+  container is ephemeral, so uncommitted work is lost. There, **commit when
+  you finish a reviewable slice** and push to the session's branch (never a
+  PR unless asked). This is the one place the rule above is deliberately
+  overridden.
+- Small, focused commits with clear messages either way (imperative mood:
+  "Add colSpec dialect detection", not "added stuff").
 - Don't commit `node_modules/`, `dist/`, `*.vsix` (see `.gitignore`).
 - Don't bundle unrelated changes into one commit.
 
