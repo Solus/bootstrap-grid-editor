@@ -1,140 +1,86 @@
-# CLAUDE.md — working agreement for this repo
+# CLAUDE.md — project guide
 
 Read `PLAN.md` first — it is the source of truth for architecture, the
-`GridModel`, domain rules, and the build sequence. This file is about
-*how to work here*, not *what to build*.
+`GridModel`, domain rules, and the build sequence. `CONTRIBUTING.md` covers
+setup and the test layers in full. This file is the quick project reference.
 
 ## What this project is
 A monorepo (npm workspaces) turning a proven single-file prototype
-(`prototype/grid-draft.html`) into a shared-core library with two
-frontends: a standalone web app and a VS Code extension. Treat the
-prototype as the **reference implementation** — port its logic, don't
-reinvent it. When behavior is unclear, the prototype's behavior is the
-spec.
-
-## How the maintainer likes to work
-- **Discuss before building.** For anything beyond a small, obvious
-  change, propose the approach and wait for a go-ahead. Don't scaffold
-  large structures or make cross-cutting decisions unsolicited.
-- **Push back.** If a request or an existing plan looks wrong, say so
-  with reasoning and offer alternatives. Don't just implement it.
-- **One concern at a time.** Prefer small, reviewable changes over large
-  sweeps. Land a thing, verify it, move on.
-- **State assumptions.** If you have to assume something to proceed, name
-  it in your reply.
-- Give your explanations and summaries in a clear, consise language. No need to write too much, unless the user asks for it.
-
-## Capture follow-ups in `FOLLOW-UPS.md`
-Whenever implementation or analysis turns up something relevant that
-isn't part of the task at hand — an open question, a deferred decision, a
-latent bug, a verification gap, a bit of brittleness, doc drift, an
-assumption worth revisiting — **write it into `FOLLOW-UPS.md`**, don't
-just mention it in passing and let it scroll away. Chat is lossy; that
-file is the durable record we review and implement from later.
-- Each entry says *what it is*, *why it matters*, and *a suggested
-  direction* — written to be argued with, not blindly executed. Tag it
-  `[decide]` / `[verify]` / `[chore]` and file it under the right section
-  (add one if none fits).
-- **Verify before you write.** Every file:line reference, count, or claim
-  goes in checked against the tree, not from memory.
-- Surfacing it in your reply too is good; the file is what makes it
-  survive. Still flag genuinely urgent things loudly — the file is for
-  what we'll get to, not a place to bury a real problem.
+(`prototype/grid-draft.html`) into a shared-core library with two frontends: a
+standalone web app and a VS Code extension. Treat the prototype as the
+**reference implementation** — port its logic, don't reinvent it. When behavior
+is unclear, the prototype's behavior is the spec.
 
 ## Non-negotiable boundaries (see PLAN.md "Non-negotiables")
-- `packages/core` imports **no DOM and no VS Code** APIs. Ever. If a
-  function needs the DOM or `vscode`, it lives in a frontend.
-- Frontends **call `core`'s functions; they never re-implement its
-  logic** (role, title, hint, classification). Whether `core` precomputes
-  those onto the model or computes them on demand is `core`'s choice —
-  today it's on demand (`colTitle`, `contentHint`, `isContainerCol`, …).
-- Edits are **span-based descriptions** produced by `core` and applied
-  by the frontend. No grid-class math or string-scanning in frontend
-  code.
-- Edits are **surgical**: change only the class attribute's value span,
-  or move element text with its adjacent title comment. Never regenerate
-  the document; preserve the user's source byte-for-byte outside the
-  edited span.
+- `packages/core` imports **no DOM and no VS Code** APIs. Ever. If a function
+  needs the DOM or `vscode`, it lives in a frontend.
+- Frontends **call `core`'s functions; they never re-implement its logic**
+  (role, title, hint, classification). Whether `core` precomputes those onto the
+  model or computes them on demand is `core`'s choice — today it's on demand
+  (`colTitle`, `contentHint`, `isContainerCol`, …).
+- Edits are **span-based descriptions** produced by `core` and applied by the
+  frontend. No grid-class math or string-scanning in frontend code.
+- Edits are **surgical**: change only the class attribute's value span, or move
+  element text with its adjacent title comment. Never regenerate the document;
+  preserve the user's source byte-for-byte outside the edited span.
 
 ## Tests
-- Runner is **Vitest**, tests co-located as `*.test.ts`.
-- The ported suite (~157 cases from the prototype) is the **contract**.
-  Keep it green. When porting the parser (session 2), those tests are
-  the regression safety net — do not weaken a test to make a change
-  pass; if behavior genuinely changes, discuss it first.
-- New behavior comes with new tests in the same change.
+- Runner is **Vitest**, tests co-located as `*.test.ts`. The ported suite (~157
+  cases from the prototype) is the **contract** — keep it green; don't weaken a
+  test to make a change pass. If behavior genuinely changes, discuss it first.
+  New behavior comes with new tests in the same change.
+- Three layers, answering different questions: `npm test` (Vitest, incl. the
+  jsdom boot), `npm run test:e2e` (Playwright), `npm run test:vscode` (a real VS
+  Code buffer). `npm run test:all` runs all three. Details in `CONTRIBUTING.md`.
 - Run the relevant package's tests before considering a change done.
-- Three layers, and they answer different questions: `npm test` (Vitest,
-  incl. the jsdom app boot), `npm run test:e2e` (Playwright — the
-  interactive surface), and `npm run test:vscode` (a real VS Code, via
-  `@vscode/test-electron` — the only layer where canvas offsets meet a
-  real editor buffer). `npm run test:all` runs all three. The VS Code
-  layer downloads VS Code on first run, so it needs network and a
-  display (CI runs it under `xvfb-run`).
 
 ## Commits
-- **In a local/interactive session, never commit without an explicit
-  request from the maintainer.** Not after finishing a task, not "to be
-  safe", not because the tree is green. Do the work, report it, and leave
-  it staged-or-unstaged for review. Only run `git commit` when asked to.
-  (Applies to `git commit` specifically; branching or staging to keep the
-  tree tidy is fine.)
-- **Exception — Claude Code on the web:** those sessions run on a
-  designated branch, an end-of-session hook requires a clean tree, and the
-  container is ephemeral, so uncommitted work is lost. There, **commit when
-  you finish a reviewable slice** and push to the session's branch (never a
-  PR unless asked). This is the one place the rule above is deliberately
-  overridden.
-- Small, focused commits with clear messages either way (imperative mood:
-  "Add colSpec dialect detection", not "added stuff").
+- Small, focused commits with clear messages (imperative mood: "Add colSpec
+  dialect detection", not "added stuff"). Don't bundle unrelated changes.
 - Don't commit `node_modules/`, `dist/`, `*.vsix` (see `.gitignore`).
-- Don't bundle unrelated changes into one commit.
+- **Exception — Claude Code on the web:** those sessions run on a designated
+  branch, an end-of-session hook requires a clean tree, and the container is
+  ephemeral, so uncommitted work is lost. There, **commit when you finish a
+  reviewable slice** and push to the session's branch (never a PR unless asked).
 
 ## Releasing a version
-Releases are cut from **git tags**; CI builds and publishes artifacts to
-GitHub Releases on a `v*` tag (see `PLAN.md` → CI/CD). Every commit runs
-tests only — tagging is what produces a release. To cut a version:
-
-1. Make sure `main` is green (tests pass) and up to date.
-2. Bump the version in **`packages/app-extension/package.json`** (the
-   `.vsix` version comes from here). Follow semver: patch for fixes,
-   minor for features, major for breaking changes. Keep other packages'
-   versions consistent if they're published too.
+Releases are cut from **git tags**; CI builds and publishes artifacts on a `v*`
+tag (see `PLAN.md` → CI/CD). To cut a version:
+1. Make sure `main` is green and up to date.
+2. Bump the version in **`packages/app-extension/package.json`** (the `.vsix`
+   version comes from here). Semver: patch/minor/major.
 3. Commit the bump on its own: `git commit -m "Release v1.2.3"`.
-4. Tag it **matching that version**: `git tag v1.2.3` (tag `vX.Y.Z` must
-   equal the `package.json` version — CI assumes they match).
+4. Tag it **matching that version**: `git tag v1.2.3` (tag `vX.Y.Z` must equal
+   the `package.json` version — CI assumes they match).
 5. Push commit **and** tag: `git push && git push --tags`.
-6. CI (`release.yml`) runs tests, builds the single-HTML standalone and
-   the `.vsix`, and attaches both to a GitHub Release named `v1.2.3`.
+6. CI (`release.yml`) runs tests, builds the standalone HTML and the `.vsix`,
+   and attaches both to a GitHub Release (and, with the publish secrets present,
+   pushes to the VS Code Marketplace and Open VSX).
 
-Do **not** hand-build and commit the `.vsix` or the HTML — artifacts
-never go in the repo. If a release build fails, fix forward and tag a
-new patch version; don't reuse or move a published tag.
+Do **not** hand-build and commit the `.vsix` or the HTML — artifacts never go in
+the repo. If a release build fails, fix forward and tag a new patch; don't reuse
+or move a published tag.
 
-## When unsure
-Ask. A short clarifying question is cheaper than a large wrong change.
-Uncertainty about the `GridModel` shape, the `@if`/control-flow
-representation, or the parser AST should be resolved by looking at real
-output and discussing — not by guessing and building on the guess.
+## Follow-ups → `FOLLOW-UPS.md`
+Record open questions, deferred decisions, latent bugs, and verification gaps in
+`FOLLOW-UPS.md` — the durable backlog we review and implement from. Each entry
+says *what it is*, *why it matters*, and *a suggested direction*; tag it
+`[decide]` / `[verify]` / `[chore]` under the right section. Verify every
+file:line reference against the tree before writing it in.
+
+When you implement or otherwise resolve a follow-up, **collapse it into the
+`## Resolved (archive)` section** at the bottom — a single line
+(`- **N.M** Title — _resolution_`), not a verbose write-up. Keep its section
+number stable so references elsewhere still resolve; the full rationale lives in
+git history. The top of the file stays the *live* backlog — open items only.
 
 ## Current status
-Sessions 1–3 are complete and released (v0.0.1 → v0.0.6): shared-core
-library, parser on `@angular/compiler`, and the VS Code extension with
-CI/CD. `@if`/`@else`/`@else if` and `*ngIf` are now first-class
-toggleable conditional regions (in-row, in-column, and top-level).
-
-Since then, a robustness pass over canvas editing (unreleased): the
-extension's canvas↔buffer seam can no longer drift (the settled buffer is
-compared with what the edits describe), refused edits resync instead of
-parking, the whole `Session` is serialised, the canvas follows the editor
-by default, and structural edits refuse an element whose closing tag the
-parser never found. This closed FOLLOW-UPS §7.4/§7.5/§9.4 and added
-§3.5/§10/§11 — so the `[decide]`/`[verify]` backlog is **not** empty
-again: §3.5 (the new VS Code integration suite has never actually run —
-this sandbox can't download VS Code; CI is its first run) and §10.1/§10.2
-(class edits rewrite the whole attribute value; selection and collapse
-state don't survive an edit).
-
-Next up (not started): Session 4 enrichment — resolving i18n keys,
-component tags, and `formControlName` from the user's project — deferred
-by choice for now in favour of HTML-only work.
+Sessions 1–3 complete and released: shared-core library, parser on
+`@angular/compiler`, and the VS Code extension with CI/CD. `@if`/`@else`/
+`@else if` and `*ngIf` are first-class toggleable conditional regions. Since
+then: a canvas-editing robustness pass, the class-convention feature, token-level
+class edits (`FOLLOW-UPS.md` §10.1), and the prerequisites for Marketplace /
+Open VSX publication (manifest, licence, listing, guarded CI publish steps) —
+publishing itself is pending external setup. Next up (not started): Session 4
+enrichment — resolving i18n keys, component tags, and `formControlName` from the
+user's project.
