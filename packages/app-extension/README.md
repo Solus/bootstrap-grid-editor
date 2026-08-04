@@ -1,9 +1,9 @@
-# Bootstrap Grid Editor for Angular
+# Bootstrap Grid Layout Editor
 
 <!--
   BANNER / DEMO GIF PLACEHOLDER
   Drop a wide banner or a short demo GIF here (e.g. media/demo.gif) once recorded,
-  then replace this comment with:  ![Bootstrap Grid Editor demo](media/demo.gif)
+  then replace this comment with:  ![Bootstrap Grid Layout Editor demo](media/demo.gif)
   Keep it a relative path under media/ so vsce rewrites it against the repository.
 -->
 
@@ -36,7 +36,7 @@ directives are preserved byte-for-byte.
 ## Install
 
 - In VS Code, open **Extensions** (`Ctrl+Shift+X`), search for
-  **Bootstrap Grid Editor for Angular**, and click **Install**.
+  **Bootstrap Grid Layout Editor**, and click **Install**.
 - Or from the command line: `code --install-extension bero-labs.bootstrap-grid-editor`.
 
 Requires VS Code **1.104** or newer.

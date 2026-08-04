@@ -54,7 +54,7 @@
       {
         "command": "bootstrapGridEditor.open",
         "title": "Open Grid Editor",
-        "category": "Bootstrap Grid",
+        "category": "Bootstrap Grid Layout Editor",
         "icon": {
           "light": "media/grid-light.svg",
           "dark": "media/grid-dark.svg"
@@ -62,7 +62,7 @@
       }
     ],
     "configuration": {
-      "title": "Bootstrap Grid Editor",
+      "title": "Bootstrap Grid Layout Editor",
       "properties": {
         "bootstrapGridEditor.defaultBreakpoint": {
           "type": "string",
