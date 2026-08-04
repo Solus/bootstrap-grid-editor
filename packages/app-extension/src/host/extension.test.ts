@@ -228,7 +228,7 @@ function openWith(doc: ReturnType<typeof makeDoc>) {
   M.state.visibleTextEditors = [editor];
   const subscriptions: { dispose(): void }[] = [];
   activate({ subscriptions, extensionUri: { path: '/ext' } } as never);
-  M.commands.get('bootstrapVisualizer.open')!();
+  M.commands.get('bootstrapGridEditor.open')!();
   return { editor, subscriptions, panel: M.panels[M.panels.length - 1]! };
 }
 
@@ -240,7 +240,7 @@ describe('activation and the open command', () => {
   it('activate registers the command into subscriptions', () => {
     const subscriptions: { dispose(): void }[] = [];
     activate({ subscriptions, extensionUri: { path: '/ext' } } as never);
-    expect(M.commands.has('bootstrapVisualizer.open')).toBe(true);
+    expect(M.commands.has('bootstrapGridEditor.open')).toBe(true);
     // the command plus the webview-panel serializer
     expect(subscriptions.length).toBe(2);
   });
@@ -250,7 +250,7 @@ describe('activation and the open command', () => {
     // the serializer must dispose the blank restored frame rather than orphan it.
     const subscriptions: { dispose(): void }[] = [];
     activate({ subscriptions, extensionUri: { path: '/ext' } } as never);
-    const serializer = M.serializers.get('bootstrapVisualizer');
+    const serializer = M.serializers.get('bootstrapGridEditor');
     expect(serializer).toBeDefined();
     let disposed = false;
     await serializer!.deserializeWebviewPanel({ dispose: () => { disposed = true; } }, undefined);
@@ -260,14 +260,14 @@ describe('activation and the open command', () => {
   it('without an active editor: an info message, no panel', () => {
     const subscriptions: { dispose(): void }[] = [];
     activate({ subscriptions, extensionUri: { path: '/ext' } } as never);
-    M.commands.get('bootstrapVisualizer.open')!();
+    M.commands.get('bootstrapGridEditor.open')!();
     expect(M.infoMsgs.length).toBe(1);
     expect(M.panels.length).toBe(0);
   });
 
   it('creates a script-enabled panel scoped to dist/webview', () => {
     const { panel } = openWith(makeDoc('<p>x</p>'));
-    expect(panel.viewType).toBe('bootstrapVisualizer');
+    expect(panel.viewType).toBe('bootstrapGridEditor');
     expect(panel.options.enableScripts).toBe(true);
     expect(panel.options.localResourceRoots?.[0]?.path).toBe('/ext/dist/webview');
   });
@@ -467,7 +467,7 @@ function runOpenOn(doc: ReturnType<typeof makeDoc>) {
   const editor = makeEditor(doc);
   M.state.activeTextEditor = editor;
   M.state.visibleTextEditors = [editor];
-  M.commands.get('bootstrapVisualizer.open')!();
+  M.commands.get('bootstrapGridEditor.open')!();
   return editor;
 }
 

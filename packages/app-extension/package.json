@@ -52,8 +52,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "bootstrapVisualizer.open",
-        "title": "Open Grid Visualizer",
+        "command": "bootstrapGridEditor.open",
+        "title": "Open Grid Editor",
         "category": "Bootstrap Grid",
         "icon": {
           "light": "media/grid-light.svg",
@@ -62,9 +62,9 @@
       }
     ],
     "configuration": {
-      "title": "Bootstrap Grid Visualizer",
+      "title": "Bootstrap Grid Editor",
       "properties": {
-        "bootstrapVisualizer.defaultBreakpoint": {
+        "bootstrapGridEditor.defaultBreakpoint": {
           "type": "string",
           "enum": [
             "xs",
@@ -78,19 +78,19 @@
           "scope": "application",
           "markdownDescription": "Breakpoint the canvas opens at. Switching breakpoints in the canvas is temporary and does not change this."
         },
-        "bootstrapVisualizer.stretchToFit": {
+        "bootstrapGridEditor.stretchToFit": {
           "type": "boolean",
           "default": false,
           "scope": "application",
           "markdownDescription": "Open with the sheet stretched to the full canvas panel instead of the breakpoint's representative width. The **Stretch to fit** checkbox in the canvas updates this."
         },
-        "bootstrapVisualizer.tintOverfullRows": {
+        "bootstrapGridEditor.tintOverfullRows": {
           "type": "boolean",
           "default": false,
           "scope": "application",
           "markdownDescription": "Open with overfull rows tinted amber. The **Tint overfull rows** checkbox in the canvas updates this."
         },
-        "bootstrapVisualizer.dialect": {
+        "bootstrapGridEditor.dialect": {
           "type": "string",
           "enum": [
             "bootstrap5",
@@ -104,19 +104,19 @@
           "scope": "application",
           "markdownDescription": "Class style for **new** columns when a file has no grid classes to detect from. A file that already uses one dialect always keeps it."
         },
-        "bootstrapVisualizer.newRowClasses": {
+        "bootstrapGridEditor.newRowClasses": {
           "type": "string",
           "default": "",
           "scope": "resource",
           "markdownDescription": "Extra classes on every row the canvas **creates**, added after `row` — e.g. `clearfix form-group` writes `<div class=\"row clearfix form-group\">`. A project convention, so it can be committed in the workspace's `.vscode/settings.json`. Grid classes (`col-*`, `offset-*`) and `row` itself are ignored here — the canvas writes those."
         },
-        "bootstrapVisualizer.newColumnClasses": {
+        "bootstrapGridEditor.newColumnClasses": {
           "type": "string",
           "default": "",
           "scope": "resource",
           "markdownDescription": "Extra classes on every column the canvas **creates**, added after the computed `col-*` classes — e.g. `px-2` writes `<div class=\"col-md-6 px-2\">`. A project convention, so it can be committed in the workspace's `.vscode/settings.json`. Grid classes are ignored here; widths and offsets come from the inspector's steppers."
         },
-        "bootstrapVisualizer.liveSync": {
+        "bootstrapGridEditor.liveSync": {
           "type": "boolean",
           "default": true,
           "scope": "application",
@@ -127,14 +127,14 @@
     "menus": {
       "editor/title": [
         {
-          "command": "bootstrapVisualizer.open",
+          "command": "bootstrapGridEditor.open",
           "when": "editorLangId == html",
           "group": "navigation"
         }
       ],
       "editor/context": [
         {
-          "command": "bootstrapVisualizer.open",
+          "command": "bootstrapGridEditor.open",
           "when": "editorTextFocus && editorLangId == html",
           "group": "navigation"
         }
@@ -142,7 +142,7 @@
     }
   },
   "activationEvents": [
-    "onWebviewPanel:bootstrapVisualizer"
+    "onWebviewPanel:bootstrapGridEditor"
   ],
   "scripts": {
     "vscode:prepublish": "npm run build",

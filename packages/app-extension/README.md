@@ -44,7 +44,7 @@ Requires VS Code **1.104** or newer.
 ## Quick start
 
 1. Open an HTML / Angular template with `.row` / `col-*` markup.
-2. Run **Open Grid Visualizer** — from the command palette, the editor title bar
+2. Run **Open Grid Editor** — from the command palette, the editor title bar
    (the grid icon on `.html` files), or the right-click menu.
 3. A canvas opens beside the editor:
    - Click a column/row to select it; the matching source is revealed, and
@@ -96,7 +96,7 @@ source. The same account page with its branches toggled:
 
 ## Settings
 
-All under `bootstrapVisualizer.*`:
+All under `bootstrapGridEditor.*`:
 
 | Setting | Default | What it does |
 |---|---|---|

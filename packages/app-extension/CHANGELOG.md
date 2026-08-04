@@ -10,8 +10,8 @@ First public release.
 
 ### Added
 
-- Open a **Grid Visualizer** canvas beside any Angular/HTML template — from the
-  editor title bar, the editor context menu, or the *Open Grid Visualizer*
+- Open a **Grid Editor** canvas beside any Angular/HTML template — from the
+  editor title bar, the editor context menu, or the *Open Grid Editor*
   command — that renders the template's Bootstrap grid as an interactive
   schematic.
 - **Edit columns visually:** resize by dragging an edge or with the inspector's

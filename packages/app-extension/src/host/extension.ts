@@ -1,4 +1,4 @@
-/* Extension host (Node). Activation, the "Open Grid Visualizer" command, the
+/* Extension host (Node). Activation, the "Open Grid Editor" command, the
    webview panel, and the source-in / edits-out / reveal bridge.
 
    Sync model (PLAN.md, decisions §3/§6): the editor document is the source of
@@ -16,16 +16,16 @@ import { Session, type SessionPorts } from './session.js';
 
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('bootstrapVisualizer.open', () => openPanel(context)),
+    vscode.commands.registerCommand('bootstrapGridEditor.open', () => openPanel(context)),
     // VS Code persists open webview panels across window restarts and tries to
     // restore them. We deliberately don't rehydrate: a canvas is bound to a
     // specific document that may no longer exist (or be open) on reopen, and a
     // fresh start has no `active` canvas to adopt it — so an unhandled restore
     // shows up as a blank, orphaned panel. Dispose it instead, leaving a clean
     // slate the user reopens from the command. (Needs the
-    // `onWebviewPanel:bootstrapVisualizer` activation event so we're alive to
+    // `onWebviewPanel:bootstrapGridEditor` activation event so we're alive to
     // handle the restore at all.)
-    vscode.window.registerWebviewPanelSerializer('bootstrapVisualizer', {
+    vscode.window.registerWebviewPanelSerializer('bootstrapGridEditor', {
       deserializeWebviewPanel(panel) {
         panel.dispose();
         return Promise.resolve();
@@ -47,7 +47,7 @@ function openPanel(context: vscode.ExtensionContext): void {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     void vscode.window.showInformationMessage(
-      'Open an HTML/Angular template first, then run "Open Grid Visualizer".');
+      'Open an HTML/Angular template first, then run "Open Grid Editor".');
     return;
   }
   // reuse the existing canvas — re-point it at this file — rather than making
@@ -65,8 +65,8 @@ function createCanvas(context: vscode.ExtensionContext, initial: vscode.TextEdit
   let doc = initial.document;
 
   const panel = vscode.window.createWebviewPanel(
-    'bootstrapVisualizer',
-    'Grid Visualizer',
+    'bootstrapGridEditor',
+    'Grid Editor',
     vscode.ViewColumn.Beside,
     {
       enableScripts: true,
@@ -151,7 +151,7 @@ export function createSessionPorts(
     warn: message => void vscode.window.showWarningMessage(message),
     config: () => readConfig(doc().uri),
     setConfig: change => {
-      void vscode.workspace.getConfiguration('bootstrapVisualizer', doc().uri)
+      void vscode.workspace.getConfiguration('bootstrapGridEditor', doc().uri)
         .update(SETTING_KEY[change.pref], change.value, writeTarget(change.pref));
     },
   };
@@ -186,8 +186,8 @@ function writeTarget(pref: PrefChange['pref']): vscode.ConfigurationTarget {
     the canvas *writes* it too — a panel holding a stale copy would clobber an
     edit made in settings.json. */
 export function isLiveSetting(e: { affectsConfiguration(section: string): boolean }): boolean {
-  return e.affectsConfiguration('bootstrapVisualizer.newRowClasses') ||
-    e.affectsConfiguration('bootstrapVisualizer.newColumnClasses');
+  return e.affectsConfiguration('bootstrapGridEditor.newRowClasses') ||
+    e.affectsConfiguration('bootstrapGridEditor.newColumnClasses');
 }
 
 /** The user's settings, read fresh at panel open. Defaults here mirror the
@@ -195,7 +195,7 @@ export function isLiveSetting(e: { affectsConfiguration(section: string): boolea
 function readConfig(resource?: vscode.Uri): ConfigWire {
   // Scoped to the document: the class convention is `resource`-scoped, so a
   // project's committed .vscode/settings.json is what its own templates get.
-  const c = vscode.workspace.getConfiguration('bootstrapVisualizer', resource);
+  const c = vscode.workspace.getConfiguration('bootstrapGridEditor', resource);
   return {
     breakpoint: c.get<ConfigWire['breakpoint']>('defaultBreakpoint'),
     stretchSheet: c.get<boolean>('stretchToFit'),
@@ -237,11 +237,11 @@ function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): stri
   <meta http-equiv="Content-Security-Policy" content="${csp}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="${styleUri}">
-  <title>Grid Visualizer</title>
+  <title>Grid Editor</title>
 </head>
 <body>
   <header>
-    <div class="brand"><b>GRID·DRAFT</b><span>Bootstrap grid visualizer</span></div>
+    <div class="brand"><b>GRID·DRAFT</b><span>Bootstrap grid editor</span></div>
     <div class="bp-switch" id="bpSwitch" role="tablist" aria-label="Breakpoint"></div>
     <div class="bp-note" id="bpNote"></div>
     <div class="spacer"></div>
