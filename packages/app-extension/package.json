@@ -1,13 +1,15 @@
 {
-  "name": "bootstrap-visualizer-extension",
-  "displayName": "Bootstrap Grid Visualizer",
-  "description": "Visual editor for Bootstrap grid layouts in Angular templates.",
-  "version": "0.1.0",
+  "name": "bootstrap-grid-editor",
+  "displayName": "Bootstrap Grid Editor for Angular",
+  "description": "Visually edit Bootstrap rows and columns in Angular templates — split, resize, offset and reorder, then apply back to your file.",
+  "version": "0.2.0",
   "license": "MIT",
+  "preview": true,
+  "pricing": "Free",
   "icon": "media/icon.png",
-  "publisher": "BeroXL",
+  "publisher": "bero-labs",
   "author": {
-    "name": "BeroXL"
+    "name": "bero-labs"
   },
   "repository": {
     "type": "git",
@@ -23,18 +25,18 @@
     "url": "https://github.com/sponsors/Solus"
   },
   "engines": {
-    "vscode": "^1.96.0"
+    "vscode": "^1.104.0"
   },
   "categories": [
     "Visualization",
     "Other"
   ],
   "keywords": [
-    "bootstrap",
-    "grid",
-    "angular",
-    "layout",
-    "responsive"
+    "responsive",
+    "html",
+    "template",
+    "drag-and-drop",
+    "columns"
   ],
   "galleryBanner": {
     "color": "#10161f",
@@ -157,7 +159,7 @@
     "@bootstrap-visualizer/core": "*",
     "@bootstrap-visualizer/editor": "*",
     "@types/mocha": "^10.0.10",
-    "@types/vscode": "^1.96.0",
+    "@types/vscode": "^1.104.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
     "esbuild": "^0.24.0",

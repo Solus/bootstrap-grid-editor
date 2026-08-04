@@ -59,7 +59,7 @@ jobs:
         run: npm run build:single
 
       - name: Build extension VSIX
-        run: npm run vsix -w bootstrap-visualizer-extension
+        run: npm run vsix -w bootstrap-grid-editor
 
       - name: Collect artifacts
         run: |
