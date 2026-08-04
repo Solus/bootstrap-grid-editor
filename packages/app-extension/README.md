@@ -107,7 +107,7 @@ All under `bootstrapVisualizer.*`:
 
 Found a bug? The most useful thing you can include is a **minimal template
 snippet that reproduces it** —
-[open an issue](https://github.com/Solus/bootstrap-visualizer/issues).
+[open an issue](https://github.com/Solus/bootstrap-grid-editor/issues).
 
 ---
 
