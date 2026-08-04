@@ -1,4 +1,11 @@
-# Bootstrap Grid Visualizer
+# Bootstrap Grid Editor for Angular
+
+<!--
+  BANNER / DEMO GIF PLACEHOLDER
+  Drop a wide banner or a short demo GIF here (e.g. media/demo.gif) once recorded,
+  then replace this comment with:  ![Bootstrap Grid Editor demo](media/demo.gif)
+  Keep it a relative path under media/ so vsce rewrites it against the repository.
+-->
 
 Edit your Bootstrap grid the way you think about it — as columns and rows, not
 class strings. This VS Code extension renders a live schematic of the grid in any
@@ -26,7 +33,15 @@ directives are preserved byte-for-byte.
 - **Bootstrap 3, 4, and 5** — the dialect is detected per file; new columns
   follow whatever the file already uses.
 
-## Use
+## Install
+
+- In VS Code, open **Extensions** (`Ctrl+Shift+X`), search for
+  **Bootstrap Grid Editor for Angular**, and click **Install**.
+- Or from the command line: `code --install-extension bero-labs.bootstrap-grid-editor`.
+
+Requires VS Code **1.104** or newer.
+
+## Quick start
 
 1. Open an HTML / Angular template with `.row` / `col-*` markup.
 2. Run **Open Grid Visualizer** — from the command palette, the editor title bar
@@ -93,6 +108,24 @@ All under `bootstrapVisualizer.*`:
 | `newColumnClasses` | `""` | Extra classes on every column the canvas **creates**, after the computed `col-*` — e.g. `px-2`. Also workspace-scoped. |
 | `liveSync` | `true` | Keep the canvas in sync with the editor as you type. Off = the canvas holds still until you save or **Resync**. Either way, canvas edits are verified against the file before they touch it. |
 
+## Known limitations
+
+- **Grid classes only.** The canvas models Bootstrap **3, 4, and 5** grid
+  classes — `col`, `col-*`, `col-{bp}-*`, `offset-*` / `col-{bp}-offset-*` — plus
+  the `d-*` display utilities that hide a column at a breakpoint. Other utility
+  and spacing classes are carried along untouched but not visualized.
+- **Angular control flow.** `@if` / `@else` / `@else if` and `*ngIf` are modeled
+  as toggleable regions. `@for` / `@switch` and `*ngFor` are **flattened** —
+  their contents render once, not iterated — so a repeated block shows as a
+  single instance.
+- **The template must parse.** A file that doesn't parse is reported on the
+  canvas rather than edited. An element missing its closing tag can still have
+  its width and offset edited, but **moving or deleting it is held back** — the
+  canvas can't tell where such an element ends, and a stray unclosed tag could
+  otherwise carry the rest of the document along.
+- **The webview bundles the Angular template compiler**, so the panel is a
+  little heavy to load; a lighter build is planned.
+
 ## Scope & privacy
 
 - **HTML-only.** It reads the template and writes classes back. It never runs
@@ -100,16 +133,16 @@ All under `bootstrapVisualizer.*`:
 - **No telemetry, no network.** The extension collects nothing and makes no
   network requests.
 
-## Known issues
+## License
 
-- This build bundles the Angular template compiler into the webview, so the
-  panel is a little heavy to load; a lighter build is planned.
+MIT — see [LICENSE](LICENSE).
 
 Found a bug? The most useful thing you can include is a **minimal template
 snippet that reproduces it** —
-[open an issue](https://github.com/Solus/bootstrap-grid-editor/issues).
+[open an issue](https://github.com/Solus/bootstrap-grid-editor/issues). If this
+saves you time, you can
+[sponsor its development](https://github.com/sponsors/Solus). Thanks!
 
 ---
 
-If this saves you time, you can
-[sponsor its development](https://github.com/sponsors/Solus). Thanks!
+_Not affiliated with the Bootstrap project._
