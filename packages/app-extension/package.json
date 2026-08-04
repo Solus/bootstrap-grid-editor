@@ -1,7 +1,7 @@
 {
   "name": "bootstrap-grid-editor",
-  "displayName": "Bootstrap Grid Editor for Angular",
-  "description": "Visually edit Bootstrap rows and columns in Angular templates — split, resize, offset and reorder, then apply back to your file.",
+  "displayName": "Bootstrap Grid Layout Editor",
+  "description": "Visually edit Bootstrap grid layouts in HTML and Angular templates — split, resize, offset and reorder, then apply back to your file.",
   "version": "0.2.0",
   "license": "MIT",
   "preview": true,
