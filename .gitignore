@@ -1,7 +1,11 @@
 node_modules/
 dist/
 dist-single/
+out/
 *.vsix
+.env
+.env.*
+!.env.example
 .vscode-test/
 *.tsbuildinfo
 test-results/
