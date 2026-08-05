@@ -1,9 +1,14 @@
-# bootstrap-visualizer
+# Bootstrap Grid Layout Editor
 
-A visual editor for Bootstrap grid layouts (rows/columns) in Angular
+A visual editor for Bootstrap grid layouts (rows/columns) in HTML and Angular
 templates. It renders a schematic of a template's grid, lets you
 resize/split/move/offset columns, and writes the changes back to the HTML
 **surgically** — preserving formatting, comments, and Angular directives.
+
+Available as a **VS Code extension** and a **standalone web app**. Install the
+extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=bero-labs.bootstrap-grid-editor)
+(or see [`packages/app-extension`](./packages/app-extension/README.md) for the
+listing).
 
 See [`PLAN.md`](./PLAN.md) for the architecture and build sequence,
 [`CLAUDE.md`](./CLAUDE.md) for the working agreement, and
