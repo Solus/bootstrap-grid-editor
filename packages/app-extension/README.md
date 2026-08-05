@@ -7,7 +7,7 @@ class strings. This VS Code extension renders a live schematic of the grid in an
 HTML or Angular template and lets you resize, split, move, and offset columns on
 a canvas, writing every change back to the document **surgically**: only the
 classes you touched change, and your formatting, comments, and Angular
-directives are preserved byte-for-byte.
+directives are preserved.
 
 ![The grid canvas open beside an Angular template in VS Code](media/hero-dashboard.png)
 
