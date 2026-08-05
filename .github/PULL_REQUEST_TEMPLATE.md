@@ -1,19 +1,13 @@
-<!-- Keep it short. The reviewer wants the what, the why, and evidence it works. -->
+<!--
+  Heads up: this is a solo-maintained project and it does not accept outside
+  pull requests. Please close this PR and open an issue instead — bug reports
+  and ideas are very welcome:
+  https://github.com/Solus/bootstrap-grid-editor/issues
 
-## What & why
+  The most useful bug report includes a minimal template snippet that reproduces
+  the problem.
+-->
 
-<!-- What does this change, and what problem does it solve? -->
-
-## Tests run
-
-<!-- Tick what you ran locally. The three layers answer different questions. -->
-
-- [ ] `npm test` (Vitest — unit + jsdom boot)
-- [ ] `npm run test:e2e` (Playwright — interactive surface)
-- [ ] `npm run test:vscode` (real VS Code buffer)
-- [ ] New behaviour comes with new tests
-
-## Notes
-
-- [ ] `FOLLOW-UPS.md` updated if this surfaced an open question, a deferred decision, or a gap
-- [ ] `packages/core` still imports no DOM and no `vscode` APIs
+**This project doesn't accept outside pull requests.** Please [open an
+issue](https://github.com/Solus/bootstrap-grid-editor/issues) instead — thanks
+for understanding.

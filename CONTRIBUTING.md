@@ -1,7 +1,13 @@
 # Contributing
 
-Thanks for your interest. This is a small project with a clear architecture;
-a little orientation goes a long way.
+Thanks for your interest. **This is a solo-maintained project and it does not
+accept outside pull requests** — changes are made by the maintainer. Bug reports
+and ideas are very welcome, though: please [open an
+issue](https://github.com/Solus/bootstrap-grid-editor/issues) instead. The most
+useful bug report includes a **minimal template snippet that reproduces it**.
+
+The rest of this file orients anyone building or forking the project (it's MIT).
+A little orientation goes a long way.
 
 ## Architecture in one breath
 
@@ -51,14 +57,6 @@ npm run vsix -w bootstrap-grid-editor   # produces a .vsix in releases/
 ```
 
 Install it via **Extensions → ⋯ → Install from VSIX…**.
-
-## Pull requests
-
-- Small, focused commits, imperative mood ("Add colSpec dialect detection").
-- Run the relevant test layers before you open the PR; the template asks which.
-- If your work surfaces an open question, a deferred decision, or a latent gap,
-  record it in [`FOLLOW-UPS.md`](./FOLLOW-UPS.md) — that file is the durable
-  backlog we work from.
 
 ## Releases
 
