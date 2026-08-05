@@ -11,6 +11,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The screenshots in the Marketplace listing now render. They were packaged with
   README-relative paths that resolved against the repository root instead of the
   extension's subdirectory; the package now pins the correct image base URL.
+- The **Class style (dialect)** setting can now be committed per project in
+  `.vscode/settings.json`. It was application-scoped (user-global only), so a
+  Bootstrap 3 project couldn't share the choice with the team; it is now
+  `resource`-scoped like the new-row/column class conventions.
 
 ## [0.2.0] - 2026-08-04
 

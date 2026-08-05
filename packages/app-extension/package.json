@@ -101,8 +101,8 @@
             "New columns use col-xs-*/col-sm-* and col-sm-offset-* (Bootstrap 3)"
           ],
           "default": "bootstrap5",
-          "scope": "application",
-          "markdownDescription": "Class style for **new** columns when a file has no grid classes to detect from. A file that already uses one dialect always keeps it."
+          "scope": "resource",
+          "markdownDescription": "Class style for **new** columns when a file has no grid classes to detect from. A file that already uses one dialect always keeps it. A project trait, so it can be committed in the workspace's `.vscode/settings.json`."
         },
         "bootstrapGridEditor.newRowClasses": {
           "type": "string",
