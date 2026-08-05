@@ -7,6 +7,9 @@ out/
 .env.*
 !.env.example
 .vscode-test/
+# Keep the shared launch/tasks configs tracked, but not personal/dev-written
+# workspace settings (the extension writes its own conventions here while testing).
+.vscode/settings.json
 *.tsbuildinfo
 test-results/
 playwright-report/
