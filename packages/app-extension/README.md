@@ -85,12 +85,12 @@ source. The same account page with its branches toggled:
 
 <table>
   <tr>
-    <td><img src="media/conditional-if.png" alt="The @if branch active: profile summary and the *ngIf tips rail shown"></td>
-    <td><img src="media/conditional-else.png" alt="The @else and @else-if branches active: sign-in form, team columns, tips rail hidden"></td>
+    <td><img src="media/conditional-if.png" alt="The in-row @if branch active: pro-features spans col-md-8 beside the usage meter"></td>
+    <td><img src="media/conditional-else.png" alt="The in-row @else-if branch active: team-features and seat-manager replace pro-features"></td>
   </tr>
   <tr>
-    <td align="center"><code>@if</code> · <code>pro</code> · tips on</td>
-    <td align="center"><code>@else</code> · <code>@else if (team)</code> · tips off</td>
+    <td align="center"><code>@if (plan === 'pro')</code> · pro-features</td>
+    <td align="center"><code>@else if (plan === 'team')</code> · team + seats</td>
   </tr>
 </table>
 
