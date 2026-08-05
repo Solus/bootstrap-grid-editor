@@ -2,7 +2,7 @@
   "name": "bootstrap-grid-editor",
   "displayName": "Bootstrap Grid Layout Editor",
   "description": "Visually edit Bootstrap grid layouts in HTML and Angular templates — split, resize, offset and reorder, then apply back to your file.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "license": "MIT",
   "preview": true,
   "pricing": "Free",
@@ -153,7 +153,7 @@
     "build": "npm run build:webview && npm run build:host",
     "build:tests": "tsc -b ../core && esbuild test-integration/buffer-seam.test.ts --bundle --platform=node --format=cjs --external:vscode --external:mocha --outfile=dist/test-integration/buffer-seam.test.cjs --sourcemap",
     "test:vscode": "npm run build && npm run build:tests && vscode-test",
-    "vsix": "npm run build && npx @vscode/vsce package --no-dependencies --out releases/"
+    "vsix": "npm run build && npx @vscode/vsce package --no-dependencies --baseImagesUrl https://github.com/Solus/bootstrap-grid-editor/raw/HEAD/packages/app-extension --out releases/"
   },
   "devDependencies": {
     "@bootstrap-visualizer/core": "*",

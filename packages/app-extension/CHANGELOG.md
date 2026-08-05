@@ -4,6 +4,14 @@ All notable changes to this extension are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-08-05
+
+### Fixed
+
+- The screenshots in the Marketplace listing now render. They were packaged with
+  README-relative paths that resolved against the repository root instead of the
+  extension's subdirectory; the package now pins the correct image base URL.
+
 ## [0.2.0] - 2026-08-04
 
 First public release.
@@ -34,4 +42,5 @@ First public release.
 - **Project class conventions:** set extra classes that every new row or column
   should carry (workspace-scoped, committable in `.vscode/settings.json`).
 
+[0.2.1]: https://github.com/Solus/bootstrap-grid-editor/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Solus/bootstrap-grid-editor/releases/tag/v0.2.0
