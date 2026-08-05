@@ -5,7 +5,7 @@
       "label": "build extension",
       "detail": "One-shot build of the webview + host bundles (used by the Run config).",
       "type": "shell",
-      "command": "npm run build -w bootstrap-visualizer-extension",
+      "command": "npm run build -w bootstrap-grid-editor",
       "group": "build",
       "problemMatcher": []
     },
@@ -13,7 +13,7 @@
       "label": "watch webview",
       "detail": "Rebuild the webview bundle on change (run manually; then Reload the webview).",
       "type": "shell",
-      "command": "npm run watch:webview -w bootstrap-visualizer-extension",
+      "command": "npm run watch:webview -w bootstrap-grid-editor",
       "isBackground": true,
       "problemMatcher": [],
       "presentation": { "group": "watch", "panel": "dedicated" }
@@ -22,7 +22,7 @@
       "label": "watch host",
       "detail": "Rebuild the host bundle on change (run manually; then Reload Window in the dev host).",
       "type": "shell",
-      "command": "npm run watch:host -w bootstrap-visualizer-extension",
+      "command": "npm run watch:host -w bootstrap-grid-editor",
       "isBackground": true,
       "problemMatcher": [],
       "presentation": { "group": "watch", "panel": "dedicated" }
