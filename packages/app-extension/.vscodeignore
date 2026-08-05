@@ -13,3 +13,7 @@ tsconfig*.json
 vite.config.ts
 **/*.map
 **/*.ts
+
+# The demo gif is large; it's referenced by absolute raw-GitHub URL in the
+# README, so it must not bloat the package. Keep it in the repo, out of the vsix.
+media/demo.gif

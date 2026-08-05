@@ -1,11 +1,6 @@
 # Bootstrap Grid Layout Editor
 
-<!--
-  BANNER / DEMO GIF PLACEHOLDER
-  Drop a wide banner or a short demo GIF here (e.g. media/demo.gif) once recorded,
-  then replace this comment with:  ![Bootstrap Grid Layout Editor demo](media/demo.gif)
-  Keep it a relative path under media/ so vsce rewrites it against the repository.
--->
+![Bootstrap Grid Layout Editor — editing a Bootstrap grid on the canvas](https://raw.githubusercontent.com/Solus/bootstrap-grid-editor/main/packages/app-extension/media/demo.gif)
 
 Edit your Bootstrap grid the way you think about it — as columns and rows, not
 class strings. This VS Code extension renders a live schematic of the grid in any
