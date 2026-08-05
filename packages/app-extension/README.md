@@ -21,7 +21,7 @@ directives are preserved.
   reformatted or regenerated.
 - **Two-way selection** — click a column to reveal its source; move the editor
   caret to select the matching block on the canvas.
-- **Conditionals are first-class** — `@if` / `@else` / `@else if` and `*ngIf`
+- **Conditionals** — `@if` / `@else` / `@else if` and `*ngIf`
   regions show up as toggleable branches you can preview.
 - **Breakpoint switching** — see the layout at xs–xxl without editing anything.
 - **Live sync** — the canvas follows the editor as you type (toggleable).
@@ -57,8 +57,7 @@ breakpoint, plus split, add, move, and delete — all writing back to the source
 
 ## Responsive, at a glance
 
-Switch the canvas breakpoint to see how the layout reflows — no editing, no
-guessing. The same pricing page at `md` (tiers wrap two-up) and `lg` (three-up):
+Switch the canvas breakpoint to see how the layout reflows. The same page at `md` (tiers wrap two-up) and `lg` (three-up):
 
 <table>
   <tr>
@@ -75,8 +74,7 @@ guessing. The same pricing page at `md` (tiers wrap two-up) and `lg` (three-up):
 
 `@if` / `@else if` / `@else` and `*ngIf` aren't flattened away — they show up as
 labelled, toggleable regions (top-level rows, in-row columns, or a single
-column). Flip a branch on the canvas to preview that variant without touching the
-source. The same account page with its branches toggled:
+column). Flip a branch on the canvas to preview that variant. The same page with its branches toggled:
 
 <table>
   <tr>
@@ -116,8 +114,7 @@ All under `bootstrapGridEditor.*`:
 - **The template must parse.** A file that doesn't parse is reported on the
   canvas rather than edited. An element missing its closing tag can still have
   its width and offset edited, but **moving or deleting it is held back** — the
-  canvas can't tell where such an element ends, and a stray unclosed tag could
-  otherwise carry the rest of the document along.
+  canvas can't tell where such an element ends.
 - **The webview bundles the Angular template compiler**, so the panel is a
   little heavy to load; a lighter build is planned.
 
