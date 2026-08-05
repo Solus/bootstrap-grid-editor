@@ -47,7 +47,7 @@ genuinely changes, discuss it first.
 ## Building the extension locally
 
 ```sh
-npm run vsix -w bootstrap-visualizer-extension   # produces a .vsix in releases/
+npm run vsix -w bootstrap-grid-editor   # produces a .vsix in releases/
 ```
 
 Install it via **Extensions → ⋯ → Install from VSIX…**.
