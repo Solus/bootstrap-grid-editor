@@ -104,7 +104,7 @@ All under `bootstrapGridEditor.*`:
 | `stretchToFit` | `false` | Open stretched to the full panel instead of the breakpoint's representative width. |
 | `tintOverfullRows` | `false` | Open with overfull rows tinted amber. |
 | `dialect` | `bootstrap5` | Class style for **new** columns when a file has no grid classes to detect from (`bootstrap5` or `bootstrap3`). A file that already uses a dialect keeps it. |
-| `newRowClasses` | `""` | Extra classes on every row the canvas **creates**, after `row` — e.g. `clearfix form-group`. Workspace-scoped, so commit it in `.vscode/settings.json` and the whole team gets it. Grid classes are ignored here. |
+| `newRowClasses` | `""` | Extra classes on every row the canvas **creates**, after `row` — e.g. `clearfix`. Workspace-scoped, so commit it in `.vscode/settings.json` and the whole team gets it. Grid classes are ignored here. |
 | `newColumnClasses` | `""` | Extra classes on every column the canvas **creates**, after the computed `col-*` — e.g. `px-2`. Also workspace-scoped. |
 | `liveSync` | `true` | Keep the canvas in sync with the editor as you type. Off = the canvas holds still until you save or **Resync**. Either way, canvas edits are verified against the file before they touch it. |
 

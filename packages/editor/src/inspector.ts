@@ -62,7 +62,7 @@ function renderViewSection(): void {
 
 /** Extra classes every row and column the canvas *creates* carries. The canvas
     computes the grid classes; this is the rest of what the project's markup
-    always has on them (`clearfix form-group`), so a page can be built without
+    always has on them (`clearfix`), so a page can be built without
     going back to fix every class attribute by hand. */
 function renderConventionSection(): void {
   const cs = sec('New rows & columns');
@@ -102,7 +102,7 @@ function convField(kind: 'row' | 'col', label: string, value: string): HTMLEleme
   const input = document.createElement('input');
   input.type = 'text';
   input.value = value;
-  input.placeholder = kind === 'row' ? 'e.g. clearfix form-group' : 'e.g. px-2';
+  input.placeholder = kind === 'row' ? 'e.g. clearfix' : 'e.g. px-2';
   input.dataset.conv = kind;
   // Commit on change (blur/Enter), not per keystroke: each commit is a write to
   // the user's settings, and with the settings watcher live a per-character

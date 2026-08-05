@@ -108,7 +108,7 @@
           "type": "string",
           "default": "",
           "scope": "resource",
-          "markdownDescription": "Extra classes on every row the canvas **creates**, added after `row` — e.g. `clearfix form-group` writes `<div class=\"row clearfix form-group\">`. A project convention, so it can be committed in the workspace's `.vscode/settings.json`. Grid classes (`col-*`, `offset-*`) and `row` itself are ignored here — the canvas writes those."
+          "markdownDescription": "Extra classes on every row the canvas **creates**, added after `row` — e.g. `clearfix` writes `<div class=\"row clearfix\">`. A project convention, so it can be committed in the workspace's `.vscode/settings.json`. Grid classes (`col-*`, `offset-*`) and `row` itself are ignored here — the canvas writes those."
         },
         "bootstrapGridEditor.newColumnClasses": {
           "type": "string",

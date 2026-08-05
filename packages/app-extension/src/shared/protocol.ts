@@ -16,7 +16,7 @@ export interface ConfigWire {
   tintOverfull?: boolean;
   dialect?: 'bootstrap5' | 'bootstrap3';
   /** Extra classes every row / column the canvas *creates* carries, on top of
-      the grid classes it computes (e.g. `clearfix form-group`). */
+      the grid classes it computes (e.g. `clearfix`). */
   newRowClasses?: string;
   newColumnClasses?: string;
   /** Host-side behaviour (not a webview render setting): when true (the shipped
