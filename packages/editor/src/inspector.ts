@@ -73,8 +73,8 @@ function renderConventionSection(): void {
   prev.className = 'insp-kv';
   // built by calling the same functions the edits call — never a second
   // implementation of what gets written
-  prev.innerHTML = 'next row <b>' + escapeHtml(newRowClassList().join(' ')) + '</b>' +
-    ' · next column <b>' +
+  prev.innerHTML = 'New rows get <b>' + escapeHtml(newRowClassList().join(' ')) + '</b>' +
+    ' · new columns get <b>' +
     escapeHtml(newColClassList(null, rowOfSel()).join(' ')) + '</b>';
   cs.appendChild(prev);
 
@@ -83,7 +83,8 @@ function renderConventionSection(): void {
     const warn = document.createElement('div');
     warn.className = 'hint';
     warn.textContent = 'Ignored: ' + [...new Set(ignored)].join(', ') +
-      ' — grid classes are computed from the column, and `row` is always written.';
+      ' — the canvas writes the grid classes itself (col-*, offset-*), and every row '
+      + 'always gets `row`.';
     cs.appendChild(warn);
   }
   if (!canPersistPrefs()) {
@@ -198,7 +199,8 @@ function renderColInspector(node: ColNode): void {
   if (hasDynamicClassBinding(el)) {
     const warn = document.createElement('div');
     warn.className = 'hint';
-    warn.textContent = 'Also has an [ngClass]/[class] binding; only the static class attribute is edited here.';
+    warn.textContent = 'This also has an [ngClass] binding — the canvas only changes the '
+      + 'plain class attribute, so classes the binding adds won\'t show up here.';
     head.appendChild(warn);
   }
 
@@ -240,14 +242,16 @@ function renderColInspector(node: ColNode): void {
         ? 'detected from this file.'
         : canPersistPrefs()
           ? 'this file doesn\'t say, so your Bootstrap version setting decides.'
-          : 'this file doesn\'t say, so the header\'s Bootstrap version decides.');
+          : 'this file doesn\'t say, so the Bootstrap version in the header decides.');
   es.appendChild(vhint);
 
   const ehint = document.createElement('div');
   ehint.className = 'hint';
   ehint.textContent = defW || defO
-    ? 'These edit the defining token (@' + (defW || defO) + '), wherever it lives — no ' + state.bp + ' overrides are created.'
-    : 'No grid classes yet — a new token will follow the row\'s tier.';
+    ? 'The + and − buttons change the ' + (defW || defO) + ' class that already sets this, '
+      + 'wherever it sits — they won\'t add a new ' + state.bp + ' class.'
+    : 'No width or offset classes yet — a new one will use the same breakpoint as the '
+      + 'rest of the row.';
   es.appendChild(ehint);
 
   // ── all breakpoints (explicit, for overrides and mixed tiers) ──
@@ -320,7 +324,8 @@ function renderColInspector(node: ColNode): void {
   }
   const dhint = document.createElement('div');
   dhint.className = 'hint';
-  dhint.textContent = '● = defined at that breakpoint; gray ↑ values are inherited. Editing an inherited row creates an explicit override at that breakpoint.';
+  dhint.textContent = '● marks a breakpoint with a class of its own. Grey ↑ values carry '
+    + 'up from a smaller breakpoint — change one and it gets its own class here.';
   det.appendChild(dhint);
 
   // actions
@@ -331,8 +336,8 @@ function renderColInspector(node: ColNode): void {
   actBtn(act, 'Split in two', () => splitCol(node));
   actBtn(act, 'Add column after', () => addColAfter(node));
   actBtn(act, 'Add row inside', () => addRowToCol(node));
-  actBtn(act, '◀ Move', () => nudgeCol(-1));
-  actBtn(act, 'Move ▶', () => nudgeCol(+1));
+  actBtn(act, '◀ Move left', () => nudgeCol(-1));
+  actBtn(act, 'Move right ▶', () => nudgeCol(+1));
   const del = actBtn(act, 'Delete', () => deleteEl(node));
   del.classList.add('danger');
 }

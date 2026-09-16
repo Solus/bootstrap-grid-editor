@@ -483,7 +483,7 @@ test.describe('inspector', () => {
       .toBeLessThan(before.indexOf('formControlName="name"'));
 
     await colWithClass(page, 'col-md-4 col-lg-3').click();   // the "code" column
-    await page.locator('#inspector').getByText('Move ▶').click();
+    await page.locator('#inspector').getByText('Move right ▶').click();
 
     const after = await source(page);
     expect(after.indexOf('formControlName="code"'))
