@@ -4,6 +4,41 @@ All notable changes to this extension are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The **Class style (dialect)** setting now applies to any file whose own
+  classes don't settle the question — not just a file with no grid classes at
+  all. `col-sm-6` is valid in both Bootstrap 3 and 4/5, so a Bootstrap 3
+  project whose template used only classes the two versions share was treated
+  as Bootstrap 4/5 and got `offset-sm-3` written into it however the setting
+  was set. A file that *shows* its version still decides for itself: `col-xs-*`
+  or `col-md-offset-*` means Bootstrap 3, a bare `col`, `col-xl-*` or
+  `offset-md-*` means Bootstrap 4/5. Nothing changes for anyone on the default.
+
+### Added
+
+- A **Bootstrap version** chip in the canvas header, beside the breakpoint
+  switch, showing which class style the canvas is writing. On a file whose
+  classes don't say, it's a button: switch it and the choice is saved to the
+  project's workspace settings, so it can be committed for the team. On a file
+  that shows its version, it's a status label — switching there would write
+  the other style's classes alongside the existing ones.
+- The inspector now names the Bootstrap version in force and what decided it
+  — the file itself, or your setting — directly under the width and offset
+  steppers, so a class it writes is never unexplained.
+
+### Changed
+
+- The inspector's explanatory text is written in the reader's terms rather than
+  the code's: no more "defining token", "tier" or "inherited row". The stepper
+  hint now says which class the + and − buttons will change, the breakpoint
+  legend explains the ● and ↑ markers in plain words, and the preview of what
+  gets created reads "New rows get …" instead of "next row row".
+- Column reorder buttons read **Move left** / **Move right**, matching the
+  rows' **Move up** / **Move down**.
+
 ## [0.2.1] - 2026-08-05
 
 ### Fixed
@@ -46,5 +81,6 @@ First public release.
 - **Project class conventions:** set extra classes that every new row or column
   should carry (workspace-scoped, committable in `.vscode/settings.json`).
 
+[Unreleased]: https://github.com/Solus/bootstrap-grid-editor/compare/v0.2.1...HEAD
 [0.2.1]: https://github.com/Solus/bootstrap-grid-editor/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Solus/bootstrap-grid-editor/releases/tag/v0.2.0
