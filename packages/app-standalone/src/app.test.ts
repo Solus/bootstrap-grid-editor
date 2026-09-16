@@ -167,16 +167,64 @@ describe('open config + sticky view prefs', () => {
     ed.applyOpenConfig({ breakpoint: before.bp, stretchSheet: before.s, tintOverfull: before.t });
   });
 
-  it('the dialect setting only breaks ties on a file with no grid classes', async () => {
+  it('the dialect setting decides every file whose own classes do not', async () => {
+    const ed = await editor();
+    const { parseTemplate } = await import('@bootstrap-visualizer/core');
+    const d = (html: string) => ed.detectDialect(parseTemplate(html));
+    ed.applyOpenConfig({ dialect: 'bootstrap3' });
+    // no grid classes → the setting decides
+    expect(d('<div class="row"><div>x</div></div>')).toBe(true);
+    // grid classes both dialects share → still the setting's call: `col-md-6`
+    // is as much Bootstrap 3 as it is Bootstrap 5, so it is not evidence.
+    expect(d('<div class="col-md-6">x</div>')).toBe(true);
+    expect(d('<div class="row"><div class="col-sm-4 col-lg-3">x</div></div>')).toBe(true);
+    // evidence of a dialect always wins over the setting
+    expect(d('<div class="col-xs-6">x</div>')).toBe(true);
+    expect(d('<div class="col">x</div>')).toBe(false);
+    expect(d('<div class="col-md-6 offset-md-2">x</div>')).toBe(false);
+    expect(d('<div class="col-xl-4">x</div>')).toBe(false);
+    // and at the shipped default, an ambiguous file reads as BS5 as it always
+    // did — this change moves nothing for anyone who never set the option
+    ed.applyOpenConfig({ dialect: 'bootstrap5' });
+    expect(d('<div class="col-md-6">x</div>')).toBe(false);
+    expect(d('<div class="col-xs-6">x</div>')).toBe(true);
+    expect(d('<div class="col-md-6 col-md-offset-2">x</div>')).toBe(true);
+    // both dialects' evidence in one file: BS3 wins, since mixing the forms on
+    // one element is the only outcome broken under either framework
+    expect(d('<div class="row"><div class="col-xs-6">a</div>'
+           + '<div class="col-md-4 offset-md-2">b</div></div>')).toBe(true);
+  });
+
+  it('a bootstrap3 setting reaches the classes a nested file actually gets', async () => {
     const ed = await editor();
     const { parseTemplate } = await import('@bootstrap-visualizer/core');
     ed.applyOpenConfig({ dialect: 'bootstrap3' });
-    // no grid classes → the setting decides
-    expect(ed.detectDialect(parseTemplate('<div class="row"><div>x</div></div>'))).toBe(true);
-    // a file that already picked a dialect always wins over the setting
-    expect(ed.detectDialect(parseTemplate('<div class="col-md-6">x</div>'))).toBe(false);
-    expect(ed.detectDialect(parseTemplate('<div class="col-xs-6">x</div>'))).toBe(true);
-    ed.applyOpenConfig({ dialect: 'bootstrap5' });   // restore default
+    // the evidence can sit anywhere in the tree, not just on a top-level child
+    expect(ed.detectDialect(parseTemplate(
+      '<section><div class="row"><div class="col-xs-6">x</div></div></section>'))).toBe(true);
+    expect(ed.detectDialect(parseTemplate(
+      '<section><div class="row"><div class="col-auto">x</div></div></section>'))).toBe(false);
+    ed.applyOpenConfig({ dialect: 'bootstrap5' });
+  });
+
+  it('a bootstrap3 project gets bootstrap3 offsets on a file of shared classes', async () => {
+    // The end the setting exists for: `col-sm-6` alone is not evidence, so a
+    // Bootstrap 3 project used to get `offset-sm-1` written into it however it
+    // set this. Now the setting reaches the token.
+    const ed = await editor();
+    const before = ed.state.src;            // later describes read the sample
+    ed.applyOpenConfig({ dialect: 'bootstrap3' });
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply('<div class="row">\n  <div class="col-sm-6">A</div>\n</div>');
+    expect(ed.state.docBs3).toBe(true);
+    ed.changeOffset(ed.state.model[0]!.cols[0]!, 'sm', +1);
+    expect(ed.state.src).toContain('class="col-sm-6 col-sm-offset-1"');
+    expect(ed.state.src).not.toContain('offset-sm-1');
+    ed.applyOpenConfig({ dialect: 'bootstrap5' });
+    ed.state.sel = null;
+    ed.apply(before);
+    ed.state.dirty = false;
   });
 
   it('flipping a sticky pref asks the host to persist it', async () => {
