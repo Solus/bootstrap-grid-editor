@@ -1,11 +1,11 @@
-/* Shared canvas chrome wiring both frontends need: the breakpoint switch and
-   the click-background-to-deselect behaviour. Requires the host HTML to
-   provide #bpSwitch and #rowsHost. */
+/* Shared canvas chrome wiring both frontends need: the breakpoint switch, the
+   Bootstrap version chip, and the click-background-to-deselect behaviour.
+   Requires the host HTML to provide #bpSwitch, #dialectChip and #rowsHost. */
 
 import { BPS } from '@bootstrap-visualizer/core';
 import { $, rowsHost } from './dom.js';
 import { render } from './render.js';
-import { state } from './state.js';
+import { setDialectPref, state } from './state.js';
 import { clearSelection } from './selection.js';
 
 export function wireBreakpointSwitch(): void {
@@ -18,6 +18,26 @@ export function wireBreakpointSwitch(): void {
     b.addEventListener('click', () => { state.bp = bp; render(); });
     host.appendChild(b);
   });
+}
+
+/** The header's Bootstrap version chip: says which class style the canvas is
+    writing, and switches it where that's the user's call. Built once here;
+    `renderHeader` keeps its label and enabled state current, since both follow
+    the open document.
+
+    Only a document whose own classes don't say is switchable — flipping the
+    chip on a document that has declared its dialect would write the other
+    style's tokens alongside the existing ones, which is broken markup in
+    either framework. There it reads as a status light instead. */
+export function wireDialectChip(): void {
+  const host = $('#dialectChip');
+  const b = document.createElement('button');
+  b.addEventListener('click', () => {
+    if (state.dialectSource !== 'setting') return;
+    setDialectPref(state.docBs3 ? 'bootstrap5' : 'bootstrap3');
+    render();
+  });
+  host.appendChild(b);
 }
 
 /** Clicking the canvas background clears the selection. */

@@ -52,6 +52,18 @@ header{
 .bp-switch button{border:none; background:transparent; border-radius:4px; padding:4px 9px; font-family:var(--mono); font-size:12px; color:var(--muted)}
 .bp-switch button.active{background:var(--amber); color:#211605; font-weight:700}
 .bp-note{font-family:var(--mono); font-size:11px; color:var(--faint)}
+/* Bootstrap version in force. Reads as a button while it's the user's to
+   change, and as a flat status label once the file itself has decided. */
+.dialect-chip button{
+  border:1px solid var(--line); background:var(--ink); border-radius:6px;
+  padding:4px 9px; font-family:var(--mono); font-size:11px; color:var(--text);
+  cursor:pointer; white-space:nowrap;
+}
+.dialect-chip button:hover:not(:disabled){border-color:var(--amber); color:var(--amber)}
+.dialect-chip button:disabled{
+  background:transparent; border-color:transparent; color:var(--faint); cursor:default;
+}
+.dialect-hint{color:var(--muted)}
 .spacer{flex:1}
 
 /* ── Main layout ────────────────────────── */

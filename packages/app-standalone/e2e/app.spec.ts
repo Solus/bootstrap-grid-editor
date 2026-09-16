@@ -417,6 +417,45 @@ test.describe('inspector', () => {
     expect(after).toContain('col-md-6');
   });
 
+  test('the header version chip switches what the steppers write', async ({ page }) => {
+    // FOLLOW-UPS §9.14: `col-sm-6` is valid in both Bootstrap 3 and 4/5, so the
+    // canvas can't tell from the file — the chip is where the user says which,
+    // and the offset it then writes has to follow.
+    await page.locator('#src').fill(
+      '<div class="row"><div class="col-sm-6">x</div></div>');
+    await page.locator('#applyBtn').click();
+
+    const chip = page.locator('#dialectChip button');
+    await expect(chip).toHaveText('Bootstrap 4/5');
+    await expect(chip).toBeEnabled();
+    await chip.click();
+    await expect(chip).toHaveText('Bootstrap 3');
+
+    await colWithClass(page, 'col-sm-6').click();
+    await expect(page.locator('#inspector')).toContainText('Bootstrap 3 classes');
+    await page.locator('.bp-grid').first().locator('.stepper').nth(1)
+      .locator('button').last().click();                           // offset +
+    const after = await source(page);
+    expect(after).toContain('col-sm-offset-1');
+    expect(after).not.toContain('offset-sm-1');
+
+    // the file now declares a dialect, so it takes the decision back
+    await expect(chip).toBeDisabled();
+    await expect(chip).toHaveText('Bootstrap 3');
+  });
+
+  test('the version chip is a status light on a file that shows its version', async ({ page }) => {
+    await page.locator('#src').fill(
+      '<div class="row"><div class="col-xs-6">x</div></div>');
+    await page.locator('#applyBtn').click();
+    const chip = page.locator('#dialectChip button');
+    await expect(chip).toHaveText('Bootstrap 3');
+    await expect(chip).toBeDisabled();
+    await colWithClass(page, 'col-xs-6').click();
+    await expect(page.locator('#inspector'))
+      .toContainText('Bootstrap 3 classes — detected from this file.');
+  });
+
   test('equal-width column disables the width stepper', async ({ page }) => {
     await colWithClass(page, 'col').click();
     const widthStepper = page.locator('.bp-grid').first().locator('.stepper').first();

@@ -81,4 +81,5 @@ export type WebviewMessage =
     DOM editor package (same reason `ConfigWire` mirrors `OpenConfig`). */
 export type PrefChange =
   | { pref: 'stretchSheet' | 'tintOverfull'; value: boolean }
-  | { pref: 'newRowClasses' | 'newColumnClasses'; value: string };
+  | { pref: 'newRowClasses' | 'newColumnClasses'; value: string }
+  | { pref: 'dialect'; value: 'bootstrap5' | 'bootstrap3' };

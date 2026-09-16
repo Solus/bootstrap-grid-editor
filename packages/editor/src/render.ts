@@ -12,7 +12,9 @@ import type {
   Breakpoint, ColNode, ColSeqItem, CondRegion, El, NodePath, RootEl, RowNode,
 } from '@bootstrap-visualizer/core';
 import { $, mkBadge, mkTypeBadge, rowsHost, sheet, toast } from './dom.js';
-import { SHEET_WIDTH, setActiveBranch, state, type Selection } from './state.js';
+import {
+  SHEET_WIDTH, dialectLabel, setActiveBranch, state, type Selection,
+} from './state.js';
 import { computeFind, updateFindCount } from './find.js';
 import { renderInspector } from './inspector.js';
 import { attachResize, makeDropzone, startColDrag } from './dnd.js';
@@ -217,11 +219,31 @@ export function renderHeader(): void {
   if (undoBtn) undoBtn.disabled = !(state.hIndex > 0);
   if (redoBtn) redoBtn.disabled = !(state.hIndex < state.history.length - 1);
   $('#bpNote').textContent = BP_LABEL[state.bp];
+  renderDialectChip();
   document.querySelectorAll<HTMLElement>('#bpSwitch button').forEach(b =>
     b.classList.toggle('active', b.dataset.bp === state.bp));
   // the bp width is a proportion cue, not a semantic constraint — stretch
   // lets the sheet use however much panel the user has given the canvas
   sheet.style.maxWidth = state.stretchSheet ? '100%' : SHEET_WIDTH[state.bp] + 'px';
+}
+
+/** Keep the header's Bootstrap version chip on the open document: the label is
+    the dialect in force, and it's only clickable where the document leaves the
+    choice open (see `wireDialectChip`). Guarded like undo/redo so a host that
+    hasn't wired the chip still renders. */
+function renderDialectChip(): void {
+  const b = document.querySelector<HTMLButtonElement>('#dialectChip button');
+  if (!b) return;
+  const fromFile = state.dialectSource === 'file';
+  b.textContent = dialectLabel(state.docBs3);
+  b.classList.toggle('from-file', fromFile);
+  b.disabled = fromFile;
+  b.title = fromFile
+    ? dialectLabel(state.docBs3) + ' — detected from this file’s own classes, '
+      + 'which is what new classes follow. Not switchable here.'
+    : 'This file’s classes don’t say which Bootstrap version it is, so new '
+      + 'classes follow this. Click to switch to '
+      + dialectLabel(!state.docBs3) + '.';
 }
 
 /** The strip that says the canvas is reading a file that didn't parse.

@@ -439,6 +439,30 @@ describe('user settings', () => {
       { key: 'newColumnClasses', value: 'px-2', target: 1 }));    // 1 = Global
   });
 
+  it('the header version chip writes the dialect to the workspace settings', async () => {
+    // same reasoning as the convention: which Bootstrap a project is on is a
+    // property of the project, and the setting is resource-scoped
+    M.state.workspaceFolders = [{ uri: {} }];
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    panel.receive({ type: 'setConfig', change: { pref: 'dialect', value: 'bootstrap3' } });
+    await vi.waitFor(() => expect(M.configWrites).toContainEqual(
+      { key: 'dialect', value: 'bootstrap3', target: 2 }));       // 2 = Workspace
+  });
+
+  it('the version chip falls back to user settings with no workspace open', async () => {
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    panel.receive({ type: 'setConfig', change: { pref: 'dialect', value: 'bootstrap3' } });
+    await vi.waitFor(() => expect(M.configWrites).toContainEqual(
+      { key: 'dialect', value: 'bootstrap3', target: 1 }));       // 1 = Global
+  });
+
+  it('the webview HTML carries the chip\'s mount point', () => {
+    // the shared editor asserts this id at boot (REQUIRED_EDITOR_IDS), so a
+    // webview shell missing it fails the panel outright
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    expect(panel.webview.html).toContain('id="dialectChip"');
+  });
+
   it('a convention edited in settings reaches an already-open panel', async () => {
     const { panel } = openWith(makeDoc('<p>x</p>'));
     panel.receive({ type: 'ready' });

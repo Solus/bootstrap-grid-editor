@@ -165,15 +165,18 @@ const SETTING_KEY: Record<PrefChange['pref'], string> = {
   tintOverfull: 'tintOverfullRows',
   newRowClasses: 'newRowClasses',
   newColumnClasses: 'newColumnClasses',
+  dialect: 'dialect',
 };
 
 /** Where a canvas-written setting goes. The view toggles are personal, so they
-    stay user-global. The class convention describes the *project's* markup, so
-    it belongs to the workspace when there is one — and it has to: it's
-    `resource`-scoped, so a value committed in `.vscode/settings.json` would
-    shadow a global write and the field would appear not to stick. */
+    stay user-global. The class convention and the Bootstrap version describe
+    the *project's* markup, so they belong to the workspace when there is one
+    — and they have to: both are `resource`-scoped, so a value committed in
+    `.vscode/settings.json` would shadow a global write and the control would
+    appear not to stick. */
 function writeTarget(pref: PrefChange['pref']): vscode.ConfigurationTarget {
-  const perProject = pref === 'newRowClasses' || pref === 'newColumnClasses';
+  const perProject = pref === 'newRowClasses' || pref === 'newColumnClasses' ||
+    pref === 'dialect';
   return perProject && vscode.workspace.workspaceFolders?.length
     ? vscode.ConfigurationTarget.Workspace
     : vscode.ConfigurationTarget.Global;
@@ -244,6 +247,7 @@ function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): stri
     <div class="brand"><b>GRID·DRAFT</b><span>Bootstrap grid editor</span></div>
     <div class="bp-switch" id="bpSwitch" role="tablist" aria-label="Breakpoint"></div>
     <div class="bp-note" id="bpNote"></div>
+    <div class="dialect-chip" id="dialectChip"></div>
     <div class="spacer"></div>
     <button id="resyncBtn" title="Reset the canvas to the current editor contents">⟳ Resync</button>
   </header>

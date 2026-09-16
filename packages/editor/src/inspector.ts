@@ -9,8 +9,8 @@ import {
 import type { ColNode, RowNode, WidthValue } from '@bootstrap-visualizer/core';
 import { escapeHtml, inspector } from './dom.js';
 import {
-  canPersistPrefs, newColClassList, newRowClassList, persistViewPref, resolvePath,
-  rowOfSel, setClassConvention, state,
+  canPersistPrefs, dialectLabel, newColClassList, newRowClassList, persistViewPref,
+  resolvePath, rowOfSel, setClassConvention, state,
 } from './state.js';
 import { render } from './render.js';
 import {
@@ -230,11 +230,24 @@ function renderColInspector(node: ColNode): void {
     () => quickOffset(node, -1), () => quickOffset(node, +1));
   eg.appendChild(oSt);
 
+  // Which class style the steppers above are about to write, and who decided
+  // — the one place a surprising `offset-md-3` can be traced back to a setting
+  // rather than read as a bug (FOLLOW-UPS §9.14).
+  const vhint = document.createElement('div');
+  vhint.className = 'hint dialect-hint';
+  vhint.textContent = dialectLabel(state.docBs3) + ' classes — '
+    + (state.dialectSource === 'file'
+        ? 'detected from this file.'
+        : canPersistPrefs()
+          ? 'this file doesn\'t say, so your Bootstrap version setting decides.'
+          : 'this file doesn\'t say, so the header\'s Bootstrap version decides.');
+  es.appendChild(vhint);
+
   const ehint = document.createElement('div');
   ehint.className = 'hint';
   ehint.textContent = defW || defO
     ? 'These edit the defining token (@' + (defW || defO) + '), wherever it lives — no ' + state.bp + ' overrides are created.'
-    : 'No grid classes yet — a new token will follow the row\'s tier and dialect.';
+    : 'No grid classes yet — a new token will follow the row\'s tier.';
   es.appendChild(ehint);
 
   // ── all breakpoints (explicit, for overrides and mixed tiers) ──

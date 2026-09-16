@@ -8,7 +8,7 @@ import '@bootstrap-visualizer/editor/styles.css';
 import {
   apply, applyOpenConfig, assertRequiredIds, readClassConvention, REQUIRED_EDITOR_IDS,
   renderInspector, selectAtOffset, setHost, toast, wireBreakpointSwitch,
-  wireCanvasBackground, wireDragSurface, wireKeyboardNav,
+  wireCanvasBackground, wireDialectChip, wireDragSurface, wireKeyboardNav,
 } from '@bootstrap-visualizer/editor';
 import { createWebviewHost, type SyncState } from './webview-host.js';
 import type { HostMessage, WebviewMessage } from '../shared/protocol.js';
@@ -28,6 +28,7 @@ let firstEdit = true;   // show the "save to persist" cue once per session
 
 setHost(createWebviewHost(post, sync));
 wireBreakpointSwitch();
+wireDialectChip();
 wireKeyboardNav();          // no undo/redo — that's the editor's native undo
 wireCanvasBackground();
 wireDragSurface();
