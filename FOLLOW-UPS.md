@@ -193,34 +193,6 @@ does show (the row draws inside the branch box) but doesn't announce.
 *Suggested direction.* Leave the behaviour; consider naming the branch in the
 toast when the insertion point is inside one.
 
-### 9.14 The resolved dialect is invisible in the canvas **[decide]**
-
-*What it is.* `detectDialect` (`packages/editor/src/state.ts`) now resolves the
-dialect three ways — BS3 evidence, BS4/5-only evidence, or the
-`bootstrapGridEditor.dialect` setting for an ambiguous document — but the canvas
-never says which of the three decided, or what it decided. The inspector's
-"Effective at …" hint mentions the dialect only in passing
-(`packages/editor/src/inspector.ts`).
-
-*Why it matters.* This was the reported symptom behind the detection fix: a user
-sees `offset-sm-3` written into a Bootstrap 3 project and reads it as a bug,
-because nothing in the UI connects the class it wrote to a setting they have
-never seen. Better detection shrinks that set but does not empty it — an
-ambiguous file still turns on a setting buried in VS Code's settings UI.
-
-*Suggested direction.* Two steps, cheapest first. (1) Name the resolved dialect
-and its source in the inspector hint — "Bootstrap 4/5 (detected)" vs "(from your
-setting)" — so the class the canvas is about to write is never unattributed.
-(2) Make it a control: a dialect chip in the canvas chrome beside the breakpoint
-switch (`wireBreakpointSwitch`, `packages/editor/src/chrome.ts`) that writes back
-through the existing `setConfig`/`PrefChange` channel
-(`packages/app-extension/src/shared/protocol.ts`), the way `stretchToFit` and
-the class convention already do — `PrefChange` would gain a dialect variant
-alongside its `ViewPref` / `ClassPref` ones. Both land in `packages/editor`, so
-the standalone app gets them too. A first-run prompt or a
-`contributes.walkthroughs` step was considered and is the weaker fix: it fires
-before the user has a file open, and misses the moment the wrong class appears.
-
 ## 10. Edit granularity and view state
 
 *Both surfaced while hardening the canvas↔buffer seam (§7.4/§7.5/§9.4). Neither
@@ -317,5 +289,6 @@ Section numbers are kept stable so references elsewhere still resolve.
 - **9.5** Divergence warned on every keystroke — _RESOLVED — edge-triggered_
 - **9.6** Auto-resync on external edits instead of blocking — _IMPLEMENTED — `liveSync`, now the default_
 - **9.7** Sync is decided by content, not `doc.version` — _RESOLVED — `syncedText`_
+- **9.14** The resolved dialect is invisible in the canvas — _IMPLEMENTED — inspector names the version and what decided it; header chip switches it where the file doesn't_
 - **10.1** A class edit rewrites the whole attribute value — _RESOLVED — token-level edits_
 - **11.1** An unclosed element's span is a guess, and structural edits trusted it — _RESOLVED — `El.unclosed` + a per-element guard_

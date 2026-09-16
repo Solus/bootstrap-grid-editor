@@ -14,7 +14,7 @@ export const $ = <T extends Element = HTMLElement>(s: string): T =>
     renderHeader because the extension omits them) is deliberately excluded. */
 export const REQUIRED_EDITOR_IDS = [
   'sheet', 'rowsHost', 'inspector', 'ruler', 'toast',
-  'bpSwitch', 'bpNote', 'findBox', 'findCount',
+  'bpSwitch', 'bpNote', 'dialectChip', 'findBox', 'findCount',
 ] as const;
 
 /** Fail loud and early if the host HTML is missing an element the code will

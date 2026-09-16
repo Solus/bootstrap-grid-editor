@@ -25,8 +25,10 @@ directives are preserved.
   regions show up as toggleable branches you can preview.
 - **Breakpoint switching** — see the layout at xs–xxl without editing anything.
 - **Live sync** — the canvas follows the editor as you type (toggleable).
-- **Bootstrap 3, 4, and 5** — the dialect is detected per file; new columns
-  follow whatever the file already uses.
+- **Bootstrap 3, 4, and 5** — detected per file; new columns follow whatever
+  the file already uses. Where a file's classes work in either (`col-sm-6` is
+  valid in both), the header chip says which version the canvas is writing and
+  lets you switch it.
 
 ## Install
 
@@ -96,7 +98,7 @@ All under `bootstrapGridEditor.*`:
 | `defaultBreakpoint` | `md` | Breakpoint the canvas opens at. |
 | `stretchToFit` | `false` | Open stretched to the full panel instead of the breakpoint's representative width. |
 | `tintOverfullRows` | `false` | Open with overfull rows tinted amber. |
-| `dialect` | `bootstrap5` | Class style for **new** columns when a file has no grid classes to detect from (`bootstrap5` or `bootstrap3`). A file that already uses a dialect keeps it. |
+| `dialect` | `bootstrap5` | Class style for **new** columns and offsets in a file whose own classes don't settle it — none, or only ones both versions share (`bootstrap5` or `bootstrap3`). A file that shows its version keeps it. The header's version chip updates this. Workspace-scoped, so commit it in `.vscode/settings.json`. |
 | `newRowClasses` | `""` | Extra classes on every row the canvas **creates**, after `row` — e.g. `clearfix`. Workspace-scoped, so commit it in `.vscode/settings.json` and the whole team gets it. Grid classes are ignored here. |
 | `newColumnClasses` | `""` | Extra classes on every column the canvas **creates**, after the computed `col-*` — e.g. `px-2`. Also workspace-scoped. |
 | `liveSync` | `true` | Keep the canvas in sync with the editor as you type. Off = the canvas holds still until you save or **Resync**. Either way, canvas edits are verified against the file before they touch it. |

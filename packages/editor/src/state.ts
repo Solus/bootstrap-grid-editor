@@ -44,6 +44,10 @@ export interface AppState {
   fileName: string | null;
   /** Any BS3-style grid class anywhere in the document. */
   docBs3: boolean;
+  /** What settled `docBs3`: the document's own classes, or the configured
+      default for a document that doesn't say. Shown in the canvas so a written
+      class is never unattributed (FOLLOW-UPS §9.14). */
+  dialectSource: DialectSource;
   /** One level of indentation as this document writes it (a tab, two spaces,
       four…), detected on every apply. Everything the canvas inserts indents
       with this, so a tab-indented file never gets spaces spliced into it. */
@@ -84,6 +88,7 @@ export const state: AppState = {
   stretchSheet: false,
   fileName: null,
   docBs3: false,
+  dialectSource: 'setting',
   indentUnit: '  ',
   eol: '\n',
   newRowClasses: { raw: '', tokens: [], dropped: [] },
@@ -138,7 +143,8 @@ export type ViewPref = 'stretchSheet' | 'tintOverfull';
 export type ClassPref = 'newRowClasses' | 'newColumnClasses';
 export type PrefChange =
   | { pref: ViewPref; value: boolean }
-  | { pref: ClassPref; value: string };
+  | { pref: ClassPref; value: string }
+  | { pref: 'dialect'; value: Dialect };
 
 /** Settings the host seeds the canvas with at open (extension only). All
     optional — an absent field keeps the built-in default. */
@@ -153,11 +159,39 @@ export interface OpenConfig {
   newColumnClasses?: string;
 }
 
+/** The two class styles, as the setting names them. */
+export type Dialect = 'bootstrap5' | 'bootstrap3';
+/** What decided the dialect in force: the document's own classes, or the
+    configured default (`dialectDefault`) for one whose classes don't say. */
+export type DialectSource = 'file' | 'setting';
+
 /** Dialect for a document whose own classes don't settle it — no grid classes,
     or only ones both dialects share (set by config; BS5 unless the host says
     otherwise). A file carrying evidence of one dialect wins over this — see
     `detectDialect`. */
 let dialectDefault = false;   // false = Bootstrap 4/5
+
+/** How the dialect reads in the canvas. Deliberately the framework's own
+    version numbers rather than the setting's `bootstrap5` — the class style is
+    shared by 4 and 5, and a user on Bootstrap 4 should recognise themselves in
+    it. */
+export function dialectLabel(bs3: boolean): string {
+  return bs3 ? 'Bootstrap 3' : 'Bootstrap 4/5';
+}
+
+/** Set the fallback dialect from the canvas (the header chip) and tell the
+    host to remember it. Re-resolves the open document, because the change only
+    shows up in a document that was relying on the fallback — one whose own
+    classes decide is unmoved, and the chip stays disabled there. */
+export function setDialectPref(value: Dialect): void {
+  dialectDefault = value === 'bootstrap3';
+  if (state.root) {
+    const d = decideDialect(state.root);
+    state.docBs3 = d.bs3;
+    state.dialectSource = d.source;
+  }
+  host?.persistPref?.({ pref: 'dialect', value });
+}
 
 /** Seed the canvas from the host's settings, once, before the first render. */
 export function applyOpenConfig(cfg: OpenConfig): void {
@@ -269,7 +303,9 @@ export function apply(newSrc: string, opts: ApplyOpts = {}): void {
   state.src = newSrc;
   state.root = root;
   state.model = model;
-  state.docBs3 = detectDialect(root);
+  const dialect = decideDialect(root);
+  state.docBs3 = dialect.bs3;
+  state.dialectSource = dialect.source;
   state.indentUnit = detectIndentUnit(newSrc);
   state.eol = detectEol(newSrc);
   if (!keepSel) state.sel = null;
@@ -373,8 +409,9 @@ export function rowOfSel(): RowNode | ColNode | null {
   return state.sel ? resolvePath(state.sel.path.slice(0, -1)) : null;
 }
 
-/** Whether new classes should be BS3-style. Three-way, because *having* grid
-    classes is not the same as having declared a dialect: `col-sm-6` is valid
+/** Which dialect new classes follow in this document, and what decided it.
+    Three-way, because *having* grid classes is not the same as having declared
+    a dialect: `col-sm-6` is valid
     in both. Evidence only one dialect has decides — BS3 evidence (`usesBs3`)
     → BS3, BS4/5-only evidence (`usesBs5`) → BS4/5 — and a document whose grid
     classes are ambiguous (or absent) falls back to the configured
@@ -384,7 +421,7 @@ export function rowOfSel(): RowNode | ColNode | null {
     BS3 wins a document carrying both, since mixing the forms on one element
     (`col-xs-6` beside `offset-md-3`) is the one outcome that is broken in
     either framework. */
-export function detectDialect(root: El): boolean {
+export function decideDialect(root: El): { bs3: boolean; source: DialectSource } {
   let bs5 = false;
   const bs3 = (function walk(e: El): boolean {
     for (const c of e.children) {
@@ -395,7 +432,15 @@ export function detectDialect(root: El): boolean {
     }
     return false;
   })(root);
-  return bs3 ? true : (bs5 ? false : dialectDefault);
+  if (bs3) return { bs3: true, source: 'file' };
+  if (bs5) return { bs3: false, source: 'file' };
+  return { bs3: dialectDefault, source: 'setting' };
+}
+
+/** Just the answer, for the callers that write tokens and don't care who
+    decided. */
+export function detectDialect(root: El): boolean {
+  return decideDialect(root).bs3;
 }
 
 /* ── tier conventions for newly created tokens ───────────────────── */

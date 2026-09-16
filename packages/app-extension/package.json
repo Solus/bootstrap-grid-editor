@@ -102,7 +102,7 @@
           ],
           "default": "bootstrap5",
           "scope": "resource",
-          "markdownDescription": "Class style for **new** columns and offsets in a file whose own classes don't settle it — no grid classes, or only ones both dialects share (`col-sm-6` is valid in either). A file that shows its dialect always keeps it: `col-xs-*` or `col-md-offset-*` means Bootstrap 3, a bare `col`, `col-xl-*` or `offset-md-*` means Bootstrap 4/5. **Set this for a Bootstrap 3 project** — otherwise a file with only shared classes gets Bootstrap 4/5 offsets. A project trait, so it can be committed in the workspace's `.vscode/settings.json`."
+          "markdownDescription": "Class style for **new** columns and offsets in a file whose own classes don't settle it — no grid classes, or only ones both dialects share (`col-sm-6` is valid in either). A file that shows its dialect always keeps it: `col-xs-*` or `col-md-offset-*` means Bootstrap 3, a bare `col`, `col-xl-*` or `offset-md-*` means Bootstrap 4/5. **Set this for a Bootstrap 3 project** — otherwise a file with only shared classes gets Bootstrap 4/5 offsets. The **Bootstrap version** chip in the canvas header updates this. A project trait, so it can be committed in the workspace's `.vscode/settings.json`."
         },
         "bootstrapGridEditor.newRowClasses": {
           "type": "string",

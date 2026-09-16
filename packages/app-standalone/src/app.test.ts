@@ -10,7 +10,7 @@
  * cheapest thing that would catch a cycle, a stale element id, or a crash
  * in the first render pass.
  */
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import indexHtml from '../index.html?raw';
 
 // Imported dynamically inside tests, NOT statically: the editor's dom.ts
@@ -256,6 +256,113 @@ describe('open config + sticky view prefs', () => {
     ed.setHost(standaloneHost);
     ed.setClassConvention('row', '');
     ed.setClassConvention('col', '');
+  });
+});
+
+describe('the header Bootstrap version chip (FOLLOW-UPS §9.14)', () => {
+  const chip = () => document.querySelector<HTMLButtonElement>('#dialectChip button')!;
+
+  // this describe swaps the open document and the fallback dialect around;
+  // later describes read the sample, so hand it all back when we're done
+  let sample = '';
+  beforeAll(async () => { sample = (await editor()).state.src; });
+  afterAll(async () => {
+    const ed = await editor();
+    const { standaloneHost } = await import('./standalone-host.js');
+    ed.setHost(standaloneHost);
+    ed.applyOpenConfig({ dialect: 'bootstrap5' });
+    ed.state.sel = null;
+    ed.apply(sample);
+    ed.state.dirty = false;
+  });
+
+  const load = async (src: string) => {
+    const ed = await editor();
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply(src);
+    return ed;
+  };
+
+  it('is a status light on a file that shows its own version', async () => {
+    const ed = await load('<div class="row"><div class="col-xs-6">A</div></div>');
+    expect(chip().textContent).toBe('Bootstrap 3');
+    expect(chip().disabled).toBe(true);         // the file decided, not the user
+    expect(chip().title).toContain('detected from this file');
+
+    await load('<div class="row"><div class="col-md-6 offset-md-2">A</div></div>');
+    expect(chip().textContent).toBe('Bootstrap 4/5');
+    expect(chip().disabled).toBe(true);
+    expect(ed.state.dialectSource).toBe('file');
+  });
+
+  it('becomes a switch on a file whose classes do not say', async () => {
+    const ed = await load('<div class="row"><div class="col-sm-6">A</div></div>');
+    expect(ed.state.dialectSource).toBe('setting');
+    expect(chip().textContent).toBe('Bootstrap 4/5');
+    expect(chip().disabled).toBe(false);
+    expect(chip().title).toContain('Click to switch to Bootstrap 3');
+  });
+
+  it('switching it changes the classes the canvas writes, and is remembered', async () => {
+    const ed = await editor();
+    const { standaloneHost } = await import('./standalone-host.js');
+    const writes: Array<[string, boolean | string]> = [];
+    ed.setHost({ ...standaloneHost, persistPref: c => writes.push([c.pref, c.value]) });
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply('<div class="row">\n  <div class="col-sm-6">A</div>\n</div>');
+
+    chip().click();
+    expect(writes).toEqual([['dialect', 'bootstrap3']]);   // host stores it
+    expect(chip().textContent).toBe('Bootstrap 3');
+    expect(ed.state.docBs3).toBe(true);
+
+    chip().click();                                        // and back again
+    expect(writes[1]).toEqual(['dialect', 'bootstrap5']);
+    expect(chip().textContent).toBe('Bootstrap 4/5');
+    expect(ed.state.docBs3).toBe(false);
+
+    chip().click();
+    // it reaches the token, which is the whole point
+    ed.changeOffset(ed.state.model[0]!.cols[0]!, 'sm', +1);
+    expect(ed.state.src).toContain('class="col-sm-6 col-sm-offset-1"');
+    // and now the file says so itself, so the chip hands the decision back to it
+    expect(ed.state.dialectSource).toBe('file');
+    expect(chip().disabled).toBe(true);
+
+    ed.setHost(standaloneHost);
+    ed.applyOpenConfig({ dialect: 'bootstrap5' });
+  });
+
+  it('a file that shows its version ignores the switch', async () => {
+    const ed = await editor();
+    const { standaloneHost } = await import('./standalone-host.js');
+    const writes: string[] = [];
+    ed.setHost({ ...standaloneHost, persistPref: c => writes.push(c.pref) });
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply('<div class="row"><div class="col-xs-6">A</div></div>');
+    chip().click();                       // disabled, and guarded in the handler too
+    expect(writes).toEqual([]);
+    expect(ed.state.docBs3).toBe(true);   // still the file's own answer
+    ed.setHost(standaloneHost);
+  });
+
+  it('the inspector says which version it is and who decided', async () => {
+    const ed = await editor();
+    ed.applyOpenConfig({ dialect: 'bootstrap5' });   // the fallback under test
+    await load('<div class="row"><div class="col-sm-6">A</div></div>');
+    ed.select({ path: [0, 0], kind: 'col' });
+    const insp = document.querySelector('#inspector')!.textContent!;
+    expect(insp).toContain('Bootstrap 4/5 classes');
+    expect(insp).toContain("this file doesn't say");
+
+    await load('<div class="row"><div class="col-xs-6">A</div></div>');
+    ed.select({ path: [0, 0], kind: 'col' });
+    expect(document.querySelector('#inspector')!.textContent)
+      .toContain('Bootstrap 3 classes — detected from this file.');
+    ed.clearSelection();
   });
 });
 
