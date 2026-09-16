@@ -3,7 +3,7 @@
    reaches the document. */
 
 import {
-  BPS, ROW_CLASS, applyEdits, buildModel, classTokens, classValue, definingBp,
+  BPS, ROW_CLASS, applyEdits, buildModel, classTokens, definingBp,
   detectEol, detectIndentUnit, mergeClasses, parseExtraClasses,
   parseTemplate, usesBs3, usesBs5, widthTokenBp,
 } from '@bootstrap-visualizer/core';
@@ -371,20 +371,6 @@ export function resolvePath(path: NodePath | null): RowNode | ColNode | null {
 
 export function rowOfSel(): RowNode | ColNode | null {
   return state.sel ? resolvePath(state.sel.path.slice(0, -1)) : null;
-}
-
-/** Any BS3-style grid class anywhere in the document? */
-export function computeDocBs3(root: El): boolean {
-  let found = false;
-  (function walk(e: El) {
-    if (found) return;
-    for (const c of e.children) {
-      const v = classValue(c);
-      if (v && usesBs3(v.trim().split(/\s+/))) { found = true; return; }
-      walk(c);
-    }
-  })(root);
-  return found;
 }
 
 /** Whether new classes should be BS3-style. Three-way, because *having* grid
