@@ -114,6 +114,26 @@ export function usesBs3(tokens: string[]): boolean {
                           /^col-(xs|sm|md|lg|xl|xxl)-offset-\d/.test(t));
 }
 
+/** Does this token list carry a grid class that *only* exists in Bootstrap
+    4/5? Bootstrap 3's grid is numeric `col-{xs,sm,md,lg}-N` plus
+    `col-{bp}-offset-N` and nothing else, so each of these postdates it:
+    a bare `col` / `col-{bp}` (equal width), `*-auto` (content width), the
+    `xl` / `xxl` tiers, the `offset-*` form, and `row-cols-*`.
+
+    The counterpart to `usesBs3`, not its negation: a list where *neither*
+    fires is genuinely ambiguous — `col-sm-6` is valid in both dialects — and
+    the caller decides what an ambiguous file means (see the editor's
+    `detectDialect`, where the user's setting breaks that tie). */
+export function usesBs5(tokens: string[]): boolean {
+  return tokens.some(t =>
+    t === 'col' ||
+    /^col-(sm|md|lg|xl|xxl)$/.test(t) ||
+    /^col-(?:(sm|md|lg|xl|xxl)-)?auto$/.test(t) ||
+    /^col-(xl|xxl)-\d{1,2}$/.test(t) ||
+    /^offset-(?:(sm|md|lg|xl|xxl)-)?\d{1,2}$/.test(t) ||
+    /^row-cols(?:-(sm|md|lg|xl|xxl))?-(?:\d{1,2}|auto)$/.test(t));
+}
+
 /* ── writing grid tokens ─────────────────────────────────────────── */
 
 /** Rebuild the token list with the width token for `bp` set to `val`

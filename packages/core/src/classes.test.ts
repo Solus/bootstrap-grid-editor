@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classIsInterpolated, colSpec, definingBp, effectiveAt, halveWidthTokenStr,
   halvedWidthTokens, hasDynamicClassBinding, isHiddenAt, offsetTokenBp,
-  setOffsetToken, setWidthToken, widthTokenBp,
+  setOffsetToken, setWidthToken, usesBs3, usesBs5, widthTokenBp,
 } from './classes.js';
 import { buildModel } from './model.js';
 import { parseTemplate } from './parser.js';
@@ -179,4 +179,41 @@ describe('explicit offset-*-0 cancels inherited offset', () => {
   it('bs3 explicit zero', () =>
     expect(setOffsetToken(['col-sm-4', 'col-sm-offset-3'], 'md', 0, true, true))
       .toEqual(['col-sm-4', 'col-sm-offset-3', 'col-md-offset-0']));
+});
+
+describe('dialect evidence: usesBs3 / usesBs5 / neither', () => {
+  // Bootstrap 3 only.
+  it('col-xs-* is bs3', () => expect(usesBs3(['col-xs-6'])).toBe(true));
+  it('bare col-xs is bs3', () => expect(usesBs3(['col-xs'])).toBe(true));
+  it('col-*-offset-* is bs3', () => expect(usesBs3(['col-sm-4', 'col-md-offset-2'])).toBe(true));
+  it('bs3 tokens are not bs5', () =>
+    expect(usesBs5(['col-xs-6', 'col-sm-offset-4'])).toBe(false));
+
+  // Bootstrap 4/5 only.
+  it('bare col is bs5', () => expect(usesBs5(['col'])).toBe(true));
+  it('bare col-md is bs5', () => expect(usesBs5(['col-md'])).toBe(true));
+  it('col-auto is bs5', () => expect(usesBs5(['col-auto'])).toBe(true));
+  it('col-md-auto is bs5', () => expect(usesBs5(['col-md-auto'])).toBe(true));
+  it('xl tier is bs5', () => expect(usesBs5(['col-xl-4'])).toBe(true));
+  it('xxl tier is bs5', () => expect(usesBs5(['col-xxl-4'])).toBe(true));
+  it('offset-* is bs5', () => expect(usesBs5(['col-sm-4', 'offset-sm-2'])).toBe(true));
+  it('bare offset-N is bs5', () => expect(usesBs5(['offset-2'])).toBe(true));
+  it('row-cols-* is bs5', () => expect(usesBs5(['row', 'row-cols-md-3'])).toBe(true));
+  it('bs5 tokens are not bs3', () => expect(usesBs3(['col', 'col-xl-4', 'offset-md-2'])).toBe(false));
+
+  // Shared by both dialects — the ambiguous case the setting exists to break.
+  it('col-sm-6 claims neither', () => {
+    expect(usesBs3(['col-sm-6'])).toBe(false);
+    expect(usesBs5(['col-sm-6'])).toBe(false);
+  });
+  it('col-md-4 / col-lg-3 claim neither', () => {
+    expect(usesBs5(['col-md-4', 'col-lg-3'])).toBe(false);
+    expect(usesBs3(['col-md-4', 'col-lg-3'])).toBe(false);
+  });
+  it('non-grid classes claim neither', () => {
+    expect(usesBs5(['row', 'form-group', 'px-2'])).toBe(false);
+    expect(usesBs3(['row', 'form-group', 'px-2'])).toBe(false);
+  });
+  it('a bs3 offset is not read as a bs5 offset', () =>
+    expect(usesBs5(['col-sm-offset-4'])).toBe(false));
 });
