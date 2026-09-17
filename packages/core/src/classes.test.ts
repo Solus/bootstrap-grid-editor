@@ -192,6 +192,10 @@ describe('dialect evidence: usesBs3 / usesBs5 / neither', () => {
   // Bootstrap 4/5 only.
   it('bare col is bs5', () => expect(usesBs5(['col'])).toBe(true));
   it('bare col-md is bs5', () => expect(usesBs5(['col-md'])).toBe(true));
+  // breakpoint-less numeric: bs3 spells its xs tier `col-xs-N`, never `col-N`
+  it('col-12 is bs5', () => expect(usesBs5(['col-12'])).toBe(true));
+  it('col-6 is bs5', () => expect(usesBs5(['col-6'])).toBe(true));
+  it('col-N is not bs3', () => expect(usesBs3(['col-12', 'col-6'])).toBe(false));
   it('col-auto is bs5', () => expect(usesBs5(['col-auto'])).toBe(true));
   it('col-md-auto is bs5', () => expect(usesBs5(['col-md-auto'])).toBe(true));
   it('xl tier is bs5', () => expect(usesBs5(['col-xl-4'])).toBe(true));

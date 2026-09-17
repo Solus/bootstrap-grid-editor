@@ -14,7 +14,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   project whose template used only classes the two versions share was treated
   as Bootstrap 4/5 and got `offset-sm-3` written into it however the setting
   was set. A file that *shows* its version still decides for itself: `col-xs-*`
-  or `col-md-offset-*` means Bootstrap 3, a bare `col`, `col-xl-*` or
+  or `col-md-offset-*` means Bootstrap 3, a bare `col`, `col-12`, `col-xl-*` or
   `offset-md-*` means Bootstrap 4/5. Nothing changes for anyone on the default.
 
 ### Added

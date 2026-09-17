@@ -183,6 +183,11 @@ describe('open config + sticky view prefs', () => {
     expect(d('<div class="col">x</div>')).toBe(false);
     expect(d('<div class="col-md-6 offset-md-2">x</div>')).toBe(false);
     expect(d('<div class="col-xl-4">x</div>')).toBe(false);
+    // a breakpoint-less `col-N` is Bootstrap 4/5 too: Bootstrap 3 spells that
+    // tier `col-xs-N`, so a file of these has shown its version and the
+    // setting must not drag it back to Bootstrap 3
+    expect(d('<div class="row"><div class="col-12">x</div></div>')).toBe(false);
+    expect(d('<div class="row"><div class="col-6 col-md-4">x</div></div>')).toBe(false);
     // and at the shipped default, an ambiguous file reads as BS5 as it always
     // did — this change moves nothing for anyone who never set the option
     ed.applyOpenConfig({ dialect: 'bootstrap5' });
@@ -221,6 +226,27 @@ describe('open config + sticky view prefs', () => {
     ed.changeOffset(ed.state.model[0]!.cols[0]!, 'sm', +1);
     expect(ed.state.src).toContain('class="col-sm-6 col-sm-offset-1"');
     expect(ed.state.src).not.toContain('offset-sm-1');
+    ed.applyOpenConfig({ dialect: 'bootstrap5' });
+    ed.state.sel = null;
+    ed.apply(before);
+    ed.state.dirty = false;
+  });
+
+  it('a col-12 file keeps bootstrap5 offsets even under a bootstrap3 setting', async () => {
+    // The converse guard: `col-12` is a Bootstrap 4/5 class (Bootstrap 3 has
+    // only `col-xs-12`), so the file has shown its version and a mis-set
+    // option must not splice `col-md-offset-2` in beside it.
+    const ed = await editor();
+    const before = ed.state.src;
+    ed.applyOpenConfig({ dialect: 'bootstrap3' });
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply('<div class="row">\n  <div class="col-12 col-md-6">A</div>\n</div>');
+    expect(ed.state.docBs3).toBe(false);
+    expect(ed.state.dialectSource).toBe('file');
+    ed.changeOffset(ed.state.model[0]!.cols[0]!, 'md', +2);
+    expect(ed.state.src).toContain('offset-md-2');
+    expect(ed.state.src).not.toContain('col-md-offset-2');
     ed.applyOpenConfig({ dialect: 'bootstrap5' });
     ed.state.sel = null;
     ed.apply(before);
