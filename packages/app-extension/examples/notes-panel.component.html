@@ -1,0 +1,46 @@
+<!-- Rows, but no grid classes at all. Nothing here says which Bootstrap
+     version the file is, so the header chip is a button and the setting
+     decides — same as stock-report, but reached from the other direction:
+     there are no width classes to read rather than ambiguous ones.
+
+     Two things to check here:
+       - select a column and the inspector says "No width or offset classes
+         yet" — the + buttons create the first one, in whichever version the
+         chip is showing;
+       - Add row / Add column write `row` and a `col-*` in that same version.
+     -->
+<div class="container-fluid">
+
+  <!--NOTES-HEADER-->
+  <div class="row">
+    <div>
+      <app-page-header [title]="'Notes'" (back)="onBack()"></app-page-header>
+    </div>
+  </div>
+
+  <!-- Plain divs inside a row: columns with nothing set on them -->
+  <div class="row">
+    <div>
+      <label app-i18n="demo.notes.subject"></label>
+      <text-input formControlName="subject"></text-input>
+    </div>
+    <div>
+      <label app-i18n="demo.notes.author"></label>
+      <lookup-input formControlName="author"></lookup-input>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label app-i18n="demo.notes.body"></label>
+      <textarea class="form-control" formControlName="body"></textarea>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <button class="btn btn-primary" (click)="onSave()" app-i18n="demo.notes.save"></button>
+    </div>
+  </div>
+
+</div>

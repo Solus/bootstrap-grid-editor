@@ -1,0 +1,52 @@
+<!-- A Bootstrap 3 file, and it says so: `col-xs-*` and `col-md-offset-*` exist
+     in no other version. The canvas detects that, so the header chip is a flat
+     status label reading "Bootstrap 3" — not switchable, because writing
+     Bootstrap 4/5 tokens in beside these would be broken markup either way.
+
+     Check that the steppers keep to the file's own style: raising the offset on
+     the reference column writes `col-md-offset-*`, never `offset-md-*`. The
+     inspector should say "Bootstrap 3 classes — detected from this file."
+     whatever the Bootstrap version setting is set to. -->
+<div class="container-fluid">
+
+  <!--SEARCH-HEADER-->
+  <div class="row">
+    <div class="col-xs-12">
+      <app-page-header [title]="'Find customer'" (back)="onBack()"></app-page-header>
+    </div>
+  </div>
+
+  <!-- Bootstrap 3 tiers: xs is spelled out, and offsets carry the col- prefix -->
+  <div class="row">
+    <div class="col-xs-12 col-sm-6">
+      <label app-i18n="demo.search.customerNo"></label>
+      <text-input formControlName="customerNo"></text-input>
+    </div>
+    <div class="col-xs-12 col-sm-6">
+      <label app-i18n="demo.search.name"></label>
+      <text-input formControlName="name"></text-input>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-sm-4">
+      <label app-i18n="demo.search.city"></label>
+      <text-input formControlName="city"></text-input>
+    </div>
+    <div class="col-sm-4 col-md-offset-4">
+      <label app-i18n="demo.search.reference"></label>
+      <text-input formControlName="reference"></text-input>
+    </div>
+  </div>
+
+  <!--ACTIONS-->
+  <div class="row">
+    <div class="col-xs-6 col-sm-3">
+      <button class="btn btn-default" (click)="onReset()" app-i18n="demo.search.reset"></button>
+    </div>
+    <div class="col-xs-6 col-sm-3">
+      <button class="btn btn-primary" (click)="onSearch()" app-i18n="demo.search.submit"></button>
+    </div>
+  </div>
+
+</div>

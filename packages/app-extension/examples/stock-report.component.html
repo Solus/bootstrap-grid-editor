@@ -1,0 +1,50 @@
+<!-- Shared classes only — the file that can't tell you its Bootstrap version.
+     Every grid class here (col-sm-*, col-md-*, col-lg-*) is valid in Bootstrap
+     3 and in 4/5, and there are no offsets yet, which is exactly the state a
+     project is in before it needs one. So the canvas can't detect a version:
+     the header chip is a *button*, and the Bootstrap version setting decides
+     what the width and offset steppers write.
+
+     Flip the chip and add an offset to the same column: Bootstrap 3 writes
+     `col-sm-offset-2`, Bootstrap 4/5 writes `offset-sm-2`. -->
+<div class="container-fluid">
+
+  <!--REPORT-HEADER-->
+  <div class="row">
+    <div class="col-md-8">
+      <label app-i18n="demo.report.title"></label>
+      <text-input formControlName="reportName"></text-input>
+    </div>
+    <div class="col-md-4">
+      <label app-i18n="demo.report.asOf"></label>
+      <date-input formControlName="asOfDate"></date-input>
+    </div>
+  </div>
+
+  <!-- Filters: stacked on phones, three-up from md -->
+  <div class="row">
+    <div class="col-sm-6 col-md-4">
+      <label app-i18n="demo.report.warehouse"></label>
+      <lookup-input formControlName="warehouse"></lookup-input>
+    </div>
+    <div class="col-sm-6 col-md-4">
+      <label app-i18n="demo.report.category"></label>
+      <lookup-input formControlName="category"></lookup-input>
+    </div>
+    <div class="col-sm-12 col-md-4">
+      <label app-i18n="demo.report.supplier"></label>
+      <lookup-input formControlName="supplier"></lookup-input>
+    </div>
+  </div>
+
+  <!--RESULTS-->
+  <div class="row">
+    <div class="col-lg-9">
+      <stock-table [rows]="results"></stock-table>
+    </div>
+    <div class="col-lg-3">
+      <totals-panel [totals]="totals"></totals-panel>
+    </div>
+  </div>
+
+</div>

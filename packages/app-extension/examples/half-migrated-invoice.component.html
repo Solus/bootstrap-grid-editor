@@ -1,0 +1,49 @@
+<!-- A file caught mid-migration: the top rows were rewritten in Bootstrap 4/5
+     (a bare `col`, `col-12`, `offset-md-*`) while the bottom ones are still
+     Bootstrap 3 (`col-xs-*`, `col-sm-offset-*`). Both versions' evidence is
+     present, and the canvas resolves the tie to **Bootstrap 3** — mixing the
+     two offset forms on one element is the one result that's broken under
+     either framework, so the older style wins and the chip is a status label.
+
+     This is a deliberately unhappy file. It's here so the tie-break is
+     something you can look at rather than take on trust; what it renders is
+     also roughly what the browser makes of it. -->
+<div class="container-fluid">
+
+  <!--INVOICE-HEADER--> <!-- migrated -->
+  <div class="row">
+    <div class="col-12">
+      <app-page-header [title]="'Invoice'" (back)="onBack()"></app-page-header>
+    </div>
+  </div>
+
+  <!-- migrated: equal-width columns and a modern offset -->
+  <div class="row">
+    <div class="col">
+      <label app-i18n="demo.invoice.number"></label>
+      <text-input formControlName="invoiceNo"></text-input>
+    </div>
+    <div class="col-md-3 offset-md-2">
+      <label app-i18n="demo.invoice.issued"></label>
+      <date-input formControlName="issuedOn"></date-input>
+    </div>
+  </div>
+
+  <!--LINES--> <!-- not migrated yet -->
+  <div class="row">
+    <div class="col-xs-12">
+      <invoice-lines [lines]="lines"></invoice-lines>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-xs-6 col-sm-4">
+      <label app-i18n="demo.invoice.vat"></label>
+      <text-input formControlName="vatCode"></text-input>
+    </div>
+    <div class="col-sm-4 col-sm-offset-4">
+      <totals-panel [totals]="totals"></totals-panel>
+    </div>
+  </div>
+
+</div>
