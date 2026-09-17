@@ -469,8 +469,20 @@ describe('user settings', () => {
     await vi.waitFor(() => expect(panel.posts.some(p => p.type === 'config')).toBe(true));
     M.config.set('newRowClasses', 'clearfix');
     M.configChanges.fire({ affectsConfiguration: (s: string) => s.endsWith('newRowClasses') });
-    const msg = panel.posts.find(p => p.type === 'classConvention') as { config: unknown };
+    const msg = panel.posts.find(p => p.type === 'liveSettings') as { config: unknown };
     expect(msg.config).toMatchObject({ newRowClasses: 'clearfix' });
+  });
+
+  it('a dialect edited in settings reaches an already-open panel', async () => {
+    // hand-editing .vscode/settings.json is the documented way to commit this
+    // for a project, so it can't be a setting that only lands on reopen
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    panel.receive({ type: 'ready' });
+    await vi.waitFor(() => expect(panel.posts.some(p => p.type === 'config')).toBe(true));
+    M.config.set('dialect', 'bootstrap3');
+    M.configChanges.fire({ affectsConfiguration: (s: string) => s.endsWith('dialect') });
+    const msg = panel.posts.find(p => p.type === 'liveSettings') as { config: unknown };
+    expect(msg.config).toMatchObject({ dialect: 'bootstrap3' });
   });
 
   it('an unrelated settings change does not disturb an open panel', async () => {
@@ -478,9 +490,9 @@ describe('user settings', () => {
     panel.receive({ type: 'ready' });
     await vi.waitFor(() => expect(panel.posts.some(p => p.type === 'config')).toBe(true));
     // re-seeding the whole config would yank the breakpoint the user has since
-    // changed on the canvas — only the convention is live
+    // changed on the canvas — only the convention and the dialect are live
     M.configChanges.fire({ affectsConfiguration: (s: string) => s.endsWith('defaultBreakpoint') });
-    expect(panel.posts.some(p => p.type === 'classConvention')).toBe(false);
+    expect(panel.posts.some(p => p.type === 'liveSettings')).toBe(false);
   });
 });
 

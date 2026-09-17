@@ -96,7 +96,7 @@ function createCanvas(context: vscode.ExtensionContext, initial: vscode.TextEdit
   }));
 
   disposables.push(vscode.workspace.onDidChangeConfiguration(ev => {
-    if (isLiveSetting(ev)) session.onClassConventionChange();
+    if (isLiveSetting(ev)) session.onLiveSettingChange();
   }));
 
   disposables.push(vscode.window.onDidChangeTextEditorSelection(ev => {
@@ -182,15 +182,19 @@ function writeTarget(pref: PrefChange['pref']): vscode.ConfigurationTarget {
     : vscode.ConfigurationTarget.Global;
 }
 
-/** The settings whose changes reach an already-open canvas. Only the class
-    convention: the others seed the canvas at open, and re-applying them
-    mid-session would yank the breakpoint or a view toggle back from under
-    someone who changed it on the canvas. The convention has to be live because
-    the canvas *writes* it too — a panel holding a stale copy would clobber an
-    edit made in settings.json. */
+/** The settings whose changes reach an already-open canvas: the class
+    convention and the Bootstrap version. The rest seed the canvas at open, and
+    re-applying them mid-session would yank the breakpoint or a view toggle
+    back from under someone who changed it on the canvas.
+
+    These three are live because the canvas *writes* them too — a panel holding
+    a stale copy would clobber an edit made in settings.json — and because
+    they're the settings a project commits, so editing the file by hand is the
+    documented way in, not a corner case. */
 export function isLiveSetting(e: { affectsConfiguration(section: string): boolean }): boolean {
   return e.affectsConfiguration('bootstrapGridEditor.newRowClasses') ||
-    e.affectsConfiguration('bootstrapGridEditor.newColumnClasses');
+    e.affectsConfiguration('bootstrapGridEditor.newColumnClasses') ||
+    e.affectsConfiguration('bootstrapGridEditor.dialect');
 }
 
 /** The user's settings, read fresh at panel open. Defaults here mirror the

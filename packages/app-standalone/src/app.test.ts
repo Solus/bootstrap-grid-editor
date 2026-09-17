@@ -375,6 +375,33 @@ describe('the header Bootstrap version chip (FOLLOW-UPS §9.14)', () => {
     ed.setHost(standaloneHost);
   });
 
+  it('a version edited in the host settings reaches the canvas, and is not echoed back', async () => {
+    // the host's own push: the value came from settings, so answering it with
+    // a write of the same value would be an echo
+    const ed = await editor();
+    const { standaloneHost } = await import('./standalone-host.js');
+    const writes: string[] = [];
+    ed.setHost({ ...standaloneHost, persistPref: c => writes.push(c.pref) });
+
+    await load('<div class="row">\n  <div class="col-sm-6">A</div>\n</div>');
+    expect(ed.state.docBs3).toBe(false);
+    ed.readLiveSettings({ dialect: 'bootstrap3' });
+    expect(ed.state.docBs3).toBe(true);              // re-resolved, so it shows
+    expect(ed.state.dialectSource).toBe('setting');
+    expect(writes).toEqual([]);
+    ed.render();                                     // as the webview does
+    expect(chip().textContent).toBe('Bootstrap 3');
+
+    // a file whose own classes decide is unmoved by the same push
+    await load('<div class="row">\n  <div class="col-12">A</div>\n</div>');
+    ed.readLiveSettings({ dialect: 'bootstrap3' });
+    expect(ed.state.docBs3).toBe(false);
+    expect(ed.state.dialectSource).toBe('file');
+    expect(writes).toEqual([]);
+
+    ed.setHost(standaloneHost);
+  });
+
   it('the inspector says which version it is and who decided', async () => {
     const ed = await editor();
     ed.applyOpenConfig({ dialect: 'bootstrap5' });   // the fallback under test

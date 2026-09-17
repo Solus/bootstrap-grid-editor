@@ -179,37 +179,54 @@ export function dialectLabel(bs3: boolean): string {
   return bs3 ? 'Bootstrap 3' : 'Bootstrap 4/5';
 }
 
-/** Set the fallback dialect from the canvas (the header chip) and tell the
-    host to remember it. Re-resolves the open document, because the change only
-    shows up in a document that was relying on the fallback — one whose own
-    classes decide is unmoved, and the chip stays disabled there. */
-export function setDialectPref(value: Dialect): void {
+/** Set the fallback dialect and re-resolve the open document. Re-resolving is
+    what makes the change visible, and only where it should be: a document
+    relying on the fallback follows it, one whose own classes decide is
+    unmoved, and the chip stays a status light there.
+
+    Doesn't tell the host — see `setDialectPref` for the canvas's end and
+    `readLiveSettings` for the host's. */
+export function setDialectDefault(value: Dialect): void {
   dialectDefault = value === 'bootstrap3';
   if (state.root) {
     const d = decideDialect(state.root);
     state.docBs3 = d.bs3;
     state.dialectSource = d.source;
   }
+}
+
+/** The header chip's end of that change: set it, and ask the host to remember
+    it. Split from `setDialectDefault` so the host's own push can reuse the
+    setting half without writing straight back to where it came from. */
+export function setDialectPref(value: Dialect): void {
+  setDialectDefault(value);
   host?.persistPref?.({ pref: 'dialect', value });
 }
 
-/** Seed the canvas from the host's settings, once, before the first render. */
+/** Seed the canvas from the host's settings, once, before the first render.
+    The settings above seed and are then the canvas's to change; the ones in
+    `readLiveSettings` keep following the host all session. */
 export function applyOpenConfig(cfg: OpenConfig): void {
   if (cfg.breakpoint) state.bp = cfg.breakpoint;
   if (cfg.stretchSheet != null) state.stretchSheet = cfg.stretchSheet;
   if (cfg.tintOverfull != null) state.tintOverfull = cfg.tintOverfull;
-  if (cfg.dialect) dialectDefault = cfg.dialect === 'bootstrap3';
-  readClassConvention(cfg);
+  readLiveSettings(cfg);
 }
 
-/** Take just the class convention out of a config. Split from
-    `applyOpenConfig` because the convention is the one setting that can also
-    arrive *mid-session* (the user edits it in settings while the canvas is
-    open) — and re-running the whole open config then would yank the
-    breakpoint and view toggles back from under them. */
-export function readClassConvention(cfg: OpenConfig): void {
+/** Take the settings that can also arrive *mid-session* out of a config — the
+    user edited them in the host's settings with the canvas already open. Split
+    from `applyOpenConfig` because re-running the whole open config then would
+    yank the breakpoint and the view toggles back from under someone who had
+    changed them on the canvas.
+
+    These two are live for the same reason: the canvas *writes* them as well as
+    reads them, so a panel holding a stale copy would clobber an edit made in
+    settings. Nothing here writes back — the value arrived from the host, and
+    answering it with a write of the same value is just an echo. */
+export function readLiveSettings(cfg: OpenConfig): void {
   if (cfg.newRowClasses != null) setClassConvention('row', cfg.newRowClasses, false);
   if (cfg.newColumnClasses != null) setClassConvention('col', cfg.newColumnClasses, false);
+  if (cfg.dialect) setDialectDefault(cfg.dialect);
 }
 
 let host: Host | null = null;

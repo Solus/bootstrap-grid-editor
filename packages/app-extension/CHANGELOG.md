@@ -16,6 +16,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   was set. A file that *shows* its version still decides for itself: `col-xs-*`
   or `col-md-offset-*` means Bootstrap 3, a bare `col`, `col-12`, `col-xl-*` or
   `offset-md-*` means Bootstrap 4/5. Nothing changes for anyone on the default.
+- Editing **Class style (dialect)** in your settings now reaches a canvas
+  that's already open, the way the class-convention settings do. It used to be
+  read only when the panel opened, so changing it — including by committing it
+  in `.vscode/settings.json`, which is the documented way to set it for a
+  project — appeared to do nothing until you closed and reopened the canvas.
 
 ### Added
 

@@ -111,24 +111,44 @@ first time this extension writes anything into a project.
 convention that survives across projects (a per-user default the workspace
 value overrides). If we ever add one, the seam is `writeTarget`.
 
-### 9.9 Only two settings are live; the rest are still read once **[decide]**
+### 9.9 Only three settings are live; the rest are still read once **[decide]**
 
 *What it is.* `onDidChangeConfiguration` (`extension.ts`, gated by
-`isLiveSetting`) forwards *only* the two class-convention settings to an open
-panel, as a `classConvention` message. The other five are still read once at
-panel open (§9.1).
+`isLiveSetting`) forwards *only* the two class-convention settings and the
+dialect to an open panel, as a `liveSettings` message. The other four are still
+read once at panel open (§9.1).
 
-*Why it matters.* It's an asymmetry someone will trip on ("I changed the
-dialect and nothing happened"). The convention had to be live for a specific
-reason — the panel *writes* it too, so a panel holding a stale copy would
-clobber an edit made in settings.json — and re-seeding the whole `OpenConfig`
-mid-session would instead yank the breakpoint and view toggles back from under
-someone who changed them on the canvas. Hence a separate message rather than a
-second `config`.
+*Why it matters.* It's an asymmetry someone will trip on. Those three are live
+for a specific reason — the panel *writes* them too, so a panel holding a stale
+copy would clobber an edit made in settings.json — and re-seeding the whole
+`OpenConfig` mid-session would instead yank the breakpoint and view toggles
+back from under someone who changed them on the canvas. Hence a separate
+message rather than a second `config`.
 
-*Suggested direction.* If the others should be live too, each needs its own
-answer to "what if the user has since changed it on the canvas?" — dialect and
-`liveSync` are safe to re-apply, breakpoint and the view toggles are not.
+*Suggested direction.* The dialect half of this is done (it was the one people
+would actually trip on, since it's a setting a project commits). Of what's
+left, `liveSync` is safe to re-apply; the breakpoint and the view toggles are
+not, and each would need its own answer to "what if the user has since changed
+it on the canvas?" Probably leave them read-once.
+
+### 9.15 A canvas-written setting is pushed straight back to the canvas **[chore]**
+
+*What it is.* The header's version chip writes `dialect` to the workspace
+settings, which fires `onDidChangeConfiguration`, which now passes
+`isLiveSetting` — so the host pushes the value the canvas just chose back to
+it. Same for the class convention edited in the inspector.
+
+*Why it matters.* Harmless today: `readLiveSettings`
+(`packages/editor/src/state.ts`) sets the same value it already holds and
+writes nothing back, so it converges in one hop and there is no loop. But it's
+a round trip that does no work, and it re-renders — if a future live setting is
+costlier to apply, or applying it disturbs canvas state, the free hop stops
+being free.
+
+*Suggested direction.* Have `Session` ignore a change it caused itself — record
+the key and value it last wrote via `setConfig` and drop the matching push.
+Cheap, but it's new state with its own staleness question, so it's not worth
+doing until something depends on it.
 
 ### 9.10 One convention per document, not named presets **[decide]**
 

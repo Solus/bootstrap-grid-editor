@@ -166,12 +166,15 @@ export class Session {
     this.ports.post({ type: 'diverged' });
   }
 
-  /** The user's class convention changed in settings while the panel is open →
-      push just that to the canvas. Not queued: it touches no sync state and no
-      document text, so it has nothing to order against. */
-  onClassConventionChange(): void {
-    const { newRowClasses, newColumnClasses } = this.ports.config();
-    this.ports.post({ type: 'classConvention', config: { newRowClasses, newColumnClasses } });
+  /** A setting the canvas follows all session changed while the panel is open
+      → push just those to the canvas. Not queued: they touch no sync state and
+      no document text, so there is nothing to order against. */
+  onLiveSettingChange(): void {
+    const { newRowClasses, newColumnClasses, dialect } = this.ports.config();
+    this.ports.post({
+      type: 'liveSettings',
+      config: { newRowClasses, newColumnClasses, dialect },
+    });
   }
 
   /** The document was saved → refresh the canvas from source, keeping the

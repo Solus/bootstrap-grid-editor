@@ -6,8 +6,8 @@
 
 import '@bootstrap-visualizer/editor/styles.css';
 import {
-  apply, applyOpenConfig, assertRequiredIds, readClassConvention, REQUIRED_EDITOR_IDS,
-  renderInspector, selectAtOffset, setHost, toast, wireBreakpointSwitch,
+  apply, applyOpenConfig, assertRequiredIds, readLiveSettings, render,
+  REQUIRED_EDITOR_IDS, selectAtOffset, setHost, toast, wireBreakpointSwitch,
   wireCanvasBackground, wireDialectChip, wireDragSurface, wireKeyboardNav,
 } from '@bootstrap-visualizer/editor';
 import { createWebviewHost, type SyncState } from './webview-host.js';
@@ -43,11 +43,13 @@ window.addEventListener('message', (e: MessageEvent<HostMessage>) => {
       // arrives once, before the first setSource → seeds the canvas defaults
       applyOpenConfig(msg.config);
       break;
-    case 'classConvention':
-      // the user edited the convention in settings while the panel was open —
-      // only that, so nothing else they've changed on the canvas is disturbed
-      readClassConvention(msg.config);
-      renderInspector();
+    case 'liveSettings':
+      // the user edited the convention or the Bootstrap version in settings
+      // while the panel was open — only those, so nothing else they've changed
+      // on the canvas is disturbed. A full render, not just the inspector: the
+      // version also shows in the header chip.
+      readLiveSettings(msg.config);
+      render();
       break;
     case 'setSource':
       sync.diverged = false;

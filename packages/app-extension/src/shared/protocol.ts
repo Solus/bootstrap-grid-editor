@@ -31,11 +31,12 @@ export type HostMessage =
   /** The user's settings, sent once before the first setSource so the canvas
       opens with them applied. */
   | { type: 'config'; config: ConfigWire }
-  /** The class convention changed in the user's settings while the panel was
+  /** A setting the canvas follows all session — the class convention or the
+      Bootstrap version — changed in the user's settings while the panel was
       open. Deliberately *not* a second `config`: re-seeding the whole open
       config would yank the breakpoint and view toggles back from under someone
       who has changed them on the canvas since. */
-  | { type: 'classConvention'; config: ConfigWire }
+  | { type: 'liveSettings'; config: ConfigWire }
   /** Full document text — sent on open, on save, on a debounced external
       edit, and whenever the canvas has to be pulled back to the buffer (a
       refused edit, or a buffer that settled differently from what the canvas
