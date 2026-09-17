@@ -46,6 +46,13 @@ npm run typecheck   # tsc across every package (not part of `npm test`)
 `test:vscode` downloads VS Code on first run and needs a display — on a headless
 machine run it under `xvfb-run -a`, as CI does.
 
+Each layer builds `packages/core` first (a `pretest*` hook, or `build:tests` for
+`test:vscode`), so you never have to remember to. `core` is the one package whose
+package entry points at `dist/` rather than `src/` — it's the published library —
+so everything downstream imports its *built* output. Without that step a stale
+`dist` shows up as a baffling `X is not a function` from code you can see is
+right there in `packages/core/src`.
+
 New behaviour comes with new tests in the same change. The ported prototype suite
 is the contract — don't weaken a test to make a change pass; if behaviour
 genuinely changes, discuss it first.

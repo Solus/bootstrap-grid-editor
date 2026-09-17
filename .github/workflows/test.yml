@@ -21,7 +21,9 @@ jobs:
 
       - run: npm ci
 
-      # tsc -b also emits packages/core/dist, which the app + jsdom tests import
+      # Purely a check now: each test layer builds packages/core itself (the
+      # `pretest*` hooks), so the suite no longer depends on this step having
+      # run first to emit the dist the app + jsdom tests import.
       - name: Typecheck
         run: npm run typecheck
 

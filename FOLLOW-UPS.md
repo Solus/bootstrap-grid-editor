@@ -35,6 +35,39 @@ for the app to boot, but it means any assertion depending on real
 geometry is meaningless there. Geometry belongs in Playwright — just
 don't let that stub grow into something load-bearing.
 
+### 3.6 `tsc -b` trusts its buildinfo over its own output **[chore]**
+
+*What it is.* `tsc -b` decides a project is up to date by comparing input
+mtimes against `tsconfig.tsbuildinfo` — not against the files it emits. Delete
+`packages/core/dist` but leave the buildinfo and it reports "up to date" and
+emits nothing. The `pretest*` hooks sidestep it with `--force` (a full core
+build is ~1s, a quarter-second more than an incremental one), but plain
+`npm run build` and `npm run typecheck` still have the blind spot.
+
+*Why it matters.* Only bites when `dist` is removed without the buildinfo
+going too — a hand-deleted directory, or a partially-cleaned tree. It presents
+as a build that claims success while the output the tests import isn't there.
+
+*Suggested direction.* Leave it unless it bites: the honest fix is for anything
+that cleans `dist` to clean the buildinfo beside it, which is a convention
+nothing currently enforces.
+
+### 3.7 `test:watch` builds core once, at start **[chore]**
+
+*What it is.* `pretest:watch` builds `packages/core` before Vitest starts, but
+editing a file under `packages/core/src` during a watch session doesn't rebuild
+`dist` — and `dist` is what everything downstream imports (§3.6). The watch
+re-runs against the core it started with.
+
+*Why it matters.* Vitest re-running on a core edit while reporting results from
+the previous core is a worse failure than the stale-dist one, because it looks
+live. Core's own `*.test.ts` files are unaffected — they import `./x.js`
+relatively, so they see the source.
+
+*Suggested direction.* Run `tsc -b packages/core --watch` alongside Vitest
+(`concurrently`, or a documented second terminal). Not worth a dependency until
+someone actually iterates on core under watch.
+
 ## 7. Extension (Session 3) — deferred polish
 
 ### 7.1 The webview bundle ships `@angular/compiler` **[DEFERRED — accepted for now]**
