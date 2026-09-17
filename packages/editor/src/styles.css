@@ -59,8 +59,8 @@ header{
   padding:4px 9px; font-family:var(--mono); font-size:11px; color:var(--text);
   cursor:pointer; white-space:nowrap;
 }
-.dialect-chip button:hover:not(:disabled){border-color:var(--amber); color:var(--amber)}
-.dialect-chip button:disabled{
+.dialect-chip button:hover:not([aria-disabled="true"]){border-color:var(--amber); color:var(--amber)}
+.dialect-chip button[aria-disabled="true"]{
   background:transparent; border-color:transparent; color:var(--faint); cursor:default;
 }
 .dialect-hint{color:var(--muted)}

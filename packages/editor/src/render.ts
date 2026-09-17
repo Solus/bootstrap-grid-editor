@@ -237,7 +237,9 @@ function renderDialectChip(): void {
   const fromFile = state.dialectSource === 'file';
   b.textContent = dialectLabel(state.docBs3);
   b.classList.toggle('from-file', fromFile);
-  b.disabled = fromFile;
+  // aria-disabled, not disabled: it stays focusable, so the title below is
+  // reachable without a mouse (see `wireDialectChip`)
+  b.setAttribute('aria-disabled', String(fromFile));
   b.title = fromFile
     ? dialectLabel(state.docBs3) + ' — detected from this file’s own classes, '
       + 'which is what new classes follow. Not switchable here.'

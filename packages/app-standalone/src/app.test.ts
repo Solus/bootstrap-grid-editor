@@ -313,12 +313,12 @@ describe('the header Bootstrap version chip (FOLLOW-UPS §9.14)', () => {
   it('is a status light on a file that shows its own version', async () => {
     const ed = await load('<div class="row"><div class="col-xs-6">A</div></div>');
     expect(chip().textContent).toBe('Bootstrap 3');
-    expect(chip().disabled).toBe(true);         // the file decided, not the user
+    expect(chip().getAttribute('aria-disabled')).toBe('true');   // file decided
     expect(chip().title).toContain('detected from this file');
 
     await load('<div class="row"><div class="col-md-6 offset-md-2">A</div></div>');
     expect(chip().textContent).toBe('Bootstrap 4/5');
-    expect(chip().disabled).toBe(true);
+    expect(chip().getAttribute('aria-disabled')).toBe('true');
     expect(ed.state.dialectSource).toBe('file');
   });
 
@@ -326,7 +326,7 @@ describe('the header Bootstrap version chip (FOLLOW-UPS §9.14)', () => {
     const ed = await load('<div class="row"><div class="col-sm-6">A</div></div>');
     expect(ed.state.dialectSource).toBe('setting');
     expect(chip().textContent).toBe('Bootstrap 4/5');
-    expect(chip().disabled).toBe(false);
+    expect(chip().getAttribute('aria-disabled')).toBe('false');
     expect(chip().title).toContain('Click to switch to Bootstrap 3');
   });
 
@@ -355,7 +355,7 @@ describe('the header Bootstrap version chip (FOLLOW-UPS §9.14)', () => {
     expect(ed.state.src).toContain('class="col-sm-6 col-sm-offset-1"');
     // and now the file says so itself, so the chip hands the decision back to it
     expect(ed.state.dialectSource).toBe('file');
-    expect(chip().disabled).toBe(true);
+    expect(chip().getAttribute('aria-disabled')).toBe('true');
 
     ed.setHost(standaloneHost);
     ed.applyOpenConfig({ dialect: 'bootstrap5' });

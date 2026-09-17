@@ -28,7 +28,12 @@ export function wireBreakpointSwitch(): void {
     Only a document whose own classes don't say is switchable — flipping the
     chip on a document that has declared its dialect would write the other
     style's tokens alongside the existing ones, which is broken markup in
-    either framework. There it reads as a status light instead. */
+    either framework. There it reads as a status light instead, marked
+    `aria-disabled` rather than `disabled`: the two look alike and neither
+    acts, but a truly disabled button leaves the tab order, and would take the
+    chip's own explanation of *why* it can't be switched with it. The click
+    handler guards the same condition, so a keyboard Enter does nothing
+    either. */
 export function wireDialectChip(): void {
   const host = $('#dialectChip');
   const b = document.createElement('button');

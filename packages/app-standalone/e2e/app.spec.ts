@@ -451,6 +451,18 @@ test.describe('inspector', () => {
     const chip = page.locator('#dialectChip button');
     await expect(chip).toHaveText('Bootstrap 3');
     await expect(chip).toBeDisabled();
+    // ...but disabled the focusable way. It carries the only explanation of
+    // why it can't be switched, and a `disabled` button would take that out of
+    // the tab order, so it must stay reachable without a mouse.
+    await expect(chip).not.toHaveAttribute('disabled');
+    await expect(chip).toHaveAttribute('title', /detected from this file/);
+    await chip.focus();
+    await expect(chip).toBeFocused();
+    // and the handler guards the same condition, so a click that gets through
+    // anyway (a keyboard Enter) still does nothing — dispatched directly,
+    // since Playwright won't click something it considers disabled
+    await chip.dispatchEvent('click');
+    await expect(chip).toHaveText('Bootstrap 3');
     await colWithClass(page, 'col-xs-6').click();
     await expect(page.locator('#inspector'))
       .toContainText('Bootstrap 3 classes — detected from this file.');
