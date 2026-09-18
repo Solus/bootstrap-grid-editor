@@ -17,6 +17,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   · Grid`) instead of a fixed "Grid Editor", and renames when you run
   **Open Grid Editor** on another file. The one panel is re-pointed rather than
   duplicated, so this is the only place that said which file it was showing.
+- Closing the file the canvas is bound to now closes the canvas too. It used to
+  stay open over a buffer nobody could see: clicking a column no longer jumped
+  to the source, and canvas edits landed in a document with no editor.
 
 ## [0.3.1] - 2026-09-18
 
