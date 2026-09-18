@@ -6,7 +6,7 @@
 import {
   BP_LABEL, classIsInterpolated, classValue, colSequence, colTitle, contentHint,
   effectiveAt, elementTitle, hasDynamicClassBinding, hashStr, isContainerCol,
-  isHiddenAt, isRowEl, rowHasForOrSwitch, rowMentionsIf,
+  isHiddenAt, isRowEl, orderAt, rowHasForOrSwitch, rowIsReorderedAt, rowMentionsIf,
 } from '@bootstrap-visualizer/core';
 import type {
   Breakpoint, ColNode, ColSeqItem, CondRegion, El, NodePath, RootEl, RowNode,
@@ -449,6 +449,17 @@ function renderRowInner(rowNode: RowNode, path: NodePath, _nested: boolean): HTM
   // renderRowBody) followed by the fill pill
   const flags = document.createElement('div');
   flags.className = 'row-flags';
+  // order-* changes where the columns go without changing the fill, so it
+  // gets its own pill rather than a mark on the sum: the row is drawn in
+  // source order here, and the browser won't draw it that way.
+  if (rowIsReorderedAt(rowNode.cols.map(c => c.spec), state.bp)) {
+    const re = document.createElement('span');
+    re.className = 'fill-pill reordered';
+    re.textContent = '⇄ reordered';
+    re.title = 'order-* classes: at ' + state.bp + ' the browser draws these columns in a ' +
+      'different order than the source — the canvas shows source order';
+    flags.appendChild(re);
+  }
   flags.appendChild(pill);
   rowDiv.appendChild(flags);
 
@@ -655,6 +666,17 @@ function renderCol(
   }
   if (hasDynamicClassBinding(colNode.el) || !editable) {
     badges.appendChild(mkBadge('dyn', 'warn'));
+  }
+  // order-*: the browser places this column by its order, not where it is in
+  // the source — and the canvas draws source order (FOLLOW-UPS §8.2). The
+  // badge says where it really goes at this breakpoint.
+  const order = orderAt(colNode.spec, state.bp);
+  if (order != null) {
+    const b = mkBadge('order ' + order, 'order');
+    b.title = 'order-* at ' + state.bp + ': the browser draws this column ' +
+      (order === 'first' ? 'first' : order === 'last' ? 'last' : 'at position ' + order) +
+      ' in its row — the canvas shows source order';
+    badges.appendChild(b);
   }
   if (badges.children.length) colDiv.appendChild(badges);
 

@@ -1100,3 +1100,39 @@ describe('a moved column stays selected (FOLLOW-UPS §10.2)', () => {
     expect(ed.state.sel).toEqual({ path: [0, 0], kind: 'col' });
   });
 });
+
+describe('order-* is shown, not applied (FOLLOW-UPS §8.2)', () => {
+  const SIDEBAR = [
+    '<div class="row">',
+    '  <div class="col-md-8">main</div>',
+    '  <div class="col-md-4 order-md-first">side</div>',
+    '</div>',
+  ].join('\n');
+
+  const load = async () => {
+    const ed = await editor();
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply(SIDEBAR);
+    return ed;
+  };
+
+  it('badges the column with its order at the current breakpoint', async () => {
+    const ed = await load();
+    ed.state.bp = 'md'; ed.render();
+    const badges = [...document.querySelectorAll('.g-col .badge.order')].map(b => b.textContent);
+    expect(badges).toEqual(['order first']);
+    // the column carrying it is still drawn where the source has it: second
+    const cols = [...document.querySelectorAll('.g-row > .g-col, .g-row .g-col')];
+    expect(cols[1]!.textContent).toContain('side');
+  });
+
+  it('flags the row as reordered only where the order bites', async () => {
+    const ed = await load();
+    ed.state.bp = 'md'; ed.render();
+    expect(document.querySelector('.fill-pill.reordered')).not.toBeNull();
+    ed.state.bp = 'xs'; ed.render();
+    expect(document.querySelector('.fill-pill.reordered')).toBeNull();
+    expect(document.querySelector('.badge.order')).toBeNull();
+  });
+});

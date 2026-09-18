@@ -106,8 +106,14 @@ a tick later — doesn't shrink the bundle.
 
 ### 8.2 Other unmodeled grid features **[deferred — lower priority]**
 
-- **`order-*`** (`order-md-2`, `order-last`): flexbox reorders columns, but
-  the canvas always draws source order — real layout can differ.
+- **`order-*`** (`order-md-2`, `order-last`): **now parsed and shown, not
+  applied.** `ColSpec.order` + `orderAt` / `rowIsReorderedAt`
+  (`packages/core/src/classes.ts`); the column gets an `order …` badge and the
+  row a `⇄ reordered` pill at a breakpoint where the drawn order would differ.
+  The canvas still draws source order, deliberately: drag, nudge and the drop
+  slots are source-position edits, so drawing flex order would make "move
+  left" mean something other than what it writes. Drawing it for real means
+  deciding whether those edits then write `order-*` classes or refuse.
 - **`row-cols-*`** (`row-cols-3`): row-driven equal-column count, set on the
   row instead of each column; not parsed.
 - **Alignment / gutters** (`justify-content-*`, `align-items-*`, `g-*`):

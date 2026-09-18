@@ -4,7 +4,9 @@
      BS4/5: col-6, col-md-4, offset-2, offset-md-3
      BS3:   col-xs-6, col-sm-offset-4, col-md-offset-2 */
 
-import type { Attr, Breakpoint, ColSpec, El, WidthValue } from './types.js';
+import type {
+  Attr, Breakpoint, ColSpec, El, OrderValue, WidthValue,
+} from './types.js';
 
 export const BPS: Breakpoint[] = ['xs', 'sm', 'md', 'lg', 'xl', 'xxl'];
 
@@ -74,9 +76,45 @@ export function colSpec(tokens: string[]): ColSpec {
     m = /^d-(?:(sm|md|lg|xl|xxl)-)?(none|inline|inline-block|block|flex|inline-flex|grid|table|table-cell|table-row|contents)$/.exec(t);
     if (m) {
       (spec.display ??= {})[(m[1] ?? 'xs') as Breakpoint] = m[2] !== 'none';
+      continue;
+    }
+    // order-* flex order: the browser draws the row in this order, not source
+    // order. Bootstrap ships 0–5 plus first/last; nothing else is a grid order.
+    m = /^order-(?:(sm|md|lg|xl|xxl)-)?([0-5]|first|last)$/.exec(t);
+    if (m) {
+      const v = m[2]!;
+      (spec.order ??= {})[(m[1] ?? 'xs') as Breakpoint] =
+        v === 'first' || v === 'last' ? v : parseInt(v, 10);
     }
   }
   return spec;
+}
+
+/** The `order-*` in force at `bp`, or null when the column declares none at
+    or below it (it then sorts as 0, in source order among its peers). */
+export function orderAt(spec: ColSpec, bp: Breakpoint): OrderValue | null {
+  return effectiveAt(spec.order ?? {}, bp);
+}
+
+/** Where a column sorts in flex order: Bootstrap's `order-first` is `-1`,
+    `order-last` is `6`, no class is `0`. */
+export function orderRank(v: OrderValue | null): number {
+  return v === 'first' ? -1 : v === 'last' ? 6 : (v ?? 0);
+}
+
+/** Does the browser draw these columns in a different order from source at
+    `bp`? Flex order is a stable sort by rank, so the drawn order differs
+    exactly when the ranks aren't non-decreasing in source order. Columns
+    hidden at `bp` take no part — a `d-none` column's order is moot. */
+export function rowIsReorderedAt(specs: ColSpec[], bp: Breakpoint): boolean {
+  let prev = -Infinity;
+  for (const spec of specs) {
+    if (isHiddenAt(spec, bp)) continue;
+    const rank = orderRank(orderAt(spec, bp));
+    if (rank < prev) return true;
+    prev = rank;
+  }
+  return false;
 }
 
 /** Is this column hidden at `bp` by a `d-*` utility? Mobile-first: the nearest
