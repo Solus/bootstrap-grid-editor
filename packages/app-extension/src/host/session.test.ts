@@ -21,7 +21,9 @@ function harness(opts: { text?: string; liveSync?: boolean } = {}) {
   const reveals: Array<[number, number]> = [];
   const warns: string[] = [];
   const configWrites: Array<[string, boolean | string]> = [];
+  const histories: string[] = [];
   let text = opts.text ?? '<div class="row"><div class="col">x</div></div>';
+  let onHistory: (() => void) | null = null;
   let applyOk = true;
   let applyCount = 0;
   let onApply: (() => void) | null = null;
@@ -52,10 +54,19 @@ function harness(opts: { text?: string; liveSync?: boolean } = {}) {
     config: () => ({ breakpoint: 'lg' as const, tintOverfull: true,
       liveSync: opts.liveSync ?? true }),
     setConfig: change => { configWrites.push([change.pref, change.value]); },
+    history: async dir => {
+      // the editor's undo runs in the renderer: the buffer change and the
+      // caret move it causes arrive as events before the command resolves
+      await Promise.resolve();
+      histories.push(dir);
+      onHistory?.();
+    },
   });
 
   return {
-    session, posts, reveals, warns, configWrites,
+    session, posts, reveals, warns, configWrites, histories,
+    /** What the editor's undo does to the buffer (and the events it fires). */
+    duringHistory: (fn: () => void) => { onHistory = fn; },
     /** The user edits the document in the editor. */
     setText: (t: string) => { text = t; },
     failNextApply: () => { applyOk = false; },
@@ -565,5 +576,71 @@ describe('Session — editor events are serialised with canvas edits', () => {
     expect(h.posts.some(p => p.type === 'diverged')).toBe(false);
     expect(h.posts.filter(p => p.type === 'setSource')).toHaveLength(1);   // ready only
     expect(h.text()).toBe('xab');
+  });
+});
+
+describe('Session — undo / redo from the canvas', () => {
+  const EDITED = '<div class="row"><div class="col-6">x</div></div>';
+
+  it('runs the editor\'s own undo, then shows the canvas the result', async () => {
+    const h = harness();
+    await h.session.onMessage({ type: 'ready' });
+    // the editor's undo rewrites the buffer and fires a change event
+    h.duringHistory(() => { h.setText(EDITED); void h.session.onDocChange(); });
+
+    await h.session.onMessage({ type: 'history', dir: 'undo' });
+
+    expect(h.histories).toEqual(['undo']);
+    // the canvas is resent the buffer as it now reads, keeping its selection
+    expect(h.posts.at(-1)).toEqual({ type: 'setSource', text: EDITED, keepSelection: true });
+  });
+
+  it('redo is the same path', async () => {
+    const h = harness();
+    await h.session.onMessage({ type: 'ready' });
+    await h.session.onMessage({ type: 'history', dir: 'redo' });
+    expect(h.histories).toEqual(['redo']);
+    expect(h.types().at(-1)).toBe('setSource');
+  });
+
+  it('with liveSync off, the buffer change it causes does not park the canvas', async () => {
+    const h = harness({ liveSync: false });
+    await h.session.onMessage({ type: 'ready' });
+    h.duringHistory(() => { h.setText(EDITED); void h.session.onDocChange(); });
+
+    await h.session.onMessage({ type: 'history', dir: 'undo' });
+    await h.session.onDocChange();      // let the queued change event run
+
+    // the canvas asked for this change: it is not the user editing under it
+    expect(h.types()).not.toContain('diverged');
+    expect(h.posts.at(-1)).toEqual({ type: 'setSource', text: EDITED, keepSelection: true });
+  });
+
+  it('the caret move the undo causes is not bounced back as a selectAt', async () => {
+    const h = harness();
+    await h.session.onMessage({ type: 'ready' });
+    h.duringHistory(() => h.session.onEditorSelection(5, 5, 5));
+
+    await h.session.onMessage({ type: 'history', dir: 'undo' });
+
+    expect(h.types()).not.toContain('selectAt');
+    // and a real caret move afterwards still reaches the canvas
+    h.session.onEditorSelection(7, 7, 7);
+    expect(h.posts.at(-1)).toEqual({ type: 'selectAt', offset: 7 });
+  });
+
+  it('a failing undo still leaves the canvas showing the buffer', async () => {
+    const h = harness();
+    await h.session.onMessage({ type: 'ready' });
+    h.duringHistory(() => { throw new Error('no editor'); });
+
+    await expect(h.session.onMessage({ type: 'history', dir: 'undo' })).rejects.toThrow();
+
+    // the next message is still handled — one failed turn doesn't wedge the queue
+    await h.session.onMessage({ type: 'discard' });
+    expect(h.types().at(-1)).toBe('setSource');
+    // …and a later caret move isn't swallowed (applyDepth was released)
+    h.session.onEditorSelection(3, 3, 3);
+    expect(h.posts.at(-1)).toEqual({ type: 'selectAt', offset: 3 });
   });
 });

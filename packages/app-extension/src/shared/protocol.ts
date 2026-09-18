@@ -72,10 +72,16 @@ export type WebviewMessage =
   | { type: 'reveal'; start: number; end: number }
   /** Reset the canvas to the current buffer (discard divergence). */
   | { type: 'discard' }
+  /** Ctrl+Z / Ctrl+Y pressed on the canvas. Undo is the editor's native undo
+      (decision §6) and a webview swallows the keystroke, so the canvas asks
+      the host to run it on the document's editor. */
+  | { type: 'history'; dir: HistoryDir }
   /** The user changed a sticky setting in the canvas (a view toggle, or the
       class convention) — write it back to their settings so it's
       remembered. */
   | { type: 'setConfig'; change: PrefChange };
+
+export type HistoryDir = 'undo' | 'redo';
 
 /** A setting the canvas can write back. Structurally the editor package's
     `PrefChange`; redeclared here because `shared`/`host` must not import the
