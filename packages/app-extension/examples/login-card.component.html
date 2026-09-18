@@ -1,0 +1,22 @@
+<!-- No grid at all: a centred card built from flex utilities, not rows and
+     columns. Open the Grid Editor on it and the canvas has nothing to draw.
+
+     The message should read "No .row elements found." and point at what the
+     VS Code panel actually has, namely Add row in the inspector. It used to
+     tell you to paste a template on the left and press Apply changes or Load
+     sample, which only exist in the standalone web app.
+
+     Then press Add row: the first row lands in the file, and the canvas
+     comes to life. -->
+<div class="d-flex justify-content-center align-items-center min-vh-100">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h1 class="h4 mb-3" app-i18n="demo.login.title"></h1>
+      <label app-i18n="demo.login.email"></label>
+      <text-input formControlName="email"></text-input>
+      <label app-i18n="demo.login.password"></label>
+      <password-input formControlName="password"></password-input>
+      <button class="btn btn-primary w-100 mt-3" (click)="onSignIn()" app-i18n="demo.login.submit"></button>
+    </div>
+  </div>
+</div>

@@ -64,3 +64,41 @@ On `notes-panel` the same column area instead says there are no width or offset
 classes yet. For the class-convention section, set `newRowClasses` to
 `clearfix` and watch the "New rows get…" preview; set it to something with a
 grid class in it, like `col-md-6`, and it warns that it ignored that.
+
+## Checking the canvas polish (after 0.3.1)
+
+Three files are here for this round. `article-layout` covers `order-*`,
+`login-card` has no grid at all, and `stock-report.component.ts` is a file
+the Grid Editor should refuse. The rest needs no special file.
+
+**`order-*` is shown, not ignored.** Open `article-layout` and step through
+the breakpoints. Each row's comment says where its **⇄ reordered** pill should
+appear, and columns with an `order-*` in force carry an **order** badge. The
+canvas still draws source order on purpose. Row 4 has badges but never a pill,
+because `order-1 order-2 order-3` is already source order. Row 5 only gets its
+pill from `lg`, because below that the column that would jump ahead is hidden.
+
+**An empty canvas points at the right thing.** Open `login-card`. The message
+should mention **Add row** in the inspector and nothing about pasting, Apply
+changes or Load sample, since those exist only in the web app.
+
+**Only HTML files open the Grid Editor.** Focus `stock-report.component.ts`.
+**Open Grid Editor** is missing from the command palette. If you run it
+another way, a message names the language and no canvas opens.
+
+**The tab names its file.** Open the canvas on `dashboard`: the tab reads
+`dashboard.component.html · Grid`. Run the command again on `customer-form`
+and the same tab renames. It moves over to the new file rather than opening a
+second canvas.
+
+**Closing the file closes the canvas.** Close the editor tab of the file the
+canvas is showing, and the canvas closes with it.
+
+**Undo works from the canvas.** Make a canvas edit, for example widen a
+column, and press **Ctrl+Z** without clicking into the text editor. The edit
+comes back out of the file, and **Ctrl+Y** puts it back. It's the editor's own
+undo, so it also takes back typing.
+
+**A dragged column stays selected.** In `stock-report`, drag a filter column
+to another spot in its row. It is still selected where it lands, and the
+inspector still shows it.

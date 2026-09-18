@@ -1,0 +1,73 @@
+<!-- order-* classes: the browser draws a row in flex order, but the canvas
+     always draws source order, because that's what every edit works on. So it
+     says so instead: a column with an order-* in force shows an "order …"
+     badge, and a row the browser would draw differently gets a "⇄ reordered"
+     pill. Both follow the breakpoint, so switch through xs → xxl as you read.
+
+     Each row below is one case; the comment above it says at which
+     breakpoints the pill should appear. -->
+<div class="container">
+
+  <!-- 1. Content first on phones, sidebar on the left from md.
+          Pill: xs and sm only. Badges on both columns at every breakpoint. -->
+  <div class="row">
+    <div class="col-md-4 order-2 order-md-1">
+      <article-sidebar [links]="related"></article-sidebar>
+    </div>
+    <div class="col-md-8 order-1 order-md-2">
+      <article-body [article]="article"></article-body>
+    </div>
+  </div>
+
+  <!-- 2. A reorder that only starts at lg.
+          Pill: lg, xl, xxl. Badge on the second column from lg only. -->
+  <div class="row">
+    <div class="col-md-6">
+      <author-card [author]="article.author"></author-card>
+    </div>
+    <div class="col-md-6 order-lg-first">
+      <share-bar [url]="article.url"></share-bar>
+    </div>
+  </div>
+
+  <!-- 3. order-last on the first column sends it to the end.
+          Pill: every breakpoint. Badge "order last" on the first column. -->
+  <div class="row">
+    <div class="col-4 order-last">
+      <tag-list [tags]="article.tags"></tag-list>
+    </div>
+    <div class="col-4">
+      <reading-time [minutes]="article.minutes"></reading-time>
+    </div>
+    <div class="col-4">
+      <publish-date [date]="article.published"></publish-date>
+    </div>
+  </div>
+
+  <!-- 4. order-* classes that don't change anything: 1, 2, 3 is source order.
+          Pill: never. Badges on all three columns. -->
+  <div class="row">
+    <div class="col-4 order-1">
+      <label app-i18n="demo.article.title"></label>
+    </div>
+    <div class="col-4 order-2">
+      <label app-i18n="demo.article.subtitle"></label>
+    </div>
+    <div class="col-4 order-3">
+      <label app-i18n="demo.article.byline"></label>
+    </div>
+  </div>
+
+  <!-- 5. The column that would jump to the front is hidden below lg, and a
+          hidden column takes no part in the order.
+          Pill: lg, xl, xxl only — not below, where it's hidden. -->
+  <div class="row">
+    <div class="col-lg-8">
+      <comment-thread [comments]="comments"></comment-thread>
+    </div>
+    <div class="col-lg-4 d-none d-lg-block order-first">
+      <newsletter-signup></newsletter-signup>
+    </div>
+  </div>
+
+</div>
