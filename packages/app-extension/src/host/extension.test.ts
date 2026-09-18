@@ -206,9 +206,10 @@ interface FakePanel {
 
 /** A fake TextDocument: positions are opaque `{ offset }` wrappers. `path` is
     the URI path (`/`-separated; an untitled document's has no slash). */
-function makeDoc(text: string, path = '/tpl.html') {
+function makeDoc(text: string, path = '/tpl.html', languageId = 'html') {
   const doc = {
     uri: { path },
+    languageId,
     version: 1,
     getText: () => text,
     setText: (t: string) => { text = t; doc.version++; },
@@ -269,6 +270,33 @@ describe('activation and the open command', () => {
     M.commands.get('bootstrapGridEditor.open')!();
     expect(M.infoMsgs.length).toBe(1);
     expect(M.panels.length).toBe(0);
+  });
+
+  it('with a non-HTML file active: an info message naming its language, no panel', () => {
+    const subscriptions: { dispose(): void }[] = [];
+    activate({ subscriptions, extensionUri: { path: '/ext' } } as never);
+    M.state.activeTextEditor = makeEditor(makeDoc('{}', '/settings.json', 'json'));
+    M.commands.get('bootstrapGridEditor.open')!();
+    expect(M.infoMsgs).toHaveLength(1);
+    expect(M.infoMsgs[0]).toContain('json');
+    expect(M.panels).toHaveLength(0);
+  });
+
+  it('a non-HTML file does not re-point an open canvas either', async () => {
+    const html = makeDoc('<div class="row">A</div>', '/a.html');
+    const { panel } = openWith(html);
+    panel.receive({ type: 'ready' });
+    await vi.waitFor(() => expect(panel.posts).toContainEqual(
+      { type: 'setSource', text: '<div class="row">A</div>' }));
+    const before = panel.posts.length;
+
+    runOpenOn(makeDoc('x = 1', '/a.ts', 'typescript'));
+
+    expect(M.infoMsgs).toHaveLength(1);
+    expect(M.panels).toHaveLength(1);
+    expect(panel.title).toBe('a.html · Grid');       // still bound to the HTML file
+    expect(panel.revealCount()).toBe(0);             // and not brought to front
+    expect(panel.posts.length).toBe(before);         // no reload was sent
   });
 
   it('titles the panel after the file it is bound to', () => {

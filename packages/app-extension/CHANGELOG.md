@@ -20,6 +20,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Closing the file the canvas is bound to now closes the canvas too. It used to
   stay open over a buffer nobody could see: clicking a column no longer jumped
   to the source, and canvas edits landed in a document with no editor.
+- **Open Grid Editor** is now offered in the command palette only while an HTML
+  file is active, matching the title-bar and context-menu entries — and if it
+  is invoked with another kind of file focused (a keybinding, say), it says so
+  instead of opening a blank canvas on that file or re-pointing an open one.
 
 ## [0.3.1] - 2026-09-18
 

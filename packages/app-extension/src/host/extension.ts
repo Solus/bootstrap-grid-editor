@@ -43,11 +43,25 @@ interface Canvas {
 }
 let active: Canvas | null = null;
 
+/** The one language the canvas is offered for. The manifest's menus (title
+    bar, context menu, and the command palette) are gated on the same id;
+    this is the check behind them, for the ways a command can still be
+    invoked with something else active — a keybinding, another extension's
+    `executeCommand`, or the palette run with a non-text editor focused. */
+const GRID_LANGUAGE = 'html';
+
 function openPanel(context: vscode.ExtensionContext): void {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
     void vscode.window.showInformationMessage(
       'Open an HTML/Angular template first, then run "Open Grid Editor".');
+    return;
+  }
+  // Checked before the reuse below as well: re-running the command on the
+  // wrong kind of file must not re-point an open canvas at it either.
+  if (editor.document.languageId !== GRID_LANGUAGE) {
+    void vscode.window.showInformationMessage(
+      `The Grid Editor works on HTML files — this one is ${editor.document.languageId}.`);
     return;
   }
   // reuse the existing canvas — re-point it at this file — rather than making
