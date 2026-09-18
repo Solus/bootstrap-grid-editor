@@ -66,7 +66,7 @@ function createCanvas(context: vscode.ExtensionContext, initial: vscode.TextEdit
 
   const panel = vscode.window.createWebviewPanel(
     'bootstrapGridEditor',
-    'Grid Editor',
+    panelTitle(doc),
     vscode.ViewColumn.Beside,
     {
       enableScripts: true,
@@ -119,10 +119,25 @@ function createCanvas(context: vscode.ExtensionContext, initial: vscode.TextEdit
     panel,
     bind(editor) {
       doc = editor.document;       // re-point every port/listener at once
+      panel.title = panelTitle(doc);
       void session.reload();       // resend the new file's source, reset sync
       panel.reveal();              // bring the canvas to front, focused
     },
   };
+}
+
+/** The panel's tab label. It names the bound file because the canvas doesn't
+    follow the active editor: one panel is re-pointed by `bind`, so without
+    the name here a canvas can sit beside a file it isn't showing with nothing
+    to say so. The file name comes first and the marker last because a tab
+    truncates from the end — what survives is the part that changes.
+
+    `uri.path` rather than `fileName`: a URI path is `/`-separated on every
+    platform, and an untitled document's path (`Untitled-1`) has no separator
+    at all, so the last segment is the right answer for both. */
+function panelTitle(doc: vscode.TextDocument): string {
+  const name = doc.uri.path.split('/').pop() || doc.uri.path;
+  return `${name} · Grid`;
 }
 
 /** Everything a `Session` needs from VS Code, in one place.

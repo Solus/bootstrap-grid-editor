@@ -199,10 +199,11 @@ interface FakePanel {
   dispose(): void;
 }
 
-/** A fake TextDocument: positions are opaque `{ offset }` wrappers. */
-function makeDoc(text: string) {
+/** A fake TextDocument: positions are opaque `{ offset }` wrappers. `path` is
+    the URI path (`/`-separated; an untitled document's has no slash). */
+function makeDoc(text: string, path = '/tpl.html') {
   const doc = {
-    uri: { path: '/tpl.html' },
+    uri: { path },
     version: 1,
     getText: () => text,
     setText: (t: string) => { text = t; doc.version++; },
@@ -263,6 +264,17 @@ describe('activation and the open command', () => {
     M.commands.get('bootstrapGridEditor.open')!();
     expect(M.infoMsgs.length).toBe(1);
     expect(M.panels.length).toBe(0);
+  });
+
+  it('titles the panel after the file it is bound to', () => {
+    const { panel } = openWith(makeDoc('<p>x</p>', '/src/app/dashboard.component.html'));
+    expect(panel.title).toBe('dashboard.component.html · Grid');
+  });
+
+  it('titles an untitled document by its name, not a blank', () => {
+    // an untitled URI's path is just the label — no directory, no slash
+    const { panel } = openWith(makeDoc('', 'Untitled-1'));
+    expect(panel.title).toBe('Untitled-1 · Grid');
   });
 
   it('creates a script-enabled panel scoped to dist/webview', () => {
@@ -531,6 +543,15 @@ describe('one reusable panel', () => {
       expect(panel.posts.filter(p => p.type === 'setSource').length).toBe(n + 1));
     // the old file's save was ignored — only docB's resend arrived
     expect(panel.posts.filter(p => p.type === 'setSource').length).toBe(n + 1);
+  });
+
+  it('re-pointing renames the tab to the new file', () => {
+    const { panel } = openWith(makeDoc('<p>A</p>', '/a/first.component.html'));
+    expect(panel.title).toBe('first.component.html · Grid');
+    runOpenOn(makeDoc('<p>B</p>', '/b/second.component.html'));
+    // same panel, new name — the one signal of which file the canvas shows
+    expect(M.panels.length).toBe(1);
+    expect(panel.title).toBe('second.component.html · Grid');
   });
 
   it('after the panel is closed, opening builds a fresh one', () => {
