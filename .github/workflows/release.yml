@@ -67,17 +67,15 @@ jobs:
           cp packages/app-standalone/dist-single/index.html "artifacts/bootstrap-visualizer-${GITHUB_REF_NAME}.html"
           cp packages/app-extension/releases/*.vsix artifacts/
 
-      # Publish the already-built .vsix (via --packagePath, never a rebuilt one)
-      # so the Marketplace, Open VSX, and the GitHub Release carry identical bits.
-      # Guarded on the PAT: a tag without secrets (interim private release, a
-      # fork) still cuts a GitHub Release without attempting to publish.
-      - name: Publish to VS Code Marketplace
-        if: env.VSCE_PAT != ''
-        run: npx @vscode/vsce publish --no-dependencies --packagePath artifacts/*.vsix
-
-      - name: Publish to Open VSX
-        if: env.OVSX_PAT != ''
-        run: npx ovsx publish artifacts/*.vsix -p "$OVSX_PAT"
+      # Keep the built bits even if a later step fails. v0.3.0's release step
+      # died after the Marketplace publish and the artifacts were lost with the
+      # runner, leaving no way to finish the release without a rebuild.
+      - name: Upload artifacts to the workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: artifacts/
+          if-no-files-found: error
 
       # Release notes = this version's section from the extension CHANGELOG,
       # so the changes are written once (CHANGELOG shows in VS Code too).
@@ -90,10 +88,53 @@ jobs:
           ' packages/app-extension/CHANGELOG.md > RELEASE_NOTES.md
           echo "----- release notes -----"; cat RELEASE_NOTES.md
 
+      # The GitHub Release goes FIRST, before the Marketplace. Publishing to the
+      # Marketplace is the one irreversible step here — a version can never be
+      # replaced or unpublished — so it must be last. In v0.3.0 the order was
+      # reversed: the Marketplace publish succeeded, the release step then
+      # failed, and the release could not simply be re-run, because `vsce
+      # publish` rejects a version that is already live.
+      #
+      # `draft: false` is explicit: v0.3.0's release was created as a draft, and
+      # GitHub's get-release-by-tag API does not return drafts, which is what
+      # produced "Release … is not yet discoverable by tag" and then the upload
+      # failure.
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           body_path: RELEASE_NOTES.md
           files: artifacts/*
+          draft: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Don't take the action's word for it. v0.3.0 left a draft release with no
+      # assets; this turns that into a loud failure before anything is
+      # published to the Marketplace. The API call itself 404s on a draft.
+      - name: Verify the GitHub Release is published with its artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ASSETS="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
+            --jq '[.assets[].name] | join(" ")')"
+          echo "Attached assets: $ASSETS"
+          for want in .vsix .html; do
+            case "$ASSETS" in
+              *"$want"*) ;;
+              *) echo "No $want asset attached to $GITHUB_REF_NAME"; exit 1 ;;
+            esac
+          done
+
+      # Publish the already-built .vsix (via --packagePath, never a rebuilt one)
+      # so the Marketplace, Open VSX, and the GitHub Release carry identical bits.
+      # Guarded on the PAT: a tag without secrets (interim private release, a
+      # fork) still cuts a GitHub Release without attempting to publish.
+      - name: Publish to VS Code Marketplace
+        if: env.VSCE_PAT != ''
+        run: npx @vscode/vsce publish --no-dependencies --packagePath artifacts/*.vsix
+
+      - name: Publish to Open VSX
+        if: env.OVSX_PAT != ''
+        run: npx ovsx publish artifacts/*.vsix -p "$OVSX_PAT"

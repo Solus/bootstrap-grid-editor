@@ -305,6 +305,39 @@ rebuilding.
 
 ---
 
+## 12. Release and CI
+
+### 12.1 Release actions are pinned to floating major tags **[chore]**
+
+*What it is.* Every action the workflows use is referenced by a moving major
+tag: `actions/checkout@v5` and `actions/setup-node@v5`
+(`.github/workflows/release.yml:20`, `:22`, and the same pair in
+`.github/workflows/test.yml:15`, `:17`),
+`actions/upload-artifact@v4` (`release.yml:74`) and
+`softprops/action-gh-release@v2` (`release.yml:103`). Whatever the maintainer
+last moved that tag to is what runs.
+
+*Why it matters.* This is not hypothetical here. The v0.3.0 release (run
+35266541641, 2026-09-17) published to the Marketplace and then failed its
+`Publish GitHub Release` step: the action created the release as a *draft*,
+GitHub's get-release-by-tag API does not return drafts, so the action's own
+"not yet discoverable by tag" retry loop ran out and the asset upload failed.
+Nothing in the repository changed between the green v0.2.1 release and that
+failure — only the code behind `@v2` did. A release is the one workflow where
+a silent upstream change costs an irreversible Marketplace publish.
+
+*Suggested direction.* Pin each action to a full commit SHA with the
+human-readable version in a trailing comment
+(`softprops/action-gh-release@<sha> # v2.4.1`), and let Dependabot's
+`github-actions` ecosystem raise the bumps as reviewable PRs. Not done in the
+v0.3.1 change because that session had no network access to resolve a SHA it
+could actually verify, and guessing one is worse than the floating tag. The
+explicit `draft: false` and the post-publish verification step added in
+v0.3.1 defend against this specific failure at any action version; the pin is
+the general fix.
+
+---
+
 ## Resolved (archive)
 
 Closed items, one line each — full rationale and detail is in git history.
