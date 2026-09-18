@@ -34,7 +34,7 @@
 import { applyEdits } from '@bootstrap-visualizer/core/edits';
 import type { Edit } from '@bootstrap-visualizer/core';
 import type {
-  ConfigWire, HostMessage, PrefChange, WebviewMessage,
+  ConfigWire, HistoryDir, HostMessage, PrefChange, WebviewMessage,
 } from '../shared/protocol.js';
 
 /** Everything the session needs from its VS Code environment. */
@@ -49,6 +49,9 @@ export interface SessionPorts {
   config(): ConfigWire;
   /** Persist a sticky setting the user changed in the canvas. */
   setConfig(change: PrefChange): void;
+  /** Run the editor's own undo / redo on the document. Resolves once the
+      buffer holds the result. */
+  history(dir: HistoryDir): Promise<void>;
 }
 
 /** Shown on the canvas when an edit is refused. It names what happened to the
@@ -248,7 +251,28 @@ export class Session {
       case 'applyEdits':
         await this.applyCanvasEdits(msg.edits);
         break;
+      case 'history':
+        await this.runHistory(msg.dir);
+        break;
     }
+  }
+
+  /** Ctrl+Z / Ctrl+Y from the canvas: the editor's undo stack is the only
+      history there is (the canvas keeps none in the extension), so run it on
+      the editor and show the canvas the result. The resend is unconditional —
+      with `liveSync` off, the buffer change this causes would otherwise read
+      as the user editing under the canvas and park it, when it was the canvas
+      that asked. `applyDepth` is raised for the same reason it is around an
+      apply: the undo moves the editor caret, and that echo must not bounce
+      back as a `selectAt` on top of the selection `keepSelection` preserves. */
+  private async runHistory(dir: HistoryDir): Promise<void> {
+    this.applyDepth++;
+    try {
+      await this.ports.history(dir);
+    } finally {
+      this.applyDepth--;
+    }
+    this.sendSource(true);
   }
 
   /** Resend the buffer to the canvas — a full resync. `keepSelection` is set

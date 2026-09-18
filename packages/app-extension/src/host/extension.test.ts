@@ -36,6 +36,11 @@ vi.mock('vscode', () => {
   const infoMsgs: string[] = [];
   const warnMsgs: string[] = [];
   const panels: unknown[] = [];
+  /** Everything the undo path does to VS Code, in order: `show:<path>@<col>`,
+      `cmd:<id>`, and the panel's `reveal` (recorded by the fake panel). */
+  const trail: string[] = [];
+  const tabGroups = { all: [] as { viewColumn: number; tabs: { input: unknown }[] }[] };
+  class TabInputText { constructor(public uri: { toString(): string }) {} }
   const applied: { ops: { uri: unknown; range: unknown; text: string }[] }[] = [];
   const config = new Map<string, unknown>();
   const configWrites: { key: string; value: unknown; target: unknown }[] = [];
@@ -74,7 +79,10 @@ vi.mock('vscode', () => {
     const panel = {
       viewType, title, options,
       posts,
-      reveal: () => { reveals++; },
+      reveal: (_col?: unknown, preserveFocus?: boolean) => {
+        reveals++;
+        trail.push('reveal' + (preserveFocus === false ? ':focus' : ''));
+      },
       revealCount: () => reveals,
       webview: {
         html: '',
@@ -108,6 +116,7 @@ vi.mock('vscode', () => {
         commands.set(id, fn);
         return { dispose: () => commands.delete(id) };
       },
+      executeCommand: (id: string) => { trail.push('cmd:' + id); return Promise.resolve(); },
     },
     window: {
       get activeTextEditor() { return state.activeTextEditor; },
@@ -115,6 +124,13 @@ vi.mock('vscode', () => {
       createWebviewPanel,
       showInformationMessage: (m: string) => { infoMsgs.push(m); return Promise.resolve(undefined); },
       showWarningMessage: (m: string) => { warnMsgs.push(m); return Promise.resolve(undefined); },
+      showTextDocument: (
+        d: { uri: { path: string } }, o: { viewColumn?: number; preserveFocus?: boolean },
+      ) => {
+        trail.push(`show:${d.uri.path}@${o.viewColumn ?? 'active'}` + (o.preserveFocus ? '' : ':focus'));
+        return Promise.resolve(undefined);
+      },
+      tabGroups,
       onDidChangeTextEditorSelection: selections.on,
       registerWebviewPanelSerializer: (
         viewType: string, s: { deserializeWebviewPanel(p: unknown, st: unknown): Thenable<void> },
@@ -143,10 +159,10 @@ vi.mock('vscode', () => {
     ViewColumn: { Beside: 2 },
     TextEditorRevealType: { InCenterIfOutsideViewport: 2 },
     ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
-    Range, Selection, WorkspaceEdit, Uri,
+    Range, Selection, WorkspaceEdit, Uri, TabInputText,
     __mock: {
       state, saves, changes, selections, closes, configChanges, commands, serializers,
-      infoMsgs, warnMsgs, panels, applied, config, configWrites,
+      infoMsgs, warnMsgs, panels, applied, config, configWrites, trail, tabGroups,
       reset() {
         // dispose any live panel first so extension.ts's module-level `active`
         // canvas clears (its onDidDispose sets active = null) — otherwise the
@@ -158,6 +174,7 @@ vi.mock('vscode', () => {
         infoMsgs.length = 0; warnMsgs.length = 0;
         panels.length = 0; applied.length = 0;
         config.clear(); configWrites.length = 0;
+        trail.length = 0; tabGroups.all = [];
         state.activeTextEditor = undefined;
         state.visibleTextEditors = [];
         state.workspaceFolders = undefined;
@@ -189,6 +206,8 @@ interface MockApi {
   panels: FakePanel[]; applied: { ops: { range: unknown; text: string }[] }[];
   config: Map<string, unknown>;
   configWrites: { key: string; value: unknown; target: unknown }[];
+  trail: string[];
+  tabGroups: { all: { viewColumn: number; tabs: { input: unknown }[] }[] };
   reset(): void;
 }
 interface FakePanel {
@@ -208,7 +227,7 @@ interface FakePanel {
     the URI path (`/`-separated; an untitled document's has no slash). */
 function makeDoc(text: string, path = '/tpl.html', languageId = 'html') {
   const doc = {
-    uri: { path },
+    uri: { path, toString: () => 'file://' + path },
     languageId,
     version: 1,
     getText: () => text,
@@ -219,9 +238,10 @@ function makeDoc(text: string, path = '/tpl.html', languageId = 'html') {
   return doc;
 }
 
-function makeEditor(doc: ReturnType<typeof makeDoc>) {
+function makeEditor(doc: ReturnType<typeof makeDoc>, viewColumn = 1) {
   return {
     document: doc,
+    viewColumn,
     selection: null as unknown,
     revealed: [] as { range: unknown; how: unknown }[],
     revealRange(range: unknown, how: unknown) { this.revealed.push({ range, how }); },
@@ -593,6 +613,47 @@ describe('one reusable panel', () => {
     panel.dispose();
     runOpenOn(makeDoc('<p>y</p>'));
     expect(M.panels.length).toBe(2);          // a new canvas, not a reuse of the disposed one
+  });
+});
+
+/* ── undo / redo from the canvas ─────────────────────────────────── */
+
+describe('Ctrl+Z on the canvas runs the editor\'s undo', () => {
+  it('focuses the file\'s editor in its own group, runs undo, then refocuses the canvas', async () => {
+    const doc = makeDoc('<p>x</p>', '/tpl.html');
+    const { panel } = openWith(doc);
+    (M.state.activeTextEditor as { viewColumn: number }).viewColumn = 1;
+
+    panel.receive({ type: 'history', dir: 'undo' });
+    await vi.waitFor(() => expect(M.trail).toContain('reveal:focus'));
+
+    expect(M.trail).toEqual(['show:/tpl.html@1:focus', 'cmd:undo', 'reveal:focus']);
+    // and the canvas is shown the buffer afterwards
+    expect(panel.posts.at(-1)).toMatchObject({ type: 'setSource', keepSelection: true });
+  });
+
+  it('redo runs the redo command', async () => {
+    const { panel } = openWith(makeDoc('<p>x</p>'));
+    panel.receive({ type: 'history', dir: 'redo' });
+    await vi.waitFor(() => expect(M.trail).toContain('cmd:redo'));
+  });
+
+  it('a file open behind another tab is shown in that tab\'s group, not the canvas\'s', async () => {
+    const doc = makeDoc('<p>x</p>', '/hidden.html');
+    const { panel } = openWith(doc);
+    // the file's editor is no longer visible (another tab covers it) …
+    M.state.visibleTextEditors = [];
+    // … but its tab is still in group 2
+    M.tabGroups.all = [
+      { viewColumn: 1, tabs: [{ input: {} }] },
+      { viewColumn: 2, tabs: [{ input: new (vscodeNs as unknown as {
+        TabInputText: new (u: unknown) => unknown }).TabInputText(doc.uri) }] },
+    ];
+
+    panel.receive({ type: 'history', dir: 'undo' });
+    await vi.waitFor(() => expect(M.trail).toContain('cmd:undo'));
+
+    expect(M.trail[0]).toBe('show:/hidden.html@2:focus');
   });
 });
 

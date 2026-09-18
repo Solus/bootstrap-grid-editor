@@ -23,23 +23,29 @@ export function wireKeyboardNav(): void {
   document.addEventListener('keydown', kbNav);
 }
 
-/** The app's own undo/redo — buttons + Ctrl+Z/Y. The standalone wires this;
-    the extension does NOT (undo there is the editor's native undo, decision
-    §6 / FOLLOW-UPS). Assumes the host HTML provides #undoBtn / #redoBtn. */
+/** The undo/redo keys — Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl/Cmd+Shift+Z — routed to
+    `onHistory`. What "undo" *is* differs per frontend (the standalone has its
+    own history; the extension defers to the editor's), so the keys are wired
+    here once and the frontend says what they do. Nothing fires while focus is
+    in a text field: there the keys stay the field's native undo. */
+export function wireHistoryKeys(onHistory: (dir: 'undo' | 'redo') => void): void {
+  document.addEventListener('keydown', e => {
+    if (inTextField(e.target as HTMLElement)) return;
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const key = e.key.toLowerCase();
+    if (key === 'z' && !e.shiftKey) { e.preventDefault(); onHistory('undo'); }
+    else if (key === 'y' || (key === 'z' && e.shiftKey)) { e.preventDefault(); onHistory('redo'); }
+  });
+}
+
+/** The app's own undo/redo — buttons + the keys, on the editor's history
+    stack. The standalone wires this; the extension wires `wireHistoryKeys`
+    to the editor's native undo instead (decision §6 / FOLLOW-UPS). Assumes the
+    host HTML provides #undoBtn / #redoBtn. */
 export function wireUndoRedo(): void {
   $('#undoBtn').addEventListener('click', undo);
   $('#redoBtn').addEventListener('click', redo);
-
-  document.addEventListener('keydown', e => {
-    if (inTextField(e.target as HTMLElement)) return;   // don't hijack native undo in a field
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
-      e.preventDefault(); undo();
-    }
-    if ((e.ctrlKey || e.metaKey) &&
-        (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
-      e.preventDefault(); redo();
-    }
-  });
+  wireHistoryKeys(dir => (dir === 'undo' ? undo() : redo()));
 }
 
 /** Convenience for the standalone: navigation + undo/redo together. */

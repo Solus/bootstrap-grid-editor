@@ -92,7 +92,8 @@ function createCanvas(context: vscode.ExtensionContext, initial: vscode.TextEdit
 
   // All sync state/decisions live in Session; this wires VS Code to its ports.
   const session = new Session(createSessionPorts(
-    () => doc, msg => void panel.webview.postMessage(msg)));
+    () => doc, msg => void panel.webview.postMessage(msg),
+    () => panel.reveal(undefined, false)));
 
   const disposables: vscode.Disposable[] = [];
 
@@ -174,6 +175,7 @@ function panelTitle(doc: vscode.TextDocument): string {
     one that's right. */
 export function createSessionPorts(
   doc: () => vscode.TextDocument, post: (msg: HostMessage) => void,
+  refocus: () => void = () => {},
 ): SessionPorts {
   return {
     post,
@@ -193,7 +195,33 @@ export function createSessionPorts(
       void vscode.workspace.getConfiguration('bootstrapGridEditor', doc().uri)
         .update(SETTING_KEY[change.pref], change.value, writeTarget(change.pref));
     },
+    history: async dir => {
+      // `undo` / `redo` act on the code editor that has focus, and with the
+      // canvas focused there is none — the command would no-op. So give the
+      // document's editor focus in the group it already lives in, run the
+      // command there, and hand focus back to the canvas. `refocus` is the
+      // panel's reveal; the integration suite, which has no panel, leaves it.
+      const d = doc();
+      await vscode.window.showTextDocument(d, {
+        viewColumn: editorGroupOf(d), preserveFocus: false, preview: false,
+      });
+      await vscode.commands.executeCommand(dir);
+      refocus();
+    },
   };
+}
+
+/** The editor group that holds `doc`: the visible editor's, else the group of
+    the tab it sits behind. `showTextDocument` with no column would open a
+    second copy in the *active* group, which while the canvas is focused is the
+    canvas's own. Undefined only when the document has no tab at all, which a
+    canvas can't outlive (its close closes the panel). */
+function editorGroupOf(doc: vscode.TextDocument): vscode.ViewColumn | undefined {
+  const visible = vscode.window.visibleTextEditors.find(e => e.document === doc);
+  if (visible) return visible.viewColumn;
+  const key = doc.uri.toString();
+  return vscode.window.tabGroups.all.find(g => g.tabs.some(t =>
+    t.input instanceof vscode.TabInputText && t.input.uri.toString() === key))?.viewColumn;
 }
 
 /** Canvas preference → the settings key that stores it. An exhaustive map, not

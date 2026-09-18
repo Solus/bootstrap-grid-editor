@@ -2,13 +2,15 @@
 
    Mirrors app-standalone's main, but the "source in / edits out" ends are the
    postMessage bridge instead of the textarea, and undo/redo is the editor's
-   native undo (decision §6) — so keyboard is nav-only. */
+   native undo (decision §6) — the keys are forwarded to the host, which runs
+   it on the document's editor. */
 
 import '@bootstrap-visualizer/editor/styles.css';
 import {
   apply, applyOpenConfig, assertRequiredIds, readLiveSettings, render,
   REQUIRED_EDITOR_IDS, selectAtOffset, setHost, toast, wireBreakpointSwitch,
-  wireCanvasBackground, wireDialectChip, wireDragSurface, wireKeyboardNav,
+  wireCanvasBackground, wireDialectChip, wireDragSurface, wireHistoryKeys,
+  wireKeyboardNav,
 } from '@bootstrap-visualizer/editor';
 import { createWebviewHost, type SyncState } from './webview-host.js';
 import type { HostMessage, WebviewMessage } from '../shared/protocol.js';
@@ -29,7 +31,10 @@ let firstEdit = true;   // show the "save to persist" cue once per session
 setHost(createWebviewHost(post, sync));
 wireBreakpointSwitch();
 wireDialectChip();
-wireKeyboardNav();          // no undo/redo — that's the editor's native undo
+wireKeyboardNav();
+// A webview swallows Ctrl+Z; without this, undoing a canvas edit meant
+// clicking into the text editor first. The host runs the editor's own undo.
+wireHistoryKeys(dir => post({ type: 'history', dir }));
 wireCanvasBackground();
 wireDragSurface();
 

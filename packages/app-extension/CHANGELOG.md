@@ -24,6 +24,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   file is active, matching the title-bar and context-menu entries — and if it
   is invoked with another kind of file focused (a keybinding, say), it says so
   instead of opening a blank canvas on that file or re-pointing an open one.
+- **Ctrl+Z** and **Ctrl+Y** (or Ctrl+Shift+Z) work with the canvas focused.
+  They run the editor's own undo and redo on the file — the same stack as
+  typing in it — so a canvas edit can be taken back without first clicking
+  into the text editor. The canvas refreshes to the result and keeps its
+  selection where it still applies.
 
 ## [0.3.1] - 2026-09-18
 
