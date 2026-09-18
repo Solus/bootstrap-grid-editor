@@ -95,6 +95,16 @@ function createCanvas(context: vscode.ExtensionContext, initial: vscode.TextEdit
     if (ev.document === doc) void session.onDocChange();
   }));
 
+  // The canvas is a view of one document; when that document's last editor
+  // closes, the canvas has nothing left to show or write to, so it closes
+  // with it. Staying open would be worse than blank: `reveal` would silently
+  // stop (no visible editor to drive) and canvas edits would land in a buffer
+  // nobody can see. Disposing runs the same onDidDispose path as the user
+  // closing the tab, so the listeners go and the next open starts fresh.
+  disposables.push(vscode.workspace.onDidCloseTextDocument(closed => {
+    if (closed === doc) panel.dispose();
+  }));
+
   disposables.push(vscode.workspace.onDidChangeConfiguration(ev => {
     if (isLiveSetting(ev)) session.onLiveSettingChange();
   }));

@@ -29,6 +29,7 @@ vi.mock('vscode', () => {
     };
   };
   const saves = mkEvent(), changes = mkEvent(), selections = mkEvent();
+  const closes = mkEvent();
   const configChanges = mkEvent();
   const commands = new Map<string, (...a: unknown[]) => unknown>();
   const serializers = new Map<string, { deserializeWebviewPanel(p: unknown, s: unknown): Thenable<void> }>();
@@ -123,6 +124,7 @@ vi.mock('vscode', () => {
       get workspaceFolders() { return state.workspaceFolders; },
       onDidSaveTextDocument: saves.on,
       onDidChangeTextDocument: changes.on,
+      onDidCloseTextDocument: closes.on,
       onDidChangeConfiguration: configChanges.on,
       applyEdit: (e: WorkspaceEdit) => {
         applied.push(e);
@@ -143,14 +145,15 @@ vi.mock('vscode', () => {
     ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
     Range, Selection, WorkspaceEdit, Uri,
     __mock: {
-      state, saves, changes, selections, configChanges, commands, serializers,
+      state, saves, changes, selections, closes, configChanges, commands, serializers,
       infoMsgs, warnMsgs, panels, applied, config, configWrites,
       reset() {
         // dispose any live panel first so extension.ts's module-level `active`
         // canvas clears (its onDidDispose sets active = null) — otherwise the
         // next test would reuse a stale panel instead of creating one
         (panels as FakePanel[]).forEach(p => p.dispose());
-        saves.clear(); changes.clear(); selections.clear(); configChanges.clear();
+        saves.clear(); changes.clear(); selections.clear(); closes.clear();
+        configChanges.clear();
         commands.clear(); serializers.clear();
         infoMsgs.length = 0; warnMsgs.length = 0;
         panels.length = 0; applied.length = 0;
@@ -178,6 +181,7 @@ interface MockApi {
   saves: { fire(e: unknown): void; count(): number };
   changes: { fire(e: unknown): void; count(): number };
   selections: { fire(e: unknown): void; count(): number };
+  closes: { fire(e: unknown): void; count(): number };
   configChanges: { fire(e: unknown): void; count(): number };
   commands: Map<string, (...a: unknown[]) => unknown>;
   serializers: Map<string, { deserializeWebviewPanel(p: unknown, s: unknown): Thenable<void> }>;
@@ -196,6 +200,7 @@ interface FakePanel {
   hasMessageListener(): boolean;
   reveal(): void;
   revealCount(): number;
+  onDidDispose(cb: () => void): void;
   dispose(): void;
 }
 
@@ -563,18 +568,64 @@ describe('one reusable panel', () => {
   });
 });
 
+/* ── the bound file closing ──────────────────────────────────────── */
+
+describe('closing the bound file closes the canvas', () => {
+  it('the document\'s last editor closing disposes the panel', () => {
+    const doc = makeDoc('<p>x</p>');
+    const { panel } = openWith(doc);
+    let disposed = false;
+    panel.onDidDispose(() => { disposed = true; });
+
+    M.closes.fire(doc);
+
+    expect(disposed).toBe(true);
+    // the same teardown as the user closing the tab: listeners gone …
+    expect(M.saves.count() + M.changes.count() + M.selections.count() + M.closes.count()).toBe(0);
+    // … and the next open builds a fresh canvas rather than reviving this one
+    runOpenOn(makeDoc('<p>y</p>'));
+    expect(M.panels.length).toBe(2);
+  });
+
+  it('another document closing leaves the canvas alone', () => {
+    const doc = makeDoc('<p>x</p>');
+    const { panel } = openWith(doc);
+    let disposed = false;
+    panel.onDidDispose(() => { disposed = true; });
+
+    M.closes.fire(makeDoc('<p>other</p>', '/other.html'));
+
+    expect(disposed).toBe(false);
+    expect(M.closes.count()).toBe(1);
+  });
+
+  it('after a re-point, it is the new file whose close counts', () => {
+    const docA = makeDoc('<p>A</p>', '/a.html');
+    const { panel } = openWith(docA);
+    let disposed = false;
+    panel.onDidDispose(() => { disposed = true; });
+    const docB = makeDoc('<p>B</p>', '/b.html');
+    runOpenOn(docB);
+
+    M.closes.fire(docA);                 // the file the canvas has moved off
+    expect(disposed).toBe(false);
+    M.closes.fire(docB);                 // the file it now shows
+    expect(disposed).toBe(true);
+  });
+});
+
 /* ── disposal ────────────────────────────────────────────────────── */
 
 describe('panel disposal detaches every listener', () => {
   it('save/change/selection/message routing all stop', () => {
     const doc = makeDoc('<p>x</p>');
     const { panel } = openWith(doc);
-    expect(M.saves.count() + M.changes.count() + M.selections.count()).toBe(3);
+    expect(M.saves.count() + M.changes.count() + M.selections.count() + M.closes.count()).toBe(4);
     expect(panel.hasMessageListener()).toBe(true);
 
     panel.dispose();
 
-    expect(M.saves.count() + M.changes.count() + M.selections.count()).toBe(0);
+    expect(M.saves.count() + M.changes.count() + M.selections.count() + M.closes.count()).toBe(0);
     expect(panel.hasMessageListener()).toBe(false);
     // a late save must not reach the disposed panel
     M.saves.fire(doc);
