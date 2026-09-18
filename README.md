@@ -44,6 +44,7 @@ npm run test:e2e    # Playwright browser tests (needs: npx playwright install ch
 npm run test:vscode # the extension's edits against a real VS Code buffer
 npm run test:all    # all three
 npm run typecheck   # tsc across core, its specs, the app, and the e2e specs
+npm run lint        # ESLint over every package
 ```
 
 `test:vscode` downloads VS Code on first run (cached in `.vscode-test/`) and

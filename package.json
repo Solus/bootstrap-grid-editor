@@ -15,6 +15,7 @@
     "build:core": "tsc -b packages/core --force",
     "build:single": "npm run build:single -w @bootstrap-visualizer/app-standalone",
     "pretest": "npm run build:core",
+    "lint": "eslint .",
     "test": "vitest run",
     "pretest:watch": "npm run build:core",
     "test:watch": "vitest",
@@ -25,10 +26,13 @@
     "typecheck": "tsc -b && tsc -p packages/core/tsconfig.spec.json && tsc -p packages/editor/tsconfig.json && tsc -p packages/app-standalone/tsconfig.json && tsc -p packages/app-standalone/tsconfig.e2e.json && tsc -p packages/app-extension/tsconfig.host.json && tsc -p packages/app-extension/tsconfig.webview.json && tsc -p packages/app-extension/tsconfig.integration.json"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.1",
+    "eslint": "^10.10.0",
     "jsdom": "^29.1.1",
     "typescript": "^5.6.0",
+    "typescript-eslint": "^8.70.0",
     "vitest": "^2.1.0"
   }
 }

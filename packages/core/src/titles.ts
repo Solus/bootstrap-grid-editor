@@ -138,7 +138,7 @@ export function controlName(el: El): string | null {
 /** Best content hint for a column, searched shallowly (depth 3) among
     non-row descendants: a form control's name beats an i18n key beats
     the first tag name. `tag` says which element type supplied it. */
-export function contentHint(src: string, el: El): ContentHint | null {
+export function contentHint(_src: string, el: El): ContentHint | null {
   const q = el.children.filter(c => !isRowEl(c) && !isSpacerEl(c)).map(c => ({ e: c, d: 1 }));
   let firstTag: string | null = null;
   let firstI18n: string | null = null;
