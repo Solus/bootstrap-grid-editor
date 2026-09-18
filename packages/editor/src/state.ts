@@ -4,7 +4,7 @@
 
 import {
   BPS, ROW_CLASS, applyEdits, buildModel, classTokens, definingBp,
-  detectEol, detectIndentUnit, mergeClasses, parseExtraClasses,
+  detectEol, detectIndentUnit, mergeClasses, nodeAtOffset, parseExtraClasses,
   parseTemplate, usesBs3, usesBs5, widthTokenBp,
 } from '@bootstrap-visualizer/core';
 import type {
@@ -300,6 +300,13 @@ export interface ApplyOpts {
   /** The span batch that produced this apply (from applyOps), or null for a
       whole-document replace. Passed through to the host. */
   edits?: Edit[] | null;
+  /** Select the deepest block at this offset **in the new source** once the
+      model is rebuilt, instead of carrying the old selection's path across.
+      For an edit that moves an element: its path is unknown until the model
+      exists, but where its text lands is known from the edit batch, and an
+      offset survives what a path and a content hash don't (FOLLOW-UPS §10.2).
+      The host is asked to reveal the result, as a click on it would be. */
+  selectAt?: number;
 }
 
 export function apply(newSrc: string, opts: ApplyOpts = {}): void {
@@ -342,11 +349,18 @@ export function apply(newSrc: string, opts: ApplyOpts = {}): void {
   state.dialectSource = dialect.source;
   state.indentUnit = detectIndentUnit(newSrc);
   state.eol = detectEol(newSrc);
-  if (!keepSel) state.sel = null;
+  if (opts.selectAt != null) state.sel = nodeAtOffset(model, opts.selectAt);
+  else if (!keepSel) state.sel = null;
   if (state.sel && !resolvePath(state.sel.path)) state.sel = null;
   if (!state.sel) state._bandLines = null;
   host?.commit(newSrc, edits);   // the host owns source-out (textarea / buffer)
   render();
+  // After the commit, so the host's source view holds the text the span
+  // points into (the standalone's band is positioned over its textarea).
+  if (opts.selectAt != null) {
+    const node = state.sel && resolvePath(state.sel.path);
+    revealSource(node ? node.el : null);
+  }
 }
 
 /** Rebuild the model from the current source with the current branch

@@ -29,6 +29,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   typing in it — so a canvas edit can be taken back without first clicking
   into the text editor. The canvas refreshes to the result and keeps its
   selection where it still applies.
+- A column stays selected after you drag it somewhere else. It used to be
+  deselected the moment it dropped, so the inspector emptied and a follow-up
+  nudge or width change meant clicking it again first.
 
 ## [0.3.1] - 2026-09-18
 
