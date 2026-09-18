@@ -4,6 +4,20 @@ All notable changes to this extension are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The canvas's "No `.row` elements found" message told you to paste a template
+  on the left and press **Apply changes** or **Load sample** — controls that
+  exist only in the standalone web app, not in VS Code. It now points at what
+  the panel actually has: **Add row** in the inspector, or reopening the Grid
+  Editor on a file that has a grid.
+- The canvas tab is titled after the file it shows (`dashboard.component.html
+  · Grid`) instead of a fixed "Grid Editor", and renames when you run
+  **Open Grid Editor** on another file. The one panel is re-pointed rather than
+  duplicated, so this is the only place that said which file it was showing.
+
 ## [0.3.1] - 2026-09-18
 
 ### Fixed
