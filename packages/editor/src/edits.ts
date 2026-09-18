@@ -339,12 +339,19 @@ export function moveCol(srcPath: NodePath, dstRowPath: NodePath, dstIndex: numbe
   if (insertAt >= cutStart && insertAt <= cutEnd) return;
 
   const insText = state.eol + indent + elText;
-  state.sel = null;
+  // Where the column's open tag lands in the *new* source, so it stays
+  // selected after the move (it used to be deselected, and the inspector
+  // emptied the moment it dropped — FOLLOW-UPS §10.2). The inserted text sits
+  // at `insertAt`, shifted left by the cut when the cut comes first; inside
+  // it, the tag follows the newline + indent and any title comment the
+  // element carries (`textStart` is where that comment starts).
+  const insertedAt = insertAt > cutEnd ? insertAt - (cutEnd - cutStart) : insertAt;
+  const movedStart = insertedAt + (state.eol + indent).length + (el.start - textStart);
   // remove the element from its old spot and insert it at the new one — two
   // non-overlapping edits (the no-op guard above ensures insertAt is outside
   // the cut range); applyEdits orders them
   applyOps([
     { start: cutStart, end: cutEnd, text: '' },
     { start: insertAt, end: insertAt, text: insText },
-  ]);
+  ], { selectAt: movedStart });
 }

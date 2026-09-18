@@ -258,9 +258,13 @@ keep it reviewable.*
 *What it is.* Selection is a path (`state.sel.path`, `[rowIdx, colIdx, …]`) and
 is re-resolved against a freshly built model after every apply. Two consequences,
 both verified in the code:
-- `moveCol` and `deleteEl` (`packages/editor/src/edits.ts`) set `state.sel =
-  null` outright, so the column you just dragged is deselected the moment it
-  lands — the inspector empties and a follow-up nudge needs a re-click.
+- ~~`moveCol` and `deleteEl` set `state.sel = null` outright, so the column you
+  just dragged is deselected the moment it lands.~~ **Done for `moveCol`:**
+  `ApplyOpts.selectAt` (`packages/editor/src/state.ts`) selects the block at an
+  offset in the *new* source, and `moveCol` passes where the moved tag lands,
+  computed from its own edit batch — the offset-anchoring below, applied to the
+  one edit that needed it. `deleteEl` still clears (there is nothing obvious to
+  select instead).
 - A path that still resolves may resolve to a *different* element after an
   external change (a live-sync refresh keeps the selection by path), so the
   inspector can quietly describe something other than what the user selected.
@@ -279,9 +283,11 @@ meant to protect.
 a content hash: an edit batch is a list of spans, so an offset can be mapped
 through it (shift by the net delta of every edit that starts before it). Then
 after an apply, re-select via the existing `nodeAtOffset` (`core/model.ts`) at
-the mapped offset — which would also let `moveCol` keep the moved column
-selected instead of clearing. For collapse, key on the same mapped-offset
-identity, and drop keys that no longer resolve so the set stops growing.
+the mapped offset. `selectAt` is the seam for that: what's left is the general
+mapping (so every canvas edit and the live-sync refresh keep the selection by
+offset, not path) rather than the per-edit offset `moveCol` computes. For
+collapse, key on the same mapped-offset identity, and drop keys that no longer
+resolve so the set stops growing.
 
 ---
 

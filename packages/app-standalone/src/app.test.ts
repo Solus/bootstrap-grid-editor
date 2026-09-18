@@ -1037,3 +1037,66 @@ describe('the empty canvas points at controls this frontend has', () => {
     ed.apply(restore);
   });
 });
+
+describe('a moved column stays selected (FOLLOW-UPS §10.2)', () => {
+  const TWO_ROWS = [
+    '<div class="row">',
+    '  <div class="col-4">A</div>',
+    '  <!-- second -->',
+    '  <div class="col-4">B</div>',
+    '  <div class="col-4">C</div>',
+    '</div>',
+    '<div class="row">',
+    '  <div class="col-6">D</div>',
+    '</div>',
+  ].join('\n');
+
+  const load = async () => {
+    const ed = await editor();
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply(TWO_ROWS);
+    return ed;
+  };
+  const selectedText = (ed: EditorApi) => {
+    const node = ed.state.sel && ed.resolvePath(ed.state.sel.path);
+    return node ? ed.state.src.slice(node.el.start, node.el.end) : null;
+  };
+
+  it('moved later in its row: the selection follows it to its new path', async () => {
+    const ed = await load();
+    ed.state.sel = { path: [0, 0], kind: 'col' };
+    ed.moveCol([0, 0], [0], 3);                     // A to the end of row 0
+    expect(ed.state.sel).toEqual({ path: [0, 2], kind: 'col' });
+    expect(selectedText(ed)).toBe('<div class="col-4">A</div>');
+    expect(document.querySelector('.g-col.selected')!.textContent).toContain('A');
+  });
+
+  it('moved earlier, carrying a title comment: the tag is what gets selected', async () => {
+    const ed = await load();
+    ed.state.sel = { path: [0, 1], kind: 'col' };
+    ed.moveCol([0, 1], [0], 0);                     // B (with its comment) to the front
+    expect(ed.state.sel).toEqual({ path: [0, 0], kind: 'col' });
+    expect(selectedText(ed)).toBe('<div class="col-4">B</div>');
+    expect(ed.state.src).toMatch(/<!-- second -->\n\s*<div class="col-4">B<\/div>/);
+  });
+
+  it('moved into another row: selected there', async () => {
+    const ed = await load();
+    ed.state.sel = { path: [0, 2], kind: 'col' };
+    ed.moveCol([0, 2], [1], 0);                     // C ahead of D in row 1
+    expect(ed.state.sel).toEqual({ path: [1, 0], kind: 'col' });
+    expect(selectedText(ed)).toBe('<div class="col-4">C</div>');
+    // the source view is shown the column where it now is
+    expect(ed.state._bandLines).not.toBeNull();
+  });
+
+  it('a refused move leaves the selection where it was', async () => {
+    const ed = await load();
+    ed.state.sel = { path: [0, 0], kind: 'col' };
+    const before = ed.state.src;
+    ed.moveCol([0, 0], [0], 0);                     // same place — a no-op
+    expect(ed.state.src).toBe(before);
+    expect(ed.state.sel).toEqual({ path: [0, 0], kind: 'col' });
+  });
+});

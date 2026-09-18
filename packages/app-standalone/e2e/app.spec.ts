@@ -146,6 +146,9 @@ test.describe('drag & drop', () => {
     // a move, not a copy: both still present exactly once
     expect(after.match(/formControlName="code"/g)).toHaveLength(1);
     expect(after.match(/formControlName="name"/g)).toHaveLength(1);
+    // and the column that moved is the one selected, where it now sits
+    await expect(page.locator('.g-col.selected')).toHaveCount(1);
+    await expect(page.locator('.g-col.selected')).toHaveText(/code/);
   });
 
   test('dropping a column back where it already is changes nothing', async ({ page }) => {
@@ -171,6 +174,8 @@ test.describe('drag & drop', () => {
     expect(after.match(/COL-CITY/g)).toHaveLength(1);
     expect(after.indexOf('formControlName="city"'))
       .toBeGreaterThan(after.indexOf('formControlName="zip"'));
+    // still selected after the move — the comment didn't throw the anchor off
+    await expect(page.locator('.g-col.selected .col-title')).toHaveText('COL-CITY');
   });
 });
 
