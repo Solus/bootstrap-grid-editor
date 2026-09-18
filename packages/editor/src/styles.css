@@ -145,6 +145,8 @@ textarea#src{
   background:#3a2708; border-color:#a3660e; color:#ffc775; font-weight:700;
 }
 .fill-pill.unreliable{font-style:italic; color:var(--faint)}
+/* order-*: the browser draws the row in another order than the canvas */
+.fill-pill.reordered{color:#9ecbff; border-color:rgba(158,203,255,.4)}
 .g-col .nested .fill-pill{background:var(--panel)}
 .g-col .nested .fill-pill.over{background:#3a2708}
 .g-row.overfull{border-color:rgba(239,159,39,.55)}
@@ -224,6 +226,7 @@ body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-sele
   background:var(--panel-2); border:1px solid var(--line); color:var(--muted);
 }
 .badge.warn{color:var(--amber); border-color:rgba(255,180,84,.4)}
+.badge.order{color:#9ecbff; border-color:rgba(158,203,255,.4)}
 .g-col .nested{margin-top:2px}
 .g-col .nested .g-row{margin:8px 0 8px; padding:11px 0 4px}
 .g-col .nested .g-col{min-height:34px}

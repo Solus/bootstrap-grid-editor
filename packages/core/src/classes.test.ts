@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   classIsInterpolated, colSpec, definingBp, effectiveAt, halveWidthTokenStr,
-  halvedWidthTokens, hasDynamicClassBinding, isHiddenAt, offsetTokenBp,
+  halvedWidthTokens, hasDynamicClassBinding, isHiddenAt, offsetTokenBp, orderAt,
+  orderRank, rowIsReorderedAt,
   setOffsetToken, setWidthToken, usesBs3, usesBs5, widthTokenBp,
 } from './classes.js';
 import { buildModel } from './model.js';
@@ -220,4 +221,52 @@ describe('dialect evidence: usesBs3 / usesBs5 / neither', () => {
   });
   it('a bs3 offset is not read as a bs5 offset', () =>
     expect(usesBs5(['col-sm-offset-4'])).toBe(false));
+});
+
+describe('order-* flex order (FOLLOW-UPS §8.2)', () => {
+  it('parses numeric, first and last, per breakpoint', () => {
+    const s = colSpec(['col-md-4', 'order-2', 'order-md-first', 'order-xl-last']);
+    expect(s.order).toEqual({ xs: 2, md: 'first', xl: 'last' });
+  });
+
+  it('ignores what Bootstrap does not ship', () => {
+    // order-6 and above, and non-grid tokens that merely start with "order"
+    const s = colSpec(['col', 'order-6', 'order-md-12', 'ordered', 'order-x']);
+    expect(s.order).toBeUndefined();
+  });
+
+  it('cascades mobile-first like width and display', () => {
+    const s = colSpec(['col', 'order-2', 'order-lg-first']);
+    expect(orderAt(s, 'xs')).toBe(2);
+    expect(orderAt(s, 'md')).toBe(2);
+    expect(orderAt(s, 'lg')).toBe('first');
+    expect(orderAt(s, 'xxl')).toBe('first');
+    expect(orderAt(colSpec(['col-6']), 'md')).toBeNull();
+  });
+
+  it('ranks first below every number and last above', () => {
+    expect(orderRank('first')).toBeLessThan(orderRank(0));
+    expect(orderRank(null)).toBe(0);
+    expect(orderRank(5)).toBeLessThan(orderRank('last'));
+  });
+
+  it('a row is reordered when the ranks fall in source order', () => {
+    const a = colSpec(['col-8']), side = colSpec(['col-4', 'order-md-first']);
+    // content then sidebar in source; sidebar drawn first from md up
+    expect(rowIsReorderedAt([a, side], 'xs')).toBe(false);
+    expect(rowIsReorderedAt([a, side], 'md')).toBe(true);
+    // orders that only confirm source order are not a reorder
+    expect(rowIsReorderedAt([colSpec(['col', 'order-1']), colSpec(['col', 'order-2'])], 'xs'))
+      .toBe(false);
+    // order-last on the last column changes nothing either
+    expect(rowIsReorderedAt([a, colSpec(['col-4', 'order-last'])], 'xs')).toBe(false);
+  });
+
+  it('a column hidden at that breakpoint takes no part', () => {
+    const first = colSpec(['col', 'order-first', 'd-none', 'd-lg-block']);
+    const plain = colSpec(['col']);
+    // hidden below lg: nothing to reorder; shown at lg: drawn ahead of `plain`
+    expect(rowIsReorderedAt([plain, first], 'md')).toBe(false);
+    expect(rowIsReorderedAt([plain, first], 'lg')).toBe(true);
+  });
 });

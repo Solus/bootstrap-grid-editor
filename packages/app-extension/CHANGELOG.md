@@ -33,6 +33,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   deselected the moment it dropped, so the inspector emptied and a follow-up
   nudge or width change meant clicking it again first.
 
+### Added
+
+- `order-*` classes are read. A column carrying one shows an **order** badge
+  with the order in force at the current breakpoint (`order 2`, `order first`),
+  and a row the browser would draw in a different order than the source gets a
+  **⇄ reordered** pill. The canvas keeps drawing source order — that's what
+  every edit works on — but it no longer keeps quiet about it.
+
 ## [0.3.1] - 2026-09-18
 
 ### Fixed

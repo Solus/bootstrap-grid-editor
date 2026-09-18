@@ -121,7 +121,14 @@ export interface ColSpec {
       `false` = hidden (`d-none`). Absent at a breakpoint means inherit from
       the nearest smaller one (mobile-first), like width/offset. */
   display?: Partial<Record<Breakpoint, boolean>>;
+  /** Per-breakpoint flex order from `order-*` utilities (Bootstrap 4/5):
+      `order-2`, `order-md-first`. Same mobile-first inheritance. Only
+      *declared* orders are stored; a column with none sorts as 0. */
+  order?: Partial<Record<Breakpoint, OrderValue>>;
 }
+
+/** `order-{0..5}`, `order-first` (draws before everything), `order-last`. */
+export type OrderValue = number | 'first' | 'last';
 
 /* ── grid model ──────────────────────────────────────────────────── */
 
