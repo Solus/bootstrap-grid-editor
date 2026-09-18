@@ -1010,3 +1010,30 @@ describe('rows can be added to a column and to the document', () => {
     expect(ed.state.src).toContain('<div class="col-xs-12">');
   });
 });
+
+describe('the empty canvas points at controls this frontend has', () => {
+  /* The "nothing to draw" hint comes from the Host, not the shared renderer,
+     because the way *in* is the one thing the frontends don't share. The
+     shared renderer used to hard-code this frontend's wording, so the VS Code
+     webview told its users to press buttons that only exist here. */
+  it('names the standalone\'s own way in, and those controls are present', async () => {
+    const ed = await editor();
+    const restore = ed.state.src;
+    ed.state.dirty = false;
+    ed.state.sel = null;
+    ed.apply('<form>\n  <p>nothing here yet</p>\n</form>\n');
+
+    const empty = document.querySelector('.empty-canvas');
+    expect(empty).not.toBeNull();
+    expect(empty!.textContent).toContain('No .row elements found');
+
+    // every control the hint names is really in this frontend's HTML — the
+    // assertion the extension's copy of this bug failed (webview-host.test.ts)
+    expect(empty!.textContent).toContain('Apply changes');
+    expect(document.querySelector('#applyBtn')).not.toBeNull();
+    expect(empty!.textContent).toContain('Load sample');
+    expect(document.querySelector('#sampleBtn')).not.toBeNull();
+
+    ed.apply(restore);
+  });
+});

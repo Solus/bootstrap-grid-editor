@@ -133,6 +133,17 @@ export interface Host {
       has nowhere to persist to and omits it; the extension writes it to the
       user's VS Code settings. */
   persistPref?(change: PrefChange): void;
+  /** What to offer when there is nothing to draw, as an HTML fragment shown
+      under the shared "No `.row` elements found." line. The way *in* is the
+      one thing the two frontends don't share — the standalone has a source
+      pane, a sample and a file picker; the extension has the editor the canvas
+      is bound to — so naming a control here is the host's job, not the shared
+      renderer's. Optional: a host that omits it gets the bare finding, and the
+      inspector's "Add row" either way.
+
+      Returns a trusted literal: it is inserted as HTML, so a host must never
+      build it from document text. */
+  emptyCanvasHint?(): string;
 }
 
 /** The canvas controls that double as remembered settings: the two view
@@ -252,6 +263,12 @@ export function setClassConvention(
       pref: kind === 'row' ? 'newRowClasses' : 'newColumnClasses', value: raw,
     });
   }
+}
+
+/** The host's "nothing to draw" suggestion, or null when it has none (or no
+    host is wired yet — the canvas can render before `setHost`). */
+export function emptyCanvasHint(): string | null {
+  return host?.emptyCanvasHint?.() ?? null;
 }
 
 /** Does this host remember preferences at all? The standalone doesn't, and
