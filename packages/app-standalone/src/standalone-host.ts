@@ -10,6 +10,12 @@ import { $, DIRTY_MSG, state, type Host } from '@bootstrap-visualizer/editor';
 import { srcTA } from './dom.js';
 import { highlightInSource, positionBand } from './source-band.js';
 
+/** Shown when the canvas has nothing to draw. Names this frontend's own ways
+    in: the source pane, the header's sample. */
+const EMPTY_CANVAS_HINT =
+  'Paste an Angular/Bootstrap template on the left and press <b>Apply changes</b>,<br>' +
+  'or hit <b>Load sample</b> in the header.';
+
 export const standaloneHost: Host = {
   canApplyEdit() {
     return state.dirty ? { ok: false, reason: DIRTY_MSG } : { ok: true };
@@ -28,4 +34,6 @@ export const standaloneHost: Host = {
     if (el) highlightInSource(el);
     else { state._bandLines = null; positionBand(); }
   },
+
+  emptyCanvasHint() { return EMPTY_CANVAS_HINT; },
 };

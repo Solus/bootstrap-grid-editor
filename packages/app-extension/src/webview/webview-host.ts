@@ -20,6 +20,13 @@ export interface SyncState {
 const DIVERGED_REASON =
   'The editor changed under the canvas — save it, or Discard, to resync.';
 
+/** Shown when the canvas has nothing to draw. The standalone's source pane,
+    "Apply changes" and "Load sample" don't exist here — the bound editor is
+    the only way source arrives — so this names what the webview actually has. */
+const EMPTY_CANVAS_HINT =
+  'Use <b>Add row</b> in the inspector to start one in this file,<br>' +
+  'or open a template that has a grid and run <b>Open Grid Editor</b> again.';
+
 export function createWebviewHost(
   post: (m: WebviewMessage) => void, sync: SyncState,
 ): Host {
@@ -45,5 +52,7 @@ export function createWebviewHost(
     persistPref(change) {
       post({ type: 'setConfig', change });
     },
+
+    emptyCanvasHint() { return EMPTY_CANVAS_HINT; },
   };
 }

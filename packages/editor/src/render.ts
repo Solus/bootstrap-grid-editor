@@ -13,7 +13,8 @@ import type {
 } from '@bootstrap-visualizer/core';
 import { $, mkBadge, mkTypeBadge, rowsHost, sheet, toast } from './dom.js';
 import {
-  SHEET_WIDTH, dialectLabel, setActiveBranch, state, type Selection,
+  SHEET_WIDTH, dialectLabel, emptyCanvasHint, setActiveBranch, state,
+  type Selection,
 } from './state.js';
 import { computeFind, updateFindCount } from './find.js';
 import { renderInspector } from './inspector.js';
@@ -290,9 +291,10 @@ function renderCanvas(): void {
   if (!rowsHost.children.length) {
     const d = document.createElement('div');
     d.className = 'empty-canvas';
-    d.innerHTML = 'No <code>.row</code> elements found.<br>' +
-      'Paste an Angular/Bootstrap template on the left and press <b>Apply changes</b>,<br>' +
-      'or hit <b>Load sample</b> in the header.';
+    // The finding is shared; the way out of it is the host's, because the
+    // controls differ per frontend (Host.emptyCanvasHint).
+    const hint = emptyCanvasHint();
+    d.innerHTML = 'No <code>.row</code> elements found.' + (hint ? '<br>' + hint : '');
     rowsHost.appendChild(d);
   }
 }
