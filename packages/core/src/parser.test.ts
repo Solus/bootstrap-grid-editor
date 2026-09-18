@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseTemplate, parseTemplateLegacy } from './parser.js';
 import { buildModel } from './model.js';
+import type { El } from './types.js';
 
 /* Span-semantics contract (FOLLOW-UPS §1.4). The surgical edits slice source
    at these exact offsets, so the parser adapter must define them precisely.
@@ -200,11 +201,13 @@ describe('@if region tagging', () => {
   // find every element in the tree that carries a cond tag (innermost one —
   // the enclosing chain is asserted separately, in the nesting cases)
   function tagged(root: ReturnType<typeof parseTemplate>) {
-    const out: { region: string; branch: number; cls: string }[] = [];
-    const walk = (el: any) => {
+    // `El` has no `cls`: the field this used to carry was always '' and
+    // nothing read it
+    const out: { region: string; branch: number }[] = [];
+    const walk = (el: El) => {
       const t = el.condPath?.[el.condPath.length - 1];
-      if (t) out.push({ region: t.region, branch: t.branch, cls: el.cls ?? '' });
-      el.children?.forEach(walk);
+      if (t) out.push({ region: t.region, branch: t.branch });
+      el.children.forEach(walk);
     };
     root.children.forEach(walk);
     return out;

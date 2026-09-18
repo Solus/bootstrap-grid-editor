@@ -41,6 +41,7 @@ npm run test:e2e    # Playwright: the interactive surface (needs: npx playwright
 npm run test:vscode # a real VS Code buffer, via @vscode/test-electron
 npm run test:all    # all three
 npm run typecheck   # tsc across every package (not part of `npm test`)
+npm run lint        # ESLint, correctness rules only (no formatter) — also not part of `npm test`
 ```
 
 `test:vscode` downloads VS Code on first run and needs a display — on a headless
