@@ -8,7 +8,7 @@ export default tseslint.config(
   {
     ignores: [
       '**/dist/**', '**/dist-single/**', '**/node_modules/**',
-      'packages/app-extension/releases/**', '.vscode-test/**',
+      'packages/app-extension/releases/**', '**/.vscode-test/**',
       // the reference implementation is frozen, not maintained code
       'prototype/**',
     ],
