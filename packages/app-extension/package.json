@@ -125,6 +125,12 @@
       }
     },
     "menus": {
+      "commandPalette": [
+        {
+          "command": "bootstrapGridEditor.open",
+          "when": "editorLangId == html"
+        }
+      ],
       "editor/title": [
         {
           "command": "bootstrapGridEditor.open",
