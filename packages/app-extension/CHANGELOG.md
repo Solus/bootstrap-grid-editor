@@ -4,6 +4,16 @@ All notable changes to this extension are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-09-18
+
+### Fixed
+
+- Release packaging only — the extension itself is unchanged from 0.3.0. The
+  0.3.0 release reached the Marketplace, but its GitHub Release was left as an
+  empty draft, so the `.vsix` and the standalone single-file HTML were never
+  downloadable from the repository's Releases page. This version republishes
+  the same extension with that fixed.
+
 ## [0.3.0] - 2026-09-17
 
 ### Fixed
