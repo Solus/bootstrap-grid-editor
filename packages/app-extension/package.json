@@ -2,7 +2,7 @@
   "name": "bootstrap-grid-editor",
   "displayName": "Bootstrap Grid Layout Editor",
   "description": "Visually edit Bootstrap grid layouts in HTML and Angular templates — split, resize, offset and reorder, then apply back to your file.",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "license": "MIT",
   "preview": true,
   "pricing": "Free",
