@@ -252,6 +252,28 @@ does show (the row draws inside the branch box) but doesn't announce.
 *Suggested direction.* Leave the behaviour; consider naming the branch in the
 toast when the insertion point is inside one.
 
+### 9.16 Changing the bound file's language mode closes the canvas **[decide]**
+
+*What it is.* The canvas closes with its file by listening to
+`onDidCloseTextDocument` (`packages/app-extension/src/host/extension.ts`, in
+`createCanvas`). VS Code fires that same event when a document's language id
+changes, so switching the bound file's language mode from the status bar — to
+Plain Text, say — closes the canvas too. Confirmed in the manual pass after
+0.3.1 (case cls-6).
+
+*Why it matters.* Mostly harmless: the Grid Editor only opens on HTML, so a
+file that stops being HTML losing its canvas is defensible. The edge is a
+file whose id flips *without* the user asking — another extension reassigning
+`.html` to its own language id after open (an Angular or template-language
+extension, for instance) would close the canvas out from under someone with no
+explanation.
+
+*Suggested direction.* Leave it unless someone hits the silent case. If they
+do, tell the two apart in the listener: a real close has no open document left
+at that URI, a language change still has one — re-check
+`workspace.textDocuments` for the URI before disposing, and when it's still
+open with a non-HTML id, say why the canvas closed.
+
 ## 10. Edit granularity and view state
 
 *Both surfaced while hardening the canvas↔buffer seam (§7.4/§7.5/§9.4). Neither
