@@ -612,6 +612,24 @@ test.describe('inspector', () => {
       .toHaveText(/~16\/12 → may wrap/);
   });
 
+  test('the row pills can be hovered, so their tooltips show', async ({ page }) => {
+    // Each pill explains itself in a `title`; a pill the pointer can't reach
+    // never shows it. hover() refuses an element that doesn't receive the
+    // pointer ("… intercepts pointer events"), so reaching it is the check.
+    await page.locator('#src').fill(
+      '<div class="row"><div class="col-8 order-last">a</div><div class="col-6">b</div></div>');
+    await page.locator('#applyBtn').click();
+    const flags = page.locator('.g-row').first().locator('.row-flags');
+
+    const reordered = flags.locator('.fill-pill.reordered');
+    await expect(reordered).toHaveAttribute('title', /canvas shows source order/);
+    await reordered.hover({ timeout: 3000 });
+
+    const over = flags.locator('.fill-pill.over');
+    await expect(over).toHaveAttribute('title', /row wraps/);
+    await over.hover({ timeout: 3000 });
+  });
+
   test('stretch to fit widens the sheet beyond the breakpoint cap', async ({ page }) => {
     // at xs the 400px cap is well below the panel width, so the effect is
     // unambiguous regardless of viewport. The sheet animates max-width

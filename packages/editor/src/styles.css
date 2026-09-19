@@ -268,7 +268,14 @@ body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-sele
   /* 38% label + this + the two 8px edge offsets always fits inside 100% */
   display:flex; gap:6px; align-items:center; max-width:calc(60% - 16px);
 }
-.row-flags > .fill-pill{ position:static; flex:0 0 auto; }
+/* The pills explain themselves in a `title` (overfull, approximate, reordered),
+   so in the strip they take hover — the base rule's pointer-events:none left
+   those tooltips unreachable. A click still falls through to the row. While a
+   drag is on they go back to click-through, so a pill on the row edge can't
+   shadow a drop target. */
+.row-flags > .fill-pill{ position:static; flex:0 0 auto; pointer-events:auto; }
+.row-flags > .fill-pill[title]{ cursor:help; }
+body.dnd .row-flags > .fill-pill{ pointer-events:none; }
 .row-flags > .branch-chip{ padding:1px 8px; font-size:10px; flex:0 1 auto; min-width:2.5em; }
 
 /* a d-* column hidden at the current breakpoint: a thin dashed line on the

@@ -8,6 +8,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The row's status pill now shows its tooltip on hover — why a row wraps, or
+  why its column sum is only an estimate. It never appeared before: the pill
+  ignored the pointer, so hovering it did nothing.
 - The canvas's "No `.row` elements found" message told you to paste a template
   on the left and press **Apply changes** or **Load sample** — controls that
   exist only in the standalone web app, not in VS Code. It now points at what
