@@ -17,6 +17,7 @@ import {
   addColAfter, addColToRow, addRowAfter, addRowAtEnd, addRowToCol, changeOffset,
   deleteEl, nudgeCol, nudgeRow, quickOffset, quickWidth, splitCol, stepWidth,
 } from './edits.js';
+import { icon, type IconName } from './icons.js';
 
 export function renderInspector(): void {
   const node = state.sel && resolvePath(state.sel.path);
@@ -32,7 +33,7 @@ export function renderInspector(): void {
     const act = document.createElement('div');
     act.className = 'insp-actions';
     as.appendChild(act);
-    actBtn(act, 'Add row', () => addRowAtEnd());
+    actBtn(act, 'Add row', () => addRowAtEnd(), 'addRow');
     const hint = document.createElement('div');
     hint.className = 'hint';
     hint.textContent = state.model.length
@@ -333,13 +334,12 @@ function renderColInspector(node: ColNode): void {
   const act = document.createElement('div');
   act.className = 'insp-actions';
   as.appendChild(act);
-  actBtn(act, 'Split in two', () => splitCol(node));
-  actBtn(act, 'Add column after', () => addColAfter(node));
-  actBtn(act, 'Add row inside', () => addRowToCol(node));
-  actBtn(act, '◀ Move left', () => nudgeCol(-1));
-  actBtn(act, 'Move right ▶', () => nudgeCol(+1));
-  const del = actBtn(act, 'Delete', () => deleteEl(node));
-  del.classList.add('danger');
+  actBtn(act, 'Split in two', () => splitCol(node), 'split');
+  actBtn(act, 'Add column after', () => addColAfter(node), 'addColAfter');
+  actBtn(act, 'Add row inside', () => addRowToCol(node), 'addRowInside');
+  actPair(act, ['Move left', 'moveLeft', () => nudgeCol(-1)],
+    ['Move right', 'moveRight', () => nudgeCol(+1)]);
+  dangerBtn(as, 'Delete', () => deleteEl(node));
 }
 
 function renderRowInspector(node: RowNode): void {
@@ -354,13 +354,12 @@ function renderRowInspector(node: RowNode): void {
   const act = document.createElement('div');
   act.className = 'insp-actions';
   as.appendChild(act);
-  actBtn(act, 'Add column', () => addColToRow(node));
-  actBtn(act, 'Add row after', () => addRowAfter(node));
+  actBtn(act, 'Add column', () => addColToRow(node), 'addColToRow');
+  actBtn(act, 'Add row after', () => addRowAfter(node), 'addRow');
   // rows stack vertically, so they move up/down (columns move left/right)
-  actBtn(act, '▲ Move up', () => nudgeRow(-1));
-  actBtn(act, 'Move down ▼', () => nudgeRow(+1));
-  const del = actBtn(act, 'Delete row', () => deleteEl(node));
-  del.classList.add('danger');
+  actPair(act, ['Move up', 'moveUp', () => nudgeRow(-1)],
+    ['Move down', 'moveDown', () => nudgeRow(+1)]);
+  dangerBtn(as, 'Delete row', () => deleteEl(node));
 }
 
 /* ── small controls ──────────────────────────────────────────────── */
@@ -387,10 +386,42 @@ function disableStepper(st: HTMLElement): void {
   st.querySelectorAll('button').forEach(b => b.disabled = true);
 }
 
-function actBtn(host: HTMLElement, label: string, fn: () => void): HTMLButtonElement {
+/** One action, a full-width line in the list: icon, then label. The icon
+    trails instead when `trailing` — the forward half of a pair points the way
+    it goes (Move right ▷, Move down ▽). */
+function actBtn(
+  host: HTMLElement, label: string, fn: () => void, ico?: IconName, trailing = false,
+): HTMLButtonElement {
   const b = document.createElement('button');
-  b.textContent = label;
+  const text = document.createElement('span');
+  text.textContent = label;
+  if (!ico) b.append(text);
+  else if (trailing) b.append(text, icon(ico));
+  else b.append(icon(ico), text);
   b.addEventListener('click', fn);
   host.appendChild(b);
   return b;
+}
+
+type Action = [label: string, ico: IconName, fn: () => void];
+
+/** Two opposite moves, as halves of one line — they're one decision (which
+    way?), so they must never wrap apart the way free-flowing buttons did. */
+function actPair(host: HTMLElement, back: Action, forward: Action): void {
+  const pair = document.createElement('div');
+  pair.className = 'insp-pair';
+  const [bLabel, bIco, bFn] = back;
+  const [fLabel, fIco, fFn] = forward;
+  actBtn(pair, bLabel, bFn, bIco);
+  actBtn(pair, fLabel, fFn, fIco, true);
+  host.appendChild(pair);
+}
+
+/** The destructive action, on its own line apart from the list, so reaching
+    for the last button in it can't land on a delete. */
+function dangerBtn(section: HTMLElement, label: string, fn: () => void): void {
+  const wrap = document.createElement('div');
+  wrap.className = 'insp-actions insp-danger';
+  actBtn(wrap, label, fn, 'delete').classList.add('danger');
+  section.appendChild(wrap);
 }

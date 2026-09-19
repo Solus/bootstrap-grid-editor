@@ -397,7 +397,19 @@ details.insp-details .insp-title{margin-top:6px}
   min-width:52px; color:var(--text);
 }
 .stepper .val.unset{color:var(--faint)}
-.insp-actions{display:flex; flex-wrap:wrap; gap:6px; margin-top:4px}
+/* Actions: one per line, so no label's length can push a button onto the
+   wrong row; icons line up in a column down the left. Opposite moves share a
+   line as a pair, and delete sits apart below a rule. */
+.insp-actions{display:flex; flex-direction:column; gap:6px; margin-top:4px}
+.insp-actions button{
+  display:flex; align-items:center; gap:8px; width:100%;
+  text-align:left; padding:6px 10px;
+}
+.insp-actions .icon{flex:0 0 auto; opacity:.75}
+.insp-actions button:hover:not(:disabled) .icon{opacity:1}
+.insp-pair{display:grid; grid-template-columns:1fr 1fr; gap:6px}
+.insp-pair button{justify-content:center}
+.insp-danger{margin-top:10px; padding-top:10px; border-top:1px solid var(--line)}
 .hint{font-size:11px; color:var(--faint); margin-top:8px; line-height:1.5}
 
 .toast{

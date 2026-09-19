@@ -500,7 +500,7 @@ test.describe('inspector', () => {
       .toBeLessThan(before.indexOf('formControlName="name"'));
 
     await colWithClass(page, 'col-md-4 col-lg-3').click();   // the "code" column
-    await page.locator('#inspector').getByText('Move right ▶').click();
+    await page.locator('#inspector').getByRole('button', { name: 'Move right' }).click();
 
     const after = await source(page);
     expect(after.indexOf('formControlName="code"'))
@@ -517,13 +517,44 @@ test.describe('inspector', () => {
     // select the first top-level row via its padding strip (not a column)
     await page.locator('.rows-host > .g-row').first().click({ position: { x: 300, y: 3 } });
     await expect(page.locator('#inspector')).toContainText('Move down');
-    await page.locator('#inspector').getByText('Move down ▼').click();
+    await page.locator('#inspector').getByRole('button', { name: 'Move down' }).click();
 
     const after = await source(page);
     expect(after.indexOf('app-page-header'))
       .toBeGreaterThan(after.indexOf('formControlName="code"'));
     // the moved row stays selected
     await expect(page.locator('.g-row.selected')).toHaveCount(1);
+  });
+
+  test('actions are one per line, with each move pair sharing one', async ({ page }) => {
+    // The buttons used to flow in one wrapping line, so a long label could
+    // push "Move right" onto a different row from "Move left". Real layout,
+    // so it's checked here rather than in jsdom.
+    const sameLine = async (a: string, b: string) => {
+      const insp = page.locator('#inspector');
+      const boxA = (await insp.getByRole('button', { name: a }).boundingBox())!;
+      const boxB = (await insp.getByRole('button', { name: b }).boundingBox())!;
+      expect(Math.abs(boxA.y - boxB.y)).toBeLessThan(2);
+      expect(boxB.x).toBeGreaterThan(boxA.x);           // back on the left, forward on the right
+    };
+
+    await colWithClass(page, 'col-md-4 col-lg-3').click();
+    await sameLine('Move left', 'Move right');
+    const insp = page.locator('#inspector');
+    // every action carries an icon, and the list buttons stack one per line
+    for (const name of ['Split in two', 'Add column after', 'Add row inside', 'Move left', 'Move right', 'Delete']) {
+      await expect(insp.getByRole('button', { name }).locator('svg')).toHaveCount(1);
+    }
+    const split = (await insp.getByRole('button', { name: 'Split in two' }).boundingBox())!;
+    const addCol = (await insp.getByRole('button', { name: 'Add column after' }).boundingBox())!;
+    expect(addCol.y).toBeGreaterThan(split.y + split.height - 1);
+    // delete is set apart from the list, below the move pair
+    const right = (await insp.getByRole('button', { name: 'Move right' }).boundingBox())!;
+    const del = (await insp.getByRole('button', { name: 'Delete', exact: true }).boundingBox())!;
+    expect(del.y).toBeGreaterThan(right.y + right.height + 6);
+
+    await page.locator('.rows-host > .g-row').first().click({ position: { x: 300, y: 3 } });
+    await sameLine('Move up', 'Move down');
   });
 
   test('Delete row removes the row', async ({ page }) => {
@@ -758,7 +789,7 @@ test.describe('@if branch toggle', () => {
     // show it again; moving "first" down would cross the @if brace → blocked
     await page.locator('.rows-host .cond-strip .branch-chip').click();
     await page.locator('.rows-host > .g-row').first().click({ position: { x: 300, y: 3 } });
-    await page.locator('#inspector').getByText('Move down ▼').click();
+    await page.locator('#inspector').getByRole('button', { name: 'Move down' }).click();
     await expect(page.locator('#toast')).toContainText('branch boundary');
     const src = await source(page);
     expect(src.indexOf('first')).toBeLessThan(src.indexOf('OPTIONAL'));
@@ -806,7 +837,7 @@ test.describe('@if branch toggle', () => {
 
     // select the *ngIf column and move it left, before the plain column
     await page.locator('.g-col', { hasText: 'maybe' }).click();
-    await page.locator('#inspector').getByText('◀ Move').click();
+    await page.locator('#inspector').getByRole('button', { name: 'Move left' }).click();
 
     // not blocked as a branch crossing (unlike a block @if), and the element
     // actually moved — carrying its *ngIf attribute with it

@@ -44,6 +44,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   **⇄ reordered** pill. The canvas keeps drawing source order — that's what
   every edit works on — but it no longer keeps quiet about it.
 
+### Changed
+
+- The inspector's action buttons are one per line, each with an icon. **Move
+  left** / **Move right** (and **Move up** / **Move down** for rows) share a
+  line as a pair — they used to wrap wherever the labels happened to fall, so
+  the two halves could end up on different lines. **Delete** sits apart at the
+  bottom, below a divider.
+
 ## [0.3.1] - 2026-09-18
 
 ### Fixed
