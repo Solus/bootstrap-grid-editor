@@ -3,7 +3,12 @@ name: Test
 on:
   # Tags are handled by release.yml, which runs this same suite as its gate —
   # excluded here so a release tag doesn't run every layer twice in parallel.
+  # `branches` has to be spelled out beside it: a push trigger that names only
+  # tag filters stops matching branch pushes altogether, which is how pushes to
+  # main went untested from August to v0.4.0.
   push:
+    branches:
+      - '**'
     tags-ignore:
       - 'v*'
   pull_request:
