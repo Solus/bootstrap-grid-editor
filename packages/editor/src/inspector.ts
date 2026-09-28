@@ -177,7 +177,7 @@ function renderColInspector(node: ColNode): void {
     kv0.className = 'insp-kv';
     kv0.innerHTML = 'title <b>' + escapeHtml(title.text) + '</b>' +
       (title.full !== title.text
-        ? ' <span style="color:var(--faint)">(' + escapeHtml(title.full) + ')</span>'
+        ? ' <span style="color:var(--text-faint)">(' + escapeHtml(title.full) + ')</span>'
         : '');
     head.appendChild(kv0);
   }

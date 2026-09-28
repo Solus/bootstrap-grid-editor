@@ -372,6 +372,47 @@ the general fix.
 
 ---
 
+## 13. UI redesign ("Instrument")
+
+The restyle runs on the `redesign/instrument` branch in four steps: (1) route
+every colour through semantic tokens at today's values, (2) switch to the
+Instrument palette, (3) map the tokens to VS Code theme variables in the
+webview, (4) layout and state details. The design canvas ("Instrument" boards
+and the token sheet) is the reference.
+
+### 13.1 The VS Code theme mapping is unverified against real themes **[verify]**
+
+*What it is.* The design's token → `--vscode-*` mapping was previewed on the
+canvas with Dark Modern / Light Modern colour values typed from memory, not read
+from VS Code. The extension has no theme mapping at all yet (that is step 3).
+
+*Why it matters.* Some mapped variables are unset in common themes (e.g.
+`editor.findMatchBorder`, so find-match falls back to `charts.green`), and Light
+Modern sets `descriptionForeground` equal to `foreground`, which flattens muted
+text. A wrong assumption here shows up only inside VS Code, where no test looks.
+
+*Suggested direction.* After step 3, open the canvas in a real VS Code with
+Light Modern, Dark Modern and one high-contrast theme, and compare against the
+canvas boards; fix mappings that don't hold.
+
+### 13.2 Source-pane line numbers and line tint need a layer under the textarea **[decide]**
+
+*What it is.* The design shows line numbers and a faint tint behind the
+selected element's lines in the standalone source pane. Today the pane is a
+plain `textarea#src` (`packages/editor/src/styles.css:113`) with only the
+gutter strip `#srcBand` (`styles.css:119`, positioned by
+`packages/app-standalone/src/source-band.ts`). A textarea can't draw either.
+
+*Why it matters.* Both need an element behind (tint) or beside (numbers) the
+textarea that scrolls in lockstep with it — new sync code, not just CSS. Only
+the standalone app has this pane; the extension uses VS Code's own editor.
+
+*Suggested direction.* Decide in step 4 whether they're worth it. If yes: a
+gutter column plus an underlay div, both driven from the textarea's scroll
+event, reusing the line math `source-band.ts` already does for the strip.
+
+---
+
 ## Resolved (archive)
 
 Closed items, one line each — full rationale and detail is in git history.
