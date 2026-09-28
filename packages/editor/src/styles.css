@@ -433,7 +433,8 @@ body.dnd .dropzone{pointer-events:auto; background:color-mix(in srgb, var(--acce
 /* the wide slot at a row's end: outlined, so a big area doesn't turn solid blue */
 body.dnd .dropzone.flexzone{pointer-events:auto; background:color-mix(in srgb, var(--accent) 10%, transparent);
   box-shadow:none; outline:1px dashed var(--accent); outline-offset:-1px}
-.dropzone.over{background:var(--accent) !important;
+/* scoped like the rule above so it outranks it — otherwise the halo never shows */
+body.dnd .dropzone.over{background:var(--accent) !important;
   box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent)}
 
 /* edge-drag resize */
