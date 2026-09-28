@@ -27,7 +27,7 @@ export function renderInspector(): void {
     const d = document.createElement('div');
     d.className = 'insp-empty';
     d.innerHTML = 'Select a column or row on the canvas.' +
-      '<br><br>Drag a column onto the amber slots to move it — within a row or into another row.';
+      '<br><br>Drag a column onto the highlighted slots to move it — within a row or into another row.';
     inspector.appendChild(d);
     const as = sec('Start here');
     const act = document.createElement('div');
