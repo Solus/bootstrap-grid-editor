@@ -7,6 +7,7 @@ import { $, rowsHost } from './dom.js';
 import { render } from './render.js';
 import { setDialectPref, state } from './state.js';
 import { clearSelection } from './selection.js';
+import { icon, type IconName } from './icons.js';
 
 export function wireBreakpointSwitch(): void {
   const host = $('#bpSwitch');
@@ -43,6 +44,14 @@ export function wireDialectChip(): void {
     render();
   });
   host.appendChild(b);
+}
+
+/** Put an icon in front of each named toolbar button's label. The buttons
+    are the host HTML's own; a frontend passes the ones it has. */
+export function iconizeButtons(icons: Record<string, IconName>): void {
+  for (const [id, name] of Object.entries(icons)) {
+    $('#' + id).prepend(icon(name));
+  }
 }
 
 /** Clicking the canvas background clears the selection. */

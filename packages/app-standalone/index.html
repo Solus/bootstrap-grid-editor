@@ -9,16 +9,14 @@
 
 <header>
   <div class="brand"><b>GRID·DRAFT</b><span>Bootstrap grid drafting board</span></div>
-  <div class="bp-switch" id="bpSwitch" role="tablist" aria-label="Breakpoint"></div>
-  <div class="bp-note" id="bpNote"></div>
-  <div class="dialect-chip" id="dialectChip"></div>
   <div class="spacer"></div>
-  <button id="undoBtn" title="Undo (Ctrl+Z)">↶ Undo</button>
-  <button id="redoBtn" title="Redo (Ctrl+Y)">↷ Redo</button>
-  <button id="openBtn" title="Open a template file">Open…</button>
-  <button id="sampleBtn">Load sample</button>
-  <button id="downloadBtn" title="Download current template">Download</button>
-  <button id="copyBtn" class="primary">Copy HTML</button>
+  <button id="undoBtn" class="quiet" title="Undo (Ctrl+Z)">Undo</button>
+  <button id="redoBtn" class="quiet" title="Redo (Ctrl+Y)">Redo</button>
+  <span class="tb-sep"></span>
+  <button id="openBtn" class="quiet" title="Open a template file">Open…</button>
+  <button id="sampleBtn" class="quiet">Load sample</button>
+  <button id="downloadBtn" class="quiet" title="Download current template">Download</button>
+  <button id="copyBtn" class="quiet" title="Copy the template to the clipboard">Copy HTML</button>
   <input type="file" id="fileInput" accept=".html,.htm,.txt,text/html,text/plain" hidden>
 </header>
 <div id="dropHint">Drop template file to open</div>
@@ -38,7 +36,10 @@
   <div id="paneResizer"></div>
 
   <section class="pane-canvas">
-    <div class="pane-head">Layout — schematic, not a render
+    <div class="pane-head canvas-head">
+      <div class="bp-switch" id="bpSwitch" role="tablist" aria-label="Breakpoint"></div>
+      <div class="bp-note" id="bpNote"></div>
+      <div class="dialect-chip" id="dialectChip"></div>
       <span class="spacer"></span>
       <span id="findCount"></span>
       <input id="findBox" type="text" placeholder="find… ( / )" spellcheck="false" aria-label="Find field">

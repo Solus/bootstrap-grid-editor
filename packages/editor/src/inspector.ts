@@ -243,7 +243,7 @@ function renderColInspector(node: ColNode): void {
         ? 'detected from this file.'
         : canPersistPrefs()
           ? 'this file doesn\'t say, so your Bootstrap version setting decides.'
-          : 'this file doesn\'t say, so the Bootstrap version in the header decides.');
+          : 'this file doesn\'t say, so the Bootstrap version chip above the canvas decides.');
   es.appendChild(vhint);
 
   const ehint = document.createElement('div');

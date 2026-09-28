@@ -1,4 +1,4 @@
-/* The inspector's action icons: small line drawings on a 16×16 grid, stroked
+/* The inspector's action icons, and the toolbar's: small line drawings on a 16×16 grid, stroked
    in `currentColor` so they follow the button's text colour (and its danger
    red) in either theme. Drawn rather than typed: the ◀ ▶ ▲ ▼ characters they
    replace rendered differently per font — some as emoji on Windows — and no
@@ -8,7 +8,8 @@
 
 export type IconName =
   | 'split' | 'addColAfter' | 'addRowInside' | 'addRow' | 'addColToRow'
-  | 'moveLeft' | 'moveRight' | 'moveUp' | 'moveDown' | 'delete';
+  | 'moveLeft' | 'moveRight' | 'moveUp' | 'moveDown' | 'delete'
+  | 'undo' | 'redo' | 'open' | 'sample' | 'download' | 'copy' | 'resync';
 
 /** Each icon as its shapes, in SVG path syntax. */
 const PATHS: Record<IconName, string[]> = {
@@ -28,6 +29,19 @@ const PATHS: Record<IconName, string[]> = {
   moveDown: ['M8 3v10', 'M4 9l4 4 4-4'],
   // a bin: lid, handle, body, two ribs
   delete: ['M2.5 4h11', 'M6 4V2.5h4V4', 'M3.75 4l.75 9.5h7l.75-9.5', 'M6.5 6.5v4.5', 'M9.5 6.5v4.5'],
+  // toolbar: an arrow hooking back / forward
+  undo: ['M4 6.5h6.5a3 3 0 0 1 0 6H8', 'M6.5 4L4 6.5 6.5 9'],
+  redo: ['M12 6.5H5.5a3 3 0 0 0 0 6H8', 'M9.5 4L12 6.5 9.5 9'],
+  // a folder
+  open: ['M2 4.5a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z'],
+  // a page with a folded corner and two lines of text
+  sample: ['M4 1.5h5.5l3 3V14a.5.5 0 0 1-.5.5H4a.5.5 0 0 1-.5-.5V2a.5.5 0 0 1 .5-.5z', 'M9.5 1.5v3h3', 'M5.5 8h5', 'M5.5 10.5h5'],
+  // an arrow down onto a line
+  download: ['M8 2.5v8', 'M4.5 7L8 10.5 11.5 7', 'M3 13.5h10'],
+  // two overlapping sheets
+  copy: ['M6.5 5.5h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z', 'M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2'],
+  // two arrows chasing round a circle
+  resync: ['M13 8a5 5 0 0 1-8.5 3.5', 'M3 8a5 5 0 0 1 8.5-3.5', 'M11.5 2v2.5H9', 'M4.5 14v-2.5H7'],
 };
 
 const SVG_NS = 'http://www.w3.org/2000/svg';

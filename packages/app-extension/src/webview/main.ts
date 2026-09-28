@@ -9,7 +9,7 @@ import '@bootstrap-visualizer/editor/styles.css';
 // after the editor's sheet: re-points its colour tokens at the VS Code theme
 import './vscode-theme.css';
 import {
-  apply, applyOpenConfig, assertRequiredIds, readLiveSettings, render,
+  apply, applyOpenConfig, assertRequiredIds, iconizeButtons, readLiveSettings, render,
   REQUIRED_EDITOR_IDS, selectAtOffset, setHost, toast, wireBreakpointSwitch,
   wireCanvasBackground, wireDialectChip, wireDragSurface, wireHistoryKeys,
   wireKeyboardNav,
@@ -33,6 +33,7 @@ let firstEdit = true;   // show the "save to persist" cue once per session
 setHost(createWebviewHost(post, sync));
 wireBreakpointSwitch();
 wireDialectChip();
+iconizeButtons({ resyncBtn: 'resync' });
 wireKeyboardNav();
 // A webview swallows Ctrl+Z; without this, undoing a canvas edit meant
 // clicking into the text editor first. The host runs the editor's own undo.

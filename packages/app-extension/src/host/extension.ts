@@ -316,16 +316,16 @@ function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): stri
 <body>
   <header>
     <div class="brand"><b>GRID·DRAFT</b><span>Bootstrap grid editor</span></div>
-    <div class="bp-switch" id="bpSwitch" role="tablist" aria-label="Breakpoint"></div>
-    <div class="bp-note" id="bpNote"></div>
-    <div class="dialect-chip" id="dialectChip"></div>
     <div class="spacer"></div>
-    <button id="resyncBtn" title="Reset the canvas to the current editor contents">⟳ Resync</button>
+    <button id="resyncBtn" class="quiet" title="Reset the canvas to the current editor contents">Resync</button>
   </header>
 
   <main>
     <section class="pane-canvas">
-      <div class="pane-head">Layout — schematic, not a render
+      <div class="pane-head canvas-head">
+        <div class="bp-switch" id="bpSwitch" role="tablist" aria-label="Breakpoint"></div>
+        <div class="bp-note" id="bpNote"></div>
+        <div class="dialect-chip" id="dialectChip"></div>
         <span class="spacer"></span>
         <span id="findCount"></span>
         <input id="findBox" type="text" placeholder="find… ( / )" spellcheck="false" aria-label="Find field">

@@ -100,13 +100,22 @@ button{
   background:var(--surface-raised); border:1px solid var(--border); border-radius:5px;
   padding:5px 10px; cursor:pointer;
 }
-button:hover{border-color:var(--border-strong); background-image:linear-gradient(var(--hover-bg),var(--hover-bg))}
+/* hover tints the fill only: the border stays, since in some VS Code themes
+   the stronger border colour is unset and a hovered button lost its outline */
+button:hover{background-image:linear-gradient(var(--hover-bg),var(--hover-bg))}
 button:focus-visible, summary:focus-visible, input[type="checkbox"]:focus-visible{outline:2px solid var(--focus); outline-offset:1px}
 input[type="checkbox"]{accent-color:var(--accent)}
 button:disabled{opacity:.4; cursor:default}
 button.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-fg); font-weight:600}
 button.primary:hover{background:var(--accent-hover)}
 button.danger{color:var(--danger)}
+/* toolbar buttons: icon + label, no chrome until hovered — the page's one
+   filled button is Apply, and only while there is typing to apply */
+button:has(> .icon){display:inline-flex; align-items:center; gap:6px}
+button.quiet{background:transparent; border-color:transparent; color:var(--text-muted)}
+button.quiet:hover:not(:disabled){color:var(--text)}
+button.quiet .icon{flex:0 0 auto}
+.tb-sep{width:1px; height:18px; background:var(--border); margin:0 2px; flex:0 0 auto}
 
 /* ── Header ─────────────────────────────── */
 header{
@@ -147,6 +156,11 @@ main{flex:1; display:flex; min-height:0}
   border-bottom:1px solid var(--border); flex:0 0 auto;
 }
 .pane-head .spacer{flex:1}
+/* the canvas bar: the canvas's own controls (breakpoint, version), then find */
+.canvas-head .bp-switch{flex:0 0 auto; margin-left:0; padding:1px}
+.canvas-head .bp-switch button{padding:2px 7px; font-size:11px}
+.canvas-head .bp-note, .canvas-head .dialect-chip{flex:0 0 auto; text-transform:none; letter-spacing:normal}
+.canvas-head .dialect-chip button{padding:2px 8px}
 
 .src-wrap{flex:1; position:relative; overflow:hidden; display:flex}
 textarea#src{

@@ -392,6 +392,10 @@ complete, but nothing checks how it looks.
 `editor.findMatchBorder`, so find-match falls back to `charts.green`), and Light
 Modern sets `descriptionForeground` equal to `foreground`, which flattens muted
 text. A wrong assumption here shows up only inside VS Code, where no test looks.
+It already bit once: in the owner's theme a hovered inspector button lost its
+outline, most likely because `--border-strong` (→ `input.border`) was unset or
+transparent — hover now leaves the border alone. Steppers and inputs still use
+`--border-strong`, so check them in that theme too.
 
 *Suggested direction.* Open the canvas in a real VS Code with
 Light Modern, Dark Modern and one high-contrast theme, and compare against the
