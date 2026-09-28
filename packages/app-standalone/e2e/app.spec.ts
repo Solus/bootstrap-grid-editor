@@ -1028,11 +1028,13 @@ test.describe('pane resizer', () => {
       await page.mouse.up();
     };
 
-    await drag(main.x - 400);                       // far past the left edge
-    expect(await flexBasis()).toBeGreaterThanOrEqual(260);   // clamped to minW
+    // Stay inside the viewport: Firefox reports odd pointer positions for
+    // moves past the window edge. Both targets are well past the limits.
+    await drag(main.x + 2);                          // far left
+    expect(await flexBasis()).toBe(260);             // clamped to minW
 
-    await drag(main.x + main.width + 400);           // far past the right edge
-    expect(await flexBasis()).toBeLessThanOrEqual(main.width * 0.7 + 1);   // clamped to maxW
+    await drag(main.x + main.width - 2);             // far right
+    expect(await flexBasis()).toBeCloseTo(main.width * 0.7, 0);   // clamped to maxW
   });
 });
 
