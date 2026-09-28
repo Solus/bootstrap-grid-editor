@@ -27,8 +27,16 @@ directives are preserved.
 - **Live sync** — the canvas follows the editor as you type (toggleable).
 - **Bootstrap 3, 4, and 5** — detected per file; new columns follow whatever
   the file already uses. Where a file's classes work in either (`col-sm-6` is
-  valid in both), the header chip says which version the canvas is writing and
-  lets you switch it.
+  valid in both), the version chip above the canvas says which version the
+  canvas is writing and lets you switch it.
+- **Column order** — `order-*` classes show as an **order** badge on the
+  column, and a row the browser draws in a different order gets a
+  **reordered** pill.
+- **Follows your theme** — the canvas takes its colours from your VS Code
+  theme: light, dark or high contrast.
+- **Adjustable inspector** — drag its left edge to resize it (double-click to
+  reset), or collapse it to a narrow strip of icon buttons to give the canvas
+  more room.
 
 ## Install
 
@@ -48,9 +56,9 @@ Requires VS Code **1.104** or newer.
      moving the editor caret selects the matching block back.
    - Edit with the inspector steppers, drag-resize, or drag-and-drop.
    - Edits apply to the **editor buffer immediately** — press **Ctrl+S** to
-     save. Undo with the editor's normal **Ctrl+Z**.
+     save. Undo with **Ctrl+Z** — in the editor or with the canvas focused.
    - If live sync is off and you edit the document directly, the canvas flags a
-     mismatch; click **⟳ Resync** (or save) to refresh it.
+     mismatch; click **Resync** (or save) to refresh it.
 
 Select a column and the inspector gives you width and offset steppers per
 breakpoint, plus split, add, move, and delete — all writing back to the source:
@@ -98,7 +106,7 @@ All under `bootstrapGridEditor.*`:
 | `defaultBreakpoint` | `md` | Breakpoint the canvas opens at. |
 | `stretchToFit` | `false` | Open stretched to the full panel instead of the breakpoint's representative width. |
 | `tintOverfullRows` | `false` | Open with overfull rows tinted amber. |
-| `dialect` | `bootstrap5` | Class style for **new** columns and offsets in a file whose own classes don't settle it — none, or only ones both versions share (`bootstrap5` or `bootstrap3`). A file that shows its version keeps it. The header's version chip updates this. Workspace-scoped, so commit it in `.vscode/settings.json`. |
+| `dialect` | `bootstrap5` | Class style for **new** columns and offsets in a file whose own classes don't settle it — none, or only ones both versions share (`bootstrap5` or `bootstrap3`). A file that shows its version keeps it. The version chip above the canvas updates this. Workspace-scoped, so commit it in `.vscode/settings.json`. |
 | `newRowClasses` | `""` | Extra classes on every row the canvas **creates**, after `row` — e.g. `clearfix`. Workspace-scoped, so commit it in `.vscode/settings.json` and the whole team gets it. Grid classes are ignored here. |
 | `newColumnClasses` | `""` | Extra classes on every column the canvas **creates**, after the computed `col-*` — e.g. `px-2`. Also workspace-scoped. |
 | `liveSync` | `true` | Keep the canvas in sync with the editor as you type. Off = the canvas holds still until you save or **Resync**. Either way, canvas edits are verified against the file before they touch it. |
