@@ -377,8 +377,9 @@ the general fix.
 The restyle runs on the `redesign/instrument` branch in four steps: (1) route
 every colour through semantic tokens at today's values, (2) switch to the
 Instrument palette, (3) map the tokens to VS Code theme variables in the
-webview, (4) layout and state details. The design canvas ("Instrument" boards
-and the token sheet) is the reference.
+webview, (4) layout and state details. Steps 1–4 are done (step 4 as 4a type
+and states, 4b toolbar); 13.2 was deferred. The design canvas ("Instrument"
+boards and the token sheet) is the reference.
 
 ### 13.1 The VS Code theme mapping is unverified against real themes **[verify]**
 
@@ -401,19 +402,20 @@ transparent — hover now leaves the border alone. Steppers and inputs still use
 Light Modern, Dark Modern and one high-contrast theme, and compare against the
 canvas boards; fix mappings that don't hold.
 
-### 13.2 Source-pane line numbers and line tint need a layer under the textarea **[decide]**
+### 13.2 Source-pane line numbers and line tint need a layer under the textarea **[deferred]**
 
 *What it is.* The design shows line numbers and a faint tint behind the
 selected element's lines in the standalone source pane. Today the pane is a
-plain `textarea#src` (`packages/editor/src/styles.css:113`) with only the
-gutter strip `#srcBand` (`styles.css:119`, positioned by
+plain `textarea#src` (`packages/editor/src/styles.css:166`) with only the
+gutter strip `#srcBand` (`styles.css:172`, positioned by
 `packages/app-standalone/src/source-band.ts`). A textarea can't draw either.
 
 *Why it matters.* Both need an element behind (tint) or beside (numbers) the
 textarea that scrolls in lockstep with it — new sync code, not just CSS. Only
 the standalone app has this pane; the extension uses VS Code's own editor.
 
-*Suggested direction.* Decide in step 4 whether they're worth it. If yes: a
+*Suggested direction.* Deferred at the end of the restyle (not rejected) —
+the real-theme check (13.1) mattered more. When picked up: a
 gutter column plus an underlay div, both driven from the textarea's scroll
 event, reusing the line math `source-band.ts` already does for the strip.
 
