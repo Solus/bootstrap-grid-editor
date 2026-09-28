@@ -213,12 +213,14 @@ textarea#src{
 .row-label{
   position:absolute; top:-8px; left:8px; padding:0 6px;
   background:var(--surface-canvas); border-radius:3px;
-  font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:.14em;
-  color:var(--text-faint); white-space:nowrap; max-width:70%;
+  font-family:var(--font-mono); font-size:10px; line-height:15px; font-weight:700; letter-spacing:.12em;
+  color:var(--text-muted); white-space:nowrap; max-width:70%;
   overflow:hidden; text-overflow:ellipsis; pointer-events:none;
 }
-.row-label .row-title{color:var(--text-muted); letter-spacing:0; font-weight:500}
-.g-row.selected .row-label, .g-row.selected .row-label .row-title{color:var(--selected)}
+/* the title (from the source comment) is what you read, so it gets the
+   contrast; selection colours the ROW keyword and chevron, not the title */
+.row-label .row-title{font-family:var(--font-ui); font-size:11px; font-weight:600; letter-spacing:0; color:var(--text)}
+.g-row.selected .row-label, .g-row.selected .row-label .chev{color:var(--selected)}
 .fill-pill{
   position:absolute; top:-8px; right:8px; z-index:2; pointer-events:none;
   background:var(--surface-canvas); border:1px solid transparent; border-radius:3px;
