@@ -32,4 +32,9 @@ export default tseslint.config(
     files: ['packages/app-extension/.vscode-test.mjs'],
     languageOptions: { globals: { process: 'readonly', __dirname: 'readonly' } },
   },
+  {
+    // the README-media scripts run under Node, not in a page
+    files: ['packages/app-extension/scripts/**/*.mjs'],
+    languageOptions: { globals: { console: 'readonly', setTimeout: 'readonly' } },
+  },
 );
