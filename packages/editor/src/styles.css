@@ -1,54 +1,92 @@
 /* Originally extracted from prototype/grid-draft.html <style>.
    Colours come only from the semantic tokens below (see the design canvas,
    "Instrument"). Component rules never hard-code a colour: translucent
-   variants are color-mix() over a token. Values here are still the
-   prototype's dark palette. */
+   variants are color-mix() over a token. Light is the default; dark follows
+   the OS setting. Amber means "warning" only — selection is blue. */
 :root{
+  color-scheme:light;
   /* surfaces */
-  --surface-canvas:#10161f;   /* canvas behind the rows */
-  --surface:#151c27;          /* header, panes, inspector */
-  --surface-raised:#1a2231;   /* buttons, pills, badges, toasts */
-  --surface-sunken:#0e131b;   /* inputs, steppers, segmented tracks */
-  --surface-code:#151c27;     /* source pane */
+  --surface-canvas:#f7f8fa;   /* canvas behind the rows */
+  --surface:#ffffff;          /* header, panes, inspector */
+  --surface-raised:#ffffff;   /* buttons, pills, badges, toasts */
+  --surface-sunken:#f2f3f5;   /* inputs, steppers, segmented tracks */
+  --surface-code:#ffffff;     /* source pane */
   /* borders */
-  --border-subtle:rgba(122,170,255,.16); /* row outlines */
-  --border:#26324a;
-  --border-strong:#3a4a6b;
+  --border-subtle:#e6e8ec;    /* row outlines, section dividers */
+  --border:#dcdfe4;
+  --border-strong:#c3c7cf;
   /* text */
-  --text:#d5dce8;
-  --text-muted:#7d8aa0;
-  --text-faint:#55617a;
-  --text-code:#d5dce8;
+  --text:#1e1f22;
+  --text-muted:#5b5f66;
+  --text-faint:#868a92;
+  --text-code:#2a2c30;
   /* action + selection */
-  --accent:#ffb454;
-  --accent-fg:#211605;
-  --accent-hover:#ffc271;
-  --focus:#ffb454;
-  --selected:#ffb454;
-  --selected-bg:rgba(255,180,84,.15);
-  --hover-bg:#202a3d;
+  --accent:#3574f0;
+  --accent-fg:#ffffff;
+  --accent-hover:#2e63cf;
+  --focus:#3574f0;
+  --selected:#3574f0;
+  --selected-bg:rgba(53,116,240,.10);
+  --hover-bg:rgba(0,0,0,.045);
   /* grid + columns */
-  --grid-line:rgba(96,148,255,.08);
-  --grid-line-strong:rgba(96,148,255,.16);
-  --col-bg:rgba(56,132,255,.13);
-  --col-bg-hover:rgba(56,132,255,.22);
-  --col-border:rgba(122,170,255,.5);
-  --col-border-hover:rgba(122,170,255,.5);
-  --container-border:rgba(122,170,255,.32);
+  --grid-line:rgba(0,0,0,.05);
+  --grid-line-strong:rgba(0,0,0,.12);
+  --col-bg:rgba(53,116,240,.05);
+  --col-bg-hover:rgba(53,116,240,.10);
+  --col-border:rgba(53,116,240,.30);
+  --col-border-hover:rgba(53,116,240,.62);
+  --container-border:rgba(53,116,240,.30);
   /* status */
-  --warning:#ffb454;
-  --warning-bg:#3a2708;
-  --warning-border:#a3660e;
-  --danger:#ff7b72;
-  --info:#7ee2a8;
-  --match:#57d9a3;
-  --pending:#ffb454;
-  /* transitional: the prototype's light blue for tag names, breakpoint
-     defaults and reorder marks — not in the Instrument set; retire in step 2 */
-  --highlight:#9ecbff;
+  --warning:#9a5b00;
+  --warning-bg:#fff3dc;
+  --warning-border:#e0a03a;
+  --danger:#c93b37;
+  --info:#3574f0;
+  --match:#23893f;
+  --pending:#3574f0;
+  --shadow:rgba(15,20,30,.14);
   /* type */
   --font-mono:ui-monospace,"Cascadia Code","JetBrains Mono",Consolas,Menlo,monospace;
   --font-ui:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme:dark;
+    --surface-canvas:#1e1f22;
+    --surface:#2b2d30;
+    --surface-raised:#393b40;
+    --surface-sunken:#1e1f22;
+    --surface-code:#1e1f22;
+    --border-subtle:#34363b;
+    --border:#393b40;
+    --border-strong:#4e5157;
+    --text:#dfe1e5;
+    --text-muted:#a1a5ad;
+    --text-faint:#6f737a;
+    --text-code:#bcbec4;
+    --accent:#3574f0;
+    --accent-fg:#ffffff;
+    --accent-hover:#4682fa;
+    --focus:#548af7;
+    --selected:#548af7;
+    --selected-bg:rgba(84,138,247,.16);
+    --hover-bg:rgba(255,255,255,.06);
+    --grid-line:rgba(255,255,255,.045);
+    --grid-line-strong:rgba(255,255,255,.11);
+    --col-bg:rgba(120,160,240,.07);
+    --col-bg-hover:rgba(120,160,240,.13);
+    --col-border:rgba(120,160,240,.32);
+    --col-border-hover:rgba(120,160,240,.62);
+    --container-border:rgba(120,160,240,.28);
+    --warning:#e5a53d;
+    --warning-bg:rgba(229,165,61,.14);
+    --warning-border:rgba(229,165,61,.6);
+    --danger:#f0706b;
+    --info:#548af7;
+    --match:#5fbf73;
+    --pending:#548af7;
+    --shadow:rgba(0,0,0,.45);
+  }
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -62,7 +100,7 @@ button{
   background:var(--surface-raised); border:1px solid var(--border); border-radius:5px;
   padding:5px 10px; cursor:pointer;
 }
-button:hover{border-color:var(--border-strong); background:var(--hover-bg)}
+button:hover{border-color:var(--border-strong); background-image:linear-gradient(var(--hover-bg),var(--hover-bg))}
 button:focus-visible{outline:2px solid var(--focus); outline-offset:1px}
 button:disabled{opacity:.4; cursor:default}
 button.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-fg); font-weight:600}
@@ -164,7 +202,7 @@ textarea#src{
   color:var(--text-faint); white-space:nowrap; max-width:70%;
   overflow:hidden; text-overflow:ellipsis; pointer-events:none;
 }
-.row-label .row-title{color:var(--accent); letter-spacing:.06em}
+.row-label .row-title{color:var(--text-muted); letter-spacing:.06em}
 .g-row.selected .row-label{color:var(--selected)}
 .fill-pill{
   position:absolute; top:-8px; right:8px; z-index:2; pointer-events:none;
@@ -172,12 +210,12 @@ textarea#src{
   padding:1px 7px; font-family:var(--font-mono); font-size:9px; color:var(--text-muted);
 }
 .fill-pill.over{
-  background:var(--warning-bg); border-color:var(--warning-border); color:var(--warning); font-weight:700;
+  background:var(--warning-bg); border-color:var(--warning-border); color:var(--text); font-weight:700;
 }
 .fill-pill.unreliable{font-style:italic; color:var(--text-faint)}
 /* order-*: the browser draws the row in another order than the canvas */
-.fill-pill.reordered{color:var(--highlight); border-color:color-mix(in srgb, var(--highlight) 40%, transparent)}
-.g-col .nested .fill-pill{background:var(--surface)}
+.fill-pill.reordered{color:var(--info); border-color:color-mix(in srgb, var(--info) 40%, transparent)}
+.g-col .nested .fill-pill{background:var(--surface-canvas)}
 .g-col .nested .fill-pill.over{background:var(--warning-bg)}
 .g-row.overfull{border-color:var(--warning-border)}
 .view-opt{
@@ -225,9 +263,9 @@ body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-sele
 /* structural (container) columns: pure scaffolding around nested rows */
 .g-col.container > .g-col-inner{
   border-style:dashed; border-color:var(--container-border);
-  background:color-mix(in srgb, var(--col-bg) 38%, transparent);
+  background:transparent;
 }
-.g-col.container:hover > .g-col-inner{background:color-mix(in srgb, var(--col-bg) 77%, transparent)}
+.g-col.container:hover > .g-col-inner{background:var(--hover-bg)}
 .g-col.container.selected > .g-col-inner{
   border-color:var(--selected); background:var(--selected-bg);
 }
@@ -235,13 +273,13 @@ body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-sele
 .col-head{display:flex; align-items:center; gap:6px; min-width:0}
 .type-badge{
   flex:0 0 auto; font-family:var(--font-mono); font-size:8.5px; font-weight:700;
-  letter-spacing:.14em; color:var(--highlight); background:color-mix(in srgb, var(--grid-line-strong) 88%, transparent);
-  border:1px solid color-mix(in srgb, var(--col-border) 80%, transparent); border-radius:3px; padding:1px 5px;
+  letter-spacing:.14em; color:var(--text-faint); background:transparent;
+  border:1px solid var(--border); border-radius:3px; padding:1px 5px;
 }
 .g-col.container .type-badge{color:var(--text-muted); border-color:var(--border); background:var(--surface-raised)}
 .col-title{
   font-family:var(--font-mono); font-size:10.5px; font-weight:700;
-  letter-spacing:.06em; color:var(--accent);
+  letter-spacing:.06em; color:var(--text);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .col-num{font-family:var(--font-mono); font-size:10px; color:var(--text-faint)}
@@ -249,25 +287,25 @@ body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-sele
   font-family:var(--font-mono); font-size:10px; color:var(--text-muted);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.col-sub .tagname{color:var(--highlight)}
+.col-sub .tagname{color:var(--text)}
 .col-badges{display:flex; gap:4px; position:absolute; top:-6px; right:6px}
 .badge{
   font-family:var(--font-mono); font-size:9px; padding:1px 5px; border-radius:3px;
   background:var(--surface-raised); border:1px solid var(--border); color:var(--text-muted);
 }
 .badge.warn{color:var(--warning); border-color:color-mix(in srgb, var(--warning) 40%, transparent)}
-.badge.order{color:var(--highlight); border-color:color-mix(in srgb, var(--highlight) 40%, transparent)}
+.badge.order{color:var(--info); border-color:color-mix(in srgb, var(--info) 40%, transparent)}
 .g-col .nested{margin-top:2px}
 .g-col .nested .g-row{margin:8px 0 8px; padding:11px 0 4px}
 .g-col .nested .g-col{min-height:34px}
-.g-col .nested .row-label{background:var(--surface)}
+.g-col .nested .row-label{background:var(--surface-canvas)}
 .nested-sep{
   display:flex; align-items:center; gap:8px; margin:10px 2px 6px;
   font-family:var(--font-mono); font-size:9.5px; font-weight:700;
   letter-spacing:.12em; color:var(--text-muted); text-transform:none;
 }
 .nested-sep::before, .nested-sep::after{
-  content:""; height:1px; background:color-mix(in srgb, var(--col-border) 50%, transparent); flex:1;
+  content:""; height:1px; background:var(--border); flex:1;
 }
 
 /* @if region: a labeled bounding box around the active branch's columns, its
@@ -276,10 +314,10 @@ body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-sele
    12-col grid as the rest of the row. */
 .cond-box{
   position:relative; box-sizing:border-box; display:flex; flex-wrap:wrap; align-items:stretch;
-  border:1px dashed var(--container-border); border-radius:6px;
-  padding:15px 0 5px; margin-top:9px; background:color-mix(in srgb, var(--col-border) 7%, transparent);
+  border:1px dashed var(--border-strong); border-radius:6px;
+  padding:15px 0 5px; margin-top:9px; background:transparent;
 }
-.cond-box:hover{ border-color:var(--col-border); }
+.cond-box:hover{ border-color:var(--text-faint); }
 /* the in-column variant: wraps a run of conditional *nested rows*, which
    stack vertically at full column width (no span sizing) */
 .cond-box.rows{ display:block; padding:14px 6px 4px; margin:12px 0 8px; }
@@ -331,17 +369,17 @@ body.dnd .row-flags > .fill-pill{ pointer-events:none; }
 
 /* the toggle chip: a pill on the box's top edge (like the ROW label) */
 .branch-chip{
-  border:1px solid var(--border); background:var(--surface-sunken); border-radius:6px;
+  border:1px solid var(--border-strong); background:var(--surface-raised); border-radius:6px;
   padding:3px 10px; font-family:var(--font-mono); font-size:11px; color:var(--text-muted);
   cursor:pointer; white-space:nowrap; max-width:100%; overflow:hidden;
   text-overflow:ellipsis;
 }
-.branch-chip:hover{ color:var(--text); background:var(--surface-raised); border-color:var(--text-muted); }
+.branch-chip:hover{ color:var(--text); border-color:var(--text-muted); }
 .branch-chip.active{
-  background:var(--accent); color:var(--accent-fg); font-weight:700; border-color:var(--accent);
+  background:var(--text); color:var(--surface-canvas); font-weight:700; border-color:var(--text);
 }
-.branch-chip.active:hover{ background:var(--accent); color:var(--accent-fg); }
-.branch-chip.off{ color:var(--text-faint); font-style:italic; }
+.branch-chip.active:hover{ background:var(--text); color:var(--surface-canvas); }
+.branch-chip.off{ color:var(--text-muted); border-style:dashed; background:var(--surface-canvas); }
 .cond-box > .branch-chip{ position:absolute; top:-9px; left:10px; z-index:3; }
 
 .width-label{
@@ -394,7 +432,7 @@ body.resizing, body.resizing *{cursor:ew-resize !important; user-select:none}
 .g-row.collapsed{padding:10px 8px 6px; min-height:22px}
 
 .empty-canvas{color:var(--text-muted); text-align:center; padding:60px 20px; line-height:1.7}
-.empty-canvas code{font-family:var(--font-mono); color:var(--highlight)}
+.empty-canvas code{font-family:var(--font-mono); color:var(--text-code)}
 
 /* a row that failed to render — skipped in place so the rest of the canvas
    survives (see renderRow's guard) */
@@ -411,7 +449,7 @@ body.resizing, body.resizing *{cursor:ew-resize !important; user-select:none}
 .bp-grid{display:grid; grid-template-columns:auto 1fr; gap:6px 10px; align-items:center}
 .bp-grid label{font-family:var(--font-mono); font-size:11.5px; color:var(--text-muted); text-align:right}
 .bp-grid label.cur{color:var(--selected); font-weight:700}
-.bp-grid label.def{color:var(--highlight)}
+.bp-grid label.def{color:var(--text)}
 .bp-grid label.def.cur{color:var(--selected)}
 details.insp-details summary{
   cursor:pointer; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
@@ -445,10 +483,16 @@ details.insp-details .insp-title{margin-top:6px}
 .toast{
   position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
   background:var(--surface-raised); border:1px solid var(--border); border-radius:6px;
-  padding:7px 14px; font-size:12.5px; color:var(--info); display:none; z-index:9;
+  padding:7px 14px; font-size:12.5px; color:var(--text); display:none; z-index:9;
+  box-shadow:0 6px 18px var(--shadow);
+}
+.toast::before{
+  content:""; display:inline-block; width:7px; height:7px; border-radius:50%;
+  background:var(--info); margin-right:8px; vertical-align:1px;
 }
 .toast.show{display:block}
-.toast.warn{color:var(--warning); border-color:color-mix(in srgb, var(--warning) 50%, transparent)}
+.toast.warn{border-color:var(--warning-border)}
+.toast.warn::before{background:var(--warning)}
 
 /* ── Out-of-sync state (extension, with live sync turned off) ──────
    The canvas is showing a file the editor has since changed, and canvas edits
@@ -476,8 +520,8 @@ body.diverged .pane-canvas{opacity:.72}
 .parse-degraded{
   flex:0 0 auto;
   padding:7px 14px; font-size:12px; line-height:1.5;
-  color:var(--warning); background:color-mix(in srgb, var(--warning) 15%, transparent);
-  border-bottom:1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  color:var(--text); background:var(--warning-bg);
+  border-bottom:1px solid var(--warning-border);
 }
 
 /* find field */
