@@ -1,6 +1,6 @@
 # Bootstrap Grid Layout Editor
 
-![Bootstrap Grid Layout Editor — editing a Bootstrap grid on the canvas](https://raw.githubusercontent.com/Solus/bootstrap-grid-editor/main/packages/app-extension/media/demo.gif)
+![Bootstrap Grid Layout Editor — editing a Bootstrap grid on the canvas](media/demo.gif)
 
 Edit your Bootstrap grid the way you think about it — as columns and rows, not
 class strings. This VS Code extension renders a live schematic of the grid in any
@@ -64,6 +64,18 @@ Select a column and the inspector gives you width and offset steppers per
 breakpoint, plus split, add, move, and delete — all writing back to the source:
 
 ![A selected column with the inspector's width and offset steppers](media/inspector.png)
+
+Short on room? Collapse the inspector to a strip of icon buttons — the same
+controls, each named in its tooltip — and the canvas takes the width:
+
+![The inspector collapsed to a narrow strip of icon buttons beside the canvas](media/inspector-collapsed.png)
+
+## Follows your theme
+
+The canvas takes its colours from your VS Code theme — light, dark or high
+contrast. The same view in Light Modern:
+
+![The canvas in VS Code's Light Modern theme](media/theme-light.png)
 
 ## Responsive, at a glance
 

@@ -159,6 +159,8 @@
     "build": "npm run build:webview && npm run build:host",
     "build:tests": "tsc -b ../core && esbuild test-integration/buffer-seam.test.ts --bundle --platform=node --format=cjs --external:vscode --external:mocha --outfile=dist/test-integration/buffer-seam.test.cjs --sourcemap",
     "test:vscode": "npm run build && npm run build:tests && vscode-test",
+    "screenshots": "npm run build && node scripts/screenshots.mjs",
+    "demo-gif": "npm run build && node scripts/demo-gif.mjs",
     "vsix": "npm run build && npx @vscode/vsce package --no-dependencies --baseImagesUrl https://github.com/Solus/bootstrap-grid-editor/raw/HEAD/packages/app-extension --out releases/"
   },
   "devDependencies": {
@@ -169,6 +171,8 @@
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
     "esbuild": "^0.24.0",
+    "gifenc": "^1.0.3",
+    "pngjs": "^7.0.0",
     "vite": "^5.4.0"
   }
 }

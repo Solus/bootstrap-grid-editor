@@ -419,22 +419,6 @@ the real-theme check (13.1) mattered more. When picked up: a
 gutter column plus an underlay div, both driven from the textarea's scroll
 event, reusing the line math `source-band.ts` already does for the strip.
 
-### 13.3 README and Marketplace images show the old look **[chore]**
-
-*What it is.* Every image the extension README uses —
-`packages/app-extension/media/demo.gif`, `hero-dashboard.png`,
-`inspector.png`, `breakpoint-md.png` / `breakpoint-lg.png` and the
-conditional screenshots — was captured before the restyle: the fixed dark
-palette with amber selection, the breakpoint switch in the header, no
-collapsible inspector.
-
-*Why it matters.* The README is also the Marketplace listing, so from 0.5.0
-the first thing a prospective user sees no longer matches what they install.
-
-*Suggested direction.* Recapture them in VS Code with a default theme (one
-light, one dark shot is enough to show it follows the theme), including one of
-the collapsed inspector. Needs a real VS Code window, so it's a manual step.
-
 ---
 
 ## Resolved (archive)
@@ -477,3 +461,4 @@ Section numbers are kept stable so references elsewhere still resolve.
 - **9.14** The resolved dialect is invisible in the canvas — _IMPLEMENTED — inspector names the version and what decided it; header chip switches it where the file doesn't_
 - **10.1** A class edit rewrites the whole attribute value — _RESOLVED — token-level edits_
 - **11.1** An unclosed element's span is a guess, and structural edits trusted it — _RESOLVED — `El.unclosed` + a per-element guard_
+- **13.3** README and Marketplace images showed the old look — _RESOLVED — recaptured by `npm run screenshots` / `npm run demo-gif` (packages/app-extension/scripts/)_
