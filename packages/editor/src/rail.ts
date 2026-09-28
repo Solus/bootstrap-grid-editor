@@ -5,11 +5,9 @@
    row, "Add row" for nothing — each as an icon with a tooltip. Settings (View,
    the class convention) and the per-breakpoint grids stay in the full pane.
 
-   Tooltips are drawn by the page, not the browser's `title`: an icon-only
-   strip is read by hovering along it, and the native tooltip's second of delay
-   made that slow. One tooltip element, placed beside whatever is hovered or
-   focused; the icons also carry an aria-label, so screen readers get the name
-   without it. */
+   Each icon's name is its tooltip — the browser's own, which waits a moment
+   before showing, so it stays out of the way of someone who already knows the
+   buttons — and its aria-label, for screen readers. */
 
 import { classIsInterpolated, definingBp, effectiveAt } from '@bootstrap-visualizer/core';
 import type { ColNode, RowNode } from '@bootstrap-visualizer/core';
@@ -22,41 +20,11 @@ import {
 } from './edits.js';
 import { icon, type IconName } from './icons.js';
 
-/* ── tooltip ─────────────────────────────────────────────────────────── */
-
-let tipEl: HTMLElement | null = null;
-
-function showTip(target: HTMLElement): void {
-  const text = target.dataset.tip;
-  if (!text) return;
-  if (!tipEl) {
-    tipEl = document.createElement('div');
-    tipEl.className = 'ui-tip';
-    tipEl.setAttribute('role', 'tooltip');
-    document.body.appendChild(tipEl);
-  }
-  tipEl.textContent = text;
-  // to the left of the target: the strip sits at the window's right edge
-  const r = target.getBoundingClientRect();
-  tipEl.style.top = (r.top + r.height / 2) + 'px';
-  tipEl.style.right = (window.innerWidth - r.left + 8) + 'px';
-  tipEl.classList.add('show');
-}
-
-/** Hide the tooltip — also called before every re-render, since the element it
-    points at is about to be replaced. */
-export function hideTip(): void {
-  tipEl?.classList.remove('show');
-}
-
-/** Give an element the page's tooltip, on hover and on keyboard focus. */
+/** Name an element: its tooltip (the browser's, after the usual delay) and
+    its accessible name. */
 export function withTip<T extends HTMLElement>(el: T, text: string): T {
-  el.dataset.tip = text;
+  el.title = text;
   el.setAttribute('aria-label', text);
-  el.addEventListener('pointerenter', () => showTip(el));
-  el.addEventListener('pointerleave', hideTip);
-  el.addEventListener('focus', () => showTip(el));
-  el.addEventListener('blur', hideTip);
   return el;
 }
 
@@ -172,5 +140,6 @@ function renderColRail(rail: HTMLElement, node: ColNode): void {
   railBtn(rail, 'Move left', 'moveLeft', () => nudgeCol(-1));
   railBtn(rail, 'Move right', 'moveRight', () => nudgeCol(+1));
   sep(rail);
-  railBtn(rail, 'Delete', 'delete', () => deleteEl(node), { danger: true });
+  // the icon alone doesn't say what goes, so the name does ("Delete row" above)
+  railBtn(rail, 'Delete column', 'delete', () => deleteEl(node), { danger: true });
 }

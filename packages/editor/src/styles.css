@@ -591,16 +591,3 @@ body.diverged .pane-canvas{opacity:.72}
 .rail-val.long{font-size:9px}
 .rail-lock{width:32px; height:28px; display:flex; align-items:center; justify-content:center; color:var(--text-faint); border-radius:4px}
 .rail-val:focus-visible, .rail-lock:focus-visible, .rail-bp:focus-visible{outline:2px solid var(--focus); outline-offset:1px}
-/* the page's own tooltip: instant, placed by rail.ts beside what's hovered */
-.ui-tip{
-  position:fixed; z-index:60; display:none; pointer-events:none; transform:translateY(-50%);
-  white-space:nowrap; padding:4px 8px; font-family:var(--font-ui); font-size:12px; line-height:1.3;
-  background:var(--surface-raised); color:var(--text);
-  border:1px solid var(--border-strong); border-radius:3px; box-shadow:0 4px 12px var(--shadow);
-}
-.ui-tip.show{display:block}
-.ui-tip::after{
-  content:""; position:absolute; right:-5px; top:50%; width:7px; height:7px;
-  background:var(--surface-raised); border-right:1px solid var(--border-strong); border-top:1px solid var(--border-strong);
-  transform:translateY(-50%) rotate(45deg);
-}

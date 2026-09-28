@@ -606,7 +606,7 @@ describe('the collapsed inspector shows the same controls, as icons', () => {
     const got = labels();
     for (const l of ['Increase width at md', 'Decrease width at md', 'Increase offset at md',
       'Decrease offset at md', 'Split in two', 'Add column after', 'Add row inside',
-      'Move left', 'Move right', 'Delete']) expect(got).toContain(l);
+      'Move left', 'Move right', 'Delete column']) expect(got).toContain(l);
     for (const l of ['Add column', 'Add row after', 'Move up', 'Move down', 'Delete row'])
       expect(got).not.toContain(l);
     ed.state.inspCollapsed = false;
@@ -620,7 +620,7 @@ describe('the collapsed inspector shows the same controls, as icons', () => {
     const got = labels();
     for (const l of ['Add column', 'Add row after', 'Move up', 'Move down', 'Delete row'])
       expect(got).toContain(l);
-    for (const l of ['Split in two', 'Add column after', 'Move left', 'Delete'])
+    for (const l of ['Split in two', 'Add column after', 'Move left', 'Delete column'])
       expect(got).not.toContain(l);
     expect(insp().querySelector('.rail-step')).toBeNull();
     ed.state.inspCollapsed = false;
@@ -640,14 +640,12 @@ describe('the collapsed inspector shows the same controls, as icons', () => {
     const ed = await editor();
     ed.state.inspCollapsed = true;
     document.querySelector<HTMLElement>('.g-col')!.click();
+    // the browser's own tooltip, which waits before showing
     const val = insp().querySelector<HTMLElement>('.rail-val')!;
-    expect(val.dataset.tip).toMatch(/^Width at md: /);
-    // hovering shows the page's tooltip with that text
-    val.dispatchEvent(new Event('pointerenter'));
-    const tip = document.querySelector<HTMLElement>('.ui-tip.show')!;
-    expect(tip.textContent).toBe(val.dataset.tip);
-    val.dispatchEvent(new Event('pointerleave'));
-    expect(document.querySelector('.ui-tip.show')).toBeNull();
+    expect(val.title).toMatch(/^Width at md: /);
+    expect(val.getAttribute('aria-label')).toBe(val.title);
+    const split = insp().querySelector<HTMLElement>('[aria-label="Split in two"]')!;
+    expect(split.title).toBe('Split in two');
     ed.state.inspCollapsed = false;
     ed.clearSelection();
   });

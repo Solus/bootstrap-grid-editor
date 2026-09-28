@@ -18,12 +18,11 @@ import {
   deleteEl, nudgeCol, nudgeRow, quickOffset, quickWidth, splitCol, stepWidth,
 } from './edits.js';
 import { icon, type IconName } from './icons.js';
-import { hideTip, railBtn, renderRail } from './rail.js';
+import { railBtn, renderRail } from './rail.js';
 
 export function renderInspector(): void {
   const node = state.sel && resolvePath(state.sel.path);
   rememberFieldFocus();
-  hideTip();
   inspector.innerHTML = '';
   inspector.classList.toggle('collapsed', state.inspCollapsed);
   document.body.classList.toggle('insp-collapsed', state.inspCollapsed);
