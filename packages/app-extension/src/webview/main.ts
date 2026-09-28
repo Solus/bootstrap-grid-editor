@@ -6,6 +6,8 @@
    it on the document's editor. */
 
 import '@bootstrap-visualizer/editor/styles.css';
+// after the editor's sheet: re-points its colour tokens at the VS Code theme
+import './vscode-theme.css';
 import {
   apply, applyOpenConfig, assertRequiredIds, readLiveSettings, render,
   REQUIRED_EDITOR_IDS, selectAtOffset, setHost, toast, wireBreakpointSwitch,

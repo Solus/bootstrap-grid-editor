@@ -384,14 +384,16 @@ and the token sheet) is the reference.
 
 *What it is.* The design's token → `--vscode-*` mapping was previewed on the
 canvas with Dark Modern / Light Modern colour values typed from memory, not read
-from VS Code. The extension has no theme mapping at all yet (that is step 3).
+from VS Code. Step 3 put that mapping into the webview
+(`packages/app-extension/src/webview/vscode-theme.css`); a unit test keeps it
+complete, but nothing checks how it looks.
 
 *Why it matters.* Some mapped variables are unset in common themes (e.g.
 `editor.findMatchBorder`, so find-match falls back to `charts.green`), and Light
 Modern sets `descriptionForeground` equal to `foreground`, which flattens muted
 text. A wrong assumption here shows up only inside VS Code, where no test looks.
 
-*Suggested direction.* After step 3, open the canvas in a real VS Code with
+*Suggested direction.* Open the canvas in a real VS Code with
 Light Modern, Dark Modern and one high-contrast theme, and compare against the
 canvas boards; fix mappings that don't hold.
 

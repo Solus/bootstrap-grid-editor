@@ -1,0 +1,57 @@
+/* The webview takes its colours from the user's VS Code theme. VS Code puts a
+   theme-kind class on <body> and defines --vscode-* variables for every theme
+   colour; this sheet re-points each of the editor's semantic tokens
+   (packages/editor/src/styles.css) at one of them, so the canvas follows the
+   theme — light, dark or high contrast — and changes with it live.
+   Every token the editor defines must be mapped here (vscode-theme.test.ts). */
+body.vscode-light, body.vscode-dark,
+body.vscode-high-contrast, body.vscode-high-contrast-light{
+  --surface-canvas:   var(--vscode-editor-background);
+  --surface:          var(--vscode-sideBar-background, var(--vscode-editor-background));
+  --surface-raised:   var(--vscode-editorWidget-background);
+  --surface-sunken:   var(--vscode-input-background);
+  --surface-code:     var(--vscode-editor-background);
+  --border-subtle:    var(--vscode-editorIndentGuide-background1, var(--vscode-panel-border));
+  --border:           var(--vscode-panel-border, var(--vscode-widget-border));
+  --border-strong:    var(--vscode-input-border, var(--vscode-widget-border, var(--vscode-panel-border)));
+  --text:             var(--vscode-foreground);
+  --text-muted:       var(--vscode-descriptionForeground);
+  --text-faint:       var(--vscode-disabledForeground);
+  --text-code:        var(--vscode-editor-foreground);
+  --accent:           var(--vscode-button-background);
+  --accent-fg:        var(--vscode-button-foreground);
+  --accent-hover:     var(--vscode-button-hoverBackground);
+  --focus:            var(--vscode-focusBorder);
+  --selected:         var(--vscode-focusBorder);
+  --selected-bg:      var(--vscode-editor-selectionHighlightBackground, var(--vscode-list-inactiveSelectionBackground));
+  --hover-bg:         var(--vscode-list-hoverBackground);
+  --grid-line:        color-mix(in srgb, var(--vscode-editorIndentGuide-background1) 50%, transparent);
+  --grid-line-strong: var(--vscode-editorIndentGuide-activeBackground1);
+  --col-bg:           color-mix(in srgb, var(--vscode-charts-blue) 7%, transparent);
+  --col-bg-hover:     color-mix(in srgb, var(--vscode-charts-blue) 13%, transparent);
+  --col-border:       color-mix(in srgb, var(--vscode-charts-blue) 40%, transparent);
+  --col-border-hover: color-mix(in srgb, var(--vscode-charts-blue) 70%, transparent);
+  --container-border: color-mix(in srgb, var(--vscode-charts-blue) 32%, transparent);
+  --warning:          var(--vscode-editorWarning-foreground);
+  --warning-bg:       var(--vscode-inputValidation-warningBackground);
+  --warning-border:   var(--vscode-inputValidation-warningBorder, var(--vscode-editorWarning-foreground));
+  --danger:           var(--vscode-errorForeground);
+  --info:             var(--vscode-editorInfo-foreground);
+  --match:            var(--vscode-editor-findMatchBorder, var(--vscode-charts-green));
+  --pending:          var(--vscode-editorGutter-modifiedBackground);
+  --shadow:           var(--vscode-widget-shadow);
+  --font-ui:          var(--vscode-font-family);
+  --font-mono:        var(--vscode-editor-font-family);
+}
+body.vscode-light, body.vscode-high-contrast-light{ color-scheme:light }
+body.vscode-dark, body.vscode-high-contrast{ color-scheme:dark }
+
+/* High contrast: these themes leave most fills unset and draw everything
+   with contrastBorder, so outlines have to carry the state. */
+body.vscode-high-contrast, body.vscode-high-contrast-light{
+  --border-subtle:    var(--vscode-contrastBorder);
+  --border:           var(--vscode-contrastBorder);
+  --col-border:       var(--vscode-contrastBorder);
+  --container-border: var(--vscode-contrastBorder);
+  --selected:         var(--vscode-contrastActiveBorder, var(--vscode-focusBorder));
+}
