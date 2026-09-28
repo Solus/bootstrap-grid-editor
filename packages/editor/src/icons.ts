@@ -9,7 +9,8 @@
 export type IconName =
   | 'split' | 'addColAfter' | 'addRowInside' | 'addRow' | 'addColToRow'
   | 'moveLeft' | 'moveRight' | 'moveUp' | 'moveDown' | 'delete'
-  | 'undo' | 'redo' | 'open' | 'sample' | 'download' | 'copy' | 'resync';
+  | 'undo' | 'redo' | 'open' | 'sample' | 'download' | 'copy' | 'resync'
+  | 'plus' | 'minus' | 'panelOpen' | 'panelClose' | 'lock';
 
 /** Each icon as its shapes, in SVG path syntax. */
 const PATHS: Record<IconName, string[]> = {
@@ -42,6 +43,14 @@ const PATHS: Record<IconName, string[]> = {
   copy: ['M6.5 5.5h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z', 'M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2'],
   // two arrows chasing round a circle
   resync: ['M13 8a5 5 0 0 1-8.5 3.5', 'M3 8a5 5 0 0 1 8.5-3.5', 'M11.5 2v2.5H9', 'M4.5 14v-2.5H7'],
+  // the collapsed inspector's steppers
+  plus: ['M8 3.5v9', 'M3.5 8h9'],
+  minus: ['M3.5 8h9'],
+  // a window with its right-hand panel; the chevron says which way it goes
+  panelOpen: ['M2.5 3h11a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z', 'M10.5 3v10', 'M7 6L5 8l2 2'],
+  panelClose: ['M2.5 3h11a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z', 'M10.5 3v10', 'M5 6l2 2-2 2'],
+  // a padlock: read-only
+  lock: ['M4.5 7h7a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z', 'M5.5 7V5a2.5 2.5 0 0 1 5 0v2'],
 };
 
 const SVG_NS = 'http://www.w3.org/2000/svg';

@@ -18,11 +18,17 @@ import {
   deleteEl, nudgeCol, nudgeRow, quickOffset, quickWidth, splitCol, stepWidth,
 } from './edits.js';
 import { icon, type IconName } from './icons.js';
+import { hideTip, railBtn, renderRail } from './rail.js';
 
 export function renderInspector(): void {
   const node = state.sel && resolvePath(state.sel.path);
   rememberFieldFocus();
+  hideTip();
   inspector.innerHTML = '';
+  inspector.classList.toggle('collapsed', state.inspCollapsed);
+  document.body.classList.toggle('insp-collapsed', state.inspCollapsed);
+  if (state.inspCollapsed) { renderRail(node); return; }
+  renderInspectorHead();
   if (!node) {
     const d = document.createElement('div');
     d.className = 'insp-empty';
@@ -57,6 +63,19 @@ function renderViewSection(): void {
   vs.appendChild(viewOpt('Stretch to fit',
     'Let the sheet use the whole canvas panel instead of the breakpoint\'s representative width — proportions are unchanged',
     () => state.stretchSheet, v => persistViewPref('stretchSheet', v)));
+}
+
+/** The pane's title bar, with the button that folds it to the icon strip. */
+function renderInspectorHead(): void {
+  const h = document.createElement('div');
+  h.className = 'insp-head';
+  const t = document.createElement('span');
+  t.textContent = 'Inspector';
+  const sp = document.createElement('span');
+  sp.className = 'spacer';
+  h.append(t, sp);
+  railBtn(h, 'Collapse inspector', 'panelClose', () => { state.inspCollapsed = true; render(); });
+  inspector.appendChild(h);
 }
 
 /* ── the class convention for created rows / columns ─────────────── */

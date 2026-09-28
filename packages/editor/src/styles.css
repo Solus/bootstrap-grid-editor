@@ -150,6 +150,9 @@ main{flex:1; display:flex; min-height:0}
 .pane-canvas{flex:1; min-width:0; display:flex; flex-direction:column; background:var(--surface-canvas)}
 /* width: 268px by default, dragged via #inspectorResizer (which also draws its edge) */
 .pane-inspector{flex:0 0 268px; background:var(--surface); overflow-y:auto}
+/* folded to the icon strip: a fixed narrow width, whatever the divider set */
+.pane-inspector.collapsed{flex-basis:52px !important; overflow-x:hidden; border-left:1px solid var(--border)}
+body.insp-collapsed #inspectorResizer{display:none}
 
 .pane-head{
   display:flex; align-items:center; gap:8px; padding:6px 10px;
@@ -557,3 +560,47 @@ body.diverged .pane-canvas{opacity:.72}
 .g-col.find-hit > .g-col-inner{box-shadow:0 0 0 2px var(--match)}
 .g-col.find-hit.selected > .g-col-inner{box-shadow:0 0 0 1px var(--selected), 0 0 0 3px var(--match)}
 .g-row.find-hit{border-color:var(--match)}
+
+/* ── Inspector title bar + the collapsed icon strip (rail.ts) ───────── */
+.insp-head{
+  display:flex; align-items:center; gap:6px; padding:4px 6px 4px 14px;
+  border-bottom:1px solid var(--border);
+  font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--text-muted);
+}
+.rail{display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 0 12px}
+.rail-btn{
+  width:32px; height:28px; padding:0; flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center;
+  background:transparent; border:1px solid transparent; border-radius:4px; color:var(--text-muted);
+}
+.rail-btn:hover:not(:disabled){color:var(--text)}
+.rail-btn.sm{width:22px; height:20px}
+.rail-btn.sm .icon{width:13px; height:13px}
+.rail-btn.danger{color:var(--danger)}
+.insp-head .rail-btn{width:26px; height:24px}
+.rail-sep{width:26px; height:1px; background:var(--border-subtle); margin:5px 0; flex:0 0 auto}
+.rail-bp{font-family:var(--font-mono); font-size:10px; line-height:14px; font-weight:600; color:var(--selected); margin-bottom:2px}
+.rail-step{display:flex; flex-direction:column; align-items:center; gap:1px; margin-bottom:4px}
+.rail-cap{font-family:var(--font-mono); font-size:9px; line-height:12px; font-weight:600; letter-spacing:.06em; color:var(--text-faint); text-transform:uppercase}
+.rail-val{
+  width:30px; height:20px; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--text);
+  background:var(--surface-sunken); border:1px solid var(--border); border-radius:3px;
+}
+.rail-val.unset{color:var(--text-faint); font-weight:400}
+.rail-val.long{font-size:9px}
+.rail-lock{width:32px; height:28px; display:flex; align-items:center; justify-content:center; color:var(--text-faint); border-radius:4px}
+.rail-val:focus-visible, .rail-lock:focus-visible, .rail-bp:focus-visible{outline:2px solid var(--focus); outline-offset:1px}
+/* the page's own tooltip: instant, placed by rail.ts beside what's hovered */
+.ui-tip{
+  position:fixed; z-index:60; display:none; pointer-events:none; transform:translateY(-50%);
+  white-space:nowrap; padding:4px 8px; font-family:var(--font-ui); font-size:12px; line-height:1.3;
+  background:var(--surface-raised); color:var(--text);
+  border:1px solid var(--border-strong); border-radius:3px; box-shadow:0 4px 12px var(--shadow);
+}
+.ui-tip.show{display:block}
+.ui-tip::after{
+  content:""; position:absolute; right:-5px; top:50%; width:7px; height:7px;
+  background:var(--surface-raised); border-right:1px solid var(--border-strong); border-top:1px solid var(--border-strong);
+  transform:translateY(-50%) rotate(45deg);
+}

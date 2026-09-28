@@ -576,6 +576,99 @@ describe('selection drives the inspector', () => {
   });
 });
 
+describe('the collapsed inspector shows the same controls, as icons', () => {
+  const insp = () => document.querySelector<HTMLElement>('#inspector')!;
+  const labels = () => [...insp().querySelectorAll<HTMLElement>('.rail [aria-label]')]
+    .map(el => el.getAttribute('aria-label'));
+  const collapse = () =>
+    insp().querySelector<HTMLButtonElement>('[aria-label="Collapse inspector"]')!.click();
+  const expand = () =>
+    insp().querySelector<HTMLButtonElement>('[aria-label="Expand inspector"]')!.click();
+
+  it('folds to the strip and back from its own buttons', async () => {
+    const ed = await editor();
+    ed.clearSelection();
+    collapse();
+    expect(ed.state.inspCollapsed).toBe(true);
+    expect(insp().classList.contains('collapsed')).toBe(true);
+    expect(document.body.classList.contains('insp-collapsed')).toBe(true);
+    expect(insp().querySelector('.rail')).not.toBeNull();
+    expand();
+    expect(ed.state.inspCollapsed).toBe(false);
+    expect(insp().classList.contains('collapsed')).toBe(false);
+    expect(insp().textContent).toContain('Add row');
+  });
+
+  it('a column gets the steppers and the column actions, not the row ones', async () => {
+    const ed = await editor();
+    ed.state.inspCollapsed = true;
+    document.querySelector<HTMLElement>('.g-col')!.click();
+    const got = labels();
+    for (const l of ['Increase width at md', 'Decrease width at md', 'Increase offset at md',
+      'Decrease offset at md', 'Split in two', 'Add column after', 'Add row inside',
+      'Move left', 'Move right', 'Delete']) expect(got).toContain(l);
+    for (const l of ['Add column', 'Add row after', 'Move up', 'Move down', 'Delete row'])
+      expect(got).not.toContain(l);
+    ed.state.inspCollapsed = false;
+    ed.clearSelection();
+  });
+
+  it('a row gets the row actions, not the column ones', async () => {
+    const ed = await editor();
+    ed.state.inspCollapsed = true;
+    document.querySelector<HTMLElement>('.g-row')!.click();
+    const got = labels();
+    for (const l of ['Add column', 'Add row after', 'Move up', 'Move down', 'Delete row'])
+      expect(got).toContain(l);
+    for (const l of ['Split in two', 'Add column after', 'Move left', 'Delete'])
+      expect(got).not.toContain(l);
+    expect(insp().querySelector('.rail-step')).toBeNull();
+    ed.state.inspCollapsed = false;
+    ed.clearSelection();
+  });
+
+  it('with nothing selected it offers Add row, as the full pane does', async () => {
+    const ed = await editor();
+    ed.state.inspCollapsed = true;
+    ed.clearSelection();
+    expect(labels()).toEqual(['Expand inspector', 'Add row']);
+    ed.state.inspCollapsed = false;
+    ed.renderInspector();
+  });
+
+  it('the width value says what it is in its tooltip', async () => {
+    const ed = await editor();
+    ed.state.inspCollapsed = true;
+    document.querySelector<HTMLElement>('.g-col')!.click();
+    const val = insp().querySelector<HTMLElement>('.rail-val')!;
+    expect(val.dataset.tip).toMatch(/^Width at md: /);
+    // hovering shows the page's tooltip with that text
+    val.dispatchEvent(new Event('pointerenter'));
+    const tip = document.querySelector<HTMLElement>('.ui-tip.show')!;
+    expect(tip.textContent).toBe(val.dataset.tip);
+    val.dispatchEvent(new Event('pointerleave'));
+    expect(document.querySelector('.ui-tip.show')).toBeNull();
+    ed.state.inspCollapsed = false;
+    ed.clearSelection();
+  });
+
+  it('a strip button does what the full pane\'s does', async () => {
+    const ed = await editor();
+    ed.state.inspCollapsed = true;
+    document.querySelector<HTMLElement>('.g-col')!.click();
+    const before = document.querySelector<HTMLTextAreaElement>('#src')!.value;
+    insp().querySelector<HTMLButtonElement>('[aria-label="Split in two"]')!.click();
+    const after = document.querySelector<HTMLTextAreaElement>('#src')!.value;
+    expect(after).not.toBe(before);
+    // and the strip is still there after the edit re-renders
+    expect(insp().querySelector('.rail')).not.toBeNull();
+    ed.undo();
+    expect(document.querySelector<HTMLTextAreaElement>('#src')!.value).toBe(before);
+    ed.state.inspCollapsed = false;
+    ed.clearSelection();
+  });
+});
+
 describe('an @if nested in an @if branch draws as a nested box', () => {
   const NESTED = `<div class="row">
     @if (a) {

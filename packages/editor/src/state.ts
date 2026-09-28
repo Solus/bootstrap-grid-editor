@@ -64,6 +64,8 @@ export interface AppState {
   findMatches: Selection[];
   findIdx: number | null;
   inspDetailsOpen: boolean;
+  /** The inspector is folded to its icon strip (rail.ts). Session only. */
+  inspCollapsed: boolean;
   _rowIds: Map<string, string>;
   _findSet: Set<string> | null;
   _bandLines: [number, number] | null;
@@ -97,6 +99,7 @@ export const state: AppState = {
   findMatches: [],
   findIdx: null,
   inspDetailsOpen: false,
+  inspCollapsed: false,
   _rowIds: new Map(),
   _findSet: null,
   _bandLines: null,
