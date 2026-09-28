@@ -338,6 +338,7 @@ function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): stri
       </div>
     </section>
 
+    <div id="inspectorResizer" title="Drag to resize the inspector; double-click to reset"></div>
     <aside class="pane-inspector" id="inspector" aria-label="Inspector"></aside>
   </main>
 

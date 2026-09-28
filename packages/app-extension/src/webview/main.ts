@@ -12,7 +12,7 @@ import {
   apply, applyOpenConfig, assertRequiredIds, iconizeButtons, readLiveSettings, render,
   REQUIRED_EDITOR_IDS, selectAtOffset, setHost, toast, wireBreakpointSwitch,
   wireCanvasBackground, wireDialectChip, wireDragSurface, wireHistoryKeys,
-  wireKeyboardNav,
+  wireInspectorResizer, wireKeyboardNav,
 } from '@bootstrap-visualizer/editor';
 import { createWebviewHost, type SyncState } from './webview-host.js';
 import type { HostMessage, WebviewMessage } from '../shared/protocol.js';
@@ -33,6 +33,7 @@ let firstEdit = true;   // show the "save to persist" cue once per session
 setHost(createWebviewHost(post, sync));
 wireBreakpointSwitch();
 wireDialectChip();
+wireInspectorResizer();
 iconizeButtons({ resyncBtn: 'resync' });
 wireKeyboardNav();
 // A webview swallows Ctrl+Z; without this, undoing a canvas edit meant

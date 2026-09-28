@@ -13,7 +13,7 @@ export const $ = <T extends Element = HTMLElement>(s: string): T =>
     must provide every one. Optional chrome (`#undoBtn`/`#redoBtn`, guarded in
     renderHeader because the extension omits them) is deliberately excluded. */
 export const REQUIRED_EDITOR_IDS = [
-  'sheet', 'rowsHost', 'inspector', 'ruler', 'toast',
+  'sheet', 'rowsHost', 'inspector', 'inspectorResizer', 'ruler', 'toast',
   'bpSwitch', 'bpNote', 'dialectChip', 'findBox', 'findCount',
 ] as const;
 

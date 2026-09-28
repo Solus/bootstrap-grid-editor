@@ -4,7 +4,7 @@
 import '@bootstrap-visualizer/editor/styles.css';
 import {
   apply, assertRequiredIds, iconizeButtons, REQUIRED_EDITOR_IDS, setHost, wireBreakpointSwitch,
-  wireCanvasBackground, wireDialectChip, wireDragSurface, wireKeyboard,
+  wireCanvasBackground, wireDialectChip, wireDragSurface, wireInspectorResizer, wireKeyboard,
 } from '@bootstrap-visualizer/editor';
 import { standaloneHost } from './standalone-host.js';
 import { wireSourcePane } from './source-pane.js';
@@ -23,6 +23,7 @@ assertRequiredIds([...REQUIRED_EDITOR_IDS, ...STANDALONE_IDS]);
 setHost(standaloneHost);   // the textarea end of the pipe; must precede any apply()
 wireBreakpointSwitch();
 wireDialectChip();
+wireInspectorResizer();
 iconizeButtons({
   undoBtn: 'undo', redoBtn: 'redo', openBtn: 'open', sampleBtn: 'sample',
   downloadBtn: 'download', copyBtn: 'copy',

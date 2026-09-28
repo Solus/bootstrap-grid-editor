@@ -148,7 +148,8 @@ header{
 main{flex:1; display:flex; min-height:0}
 .pane-src{flex:0 0 33%; min-width:260px; max-width:70%; display:flex; flex-direction:column; background:var(--surface)}
 .pane-canvas{flex:1; min-width:0; display:flex; flex-direction:column; background:var(--surface-canvas)}
-.pane-inspector{flex:0 0 268px; border-left:1px solid var(--border); background:var(--surface); overflow-y:auto}
+/* width: 268px by default, dragged via #inspectorResizer (which also draws its edge) */
+.pane-inspector{flex:0 0 268px; background:var(--surface); overflow-y:auto}
 
 .pane-head{
   display:flex; align-items:center; gap:8px; padding:6px 10px;
@@ -258,10 +259,11 @@ textarea#src{
 }
 body.filedrag #dropHint{display:flex}
 #fileName{color:var(--text-faint); text-transform:none; letter-spacing:normal; font-family:var(--font-mono); font-size:11px}
-#paneResizer{
+#paneResizer, #inspectorResizer{
   flex:0 0 5px; cursor:col-resize; background:var(--border); position:relative; z-index:3;
 }
-#paneResizer:hover, #paneResizer.active{background:var(--accent)}
+#paneResizer:hover, #paneResizer.active,
+#inspectorResizer:hover, #inspectorResizer.active{background:var(--accent)}
 body.pane-resizing, body.pane-resizing *{cursor:col-resize !important; user-select:none}
 
 .g-col{
@@ -494,7 +496,8 @@ details.insp-details .insp-title{margin-top:6px}
 }
 .insp-actions .icon{flex:0 0 auto; opacity:.75}
 .insp-actions button:hover:not(:disabled) .icon{opacity:1}
-.insp-pair{display:grid; grid-template-columns:1fr 1fr; gap:6px}
+/* side by side when the inspector has room; one per line when it is narrow */
+.insp-pair{display:grid; grid-template-columns:repeat(auto-fit, minmax(108px, 1fr)); gap:6px}
 .insp-pair button{justify-content:center}
 .insp-danger{margin-top:10px; padding-top:10px; border-top:1px solid var(--border)}
 .hint{font-size:11px; color:var(--text-faint); margin-top:8px; line-height:1.5}

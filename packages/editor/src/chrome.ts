@@ -54,6 +54,46 @@ export function iconizeButtons(icons: Record<string, IconName>): void {
   }
 }
 
+/** Inspector width limits. Below the minimum the action labels and the
+    width/offset steppers start to cramp; the maximum is also capped at half
+    the window, so widening the inspector can't take over the canvas. */
+export const INSPECTOR_MIN_W = 200;
+export const INSPECTOR_MAX_W = 420;
+
+/** The divider on the inspector's left edge: drag to resize the inspector,
+    double-click to put it back to the stylesheet's default width. The width
+    lasts as long as the page (not persisted). */
+export function wireInspectorResizer(): void {
+  const handle = $('#inspectorResizer');
+  const insp = $('#inspector');
+  handle.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add('active');
+    document.body.classList.add('pane-resizing');
+    const mainRect = insp.parentElement!.getBoundingClientRect();
+    const maxW = Math.max(INSPECTOR_MIN_W, Math.min(INSPECTOR_MAX_W, mainRect.width * 0.5));
+    const onMove = (ev: PointerEvent) => {
+      // the inspector sits at the right edge, so its width is measured from there
+      const w = Math.min(maxW, Math.max(INSPECTOR_MIN_W, mainRect.right - ev.clientX));
+      insp.style.flexBasis = w + 'px';
+    };
+    const onUp = (ev: PointerEvent) => {
+      handle.releasePointerCapture(ev.pointerId);
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', onUp);
+      handle.removeEventListener('pointercancel', onUp);
+      handle.classList.remove('active');
+      document.body.classList.remove('pane-resizing');
+    };
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
+  });
+  handle.addEventListener('dblclick', () => { insp.style.flexBasis = ''; });
+}
+
 /** Clicking the canvas background clears the selection. */
 export function wireCanvasBackground(): void {
   rowsHost.addEventListener('click', () => clearSelection());

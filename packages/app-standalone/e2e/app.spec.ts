@@ -1036,6 +1036,49 @@ test.describe('pane resizer', () => {
   });
 });
 
+test.describe('inspector resizer', () => {
+  // Same approach as the source-pane resizer: drive the real drag, and assert
+  // on the inline flexBasis the handler writes (the JS clamp on its own).
+  const drag = async (page: import('@playwright/test').Page, toX: number) => {
+    const box = (await page.locator('#inspectorResizer').boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(toX, box.y + box.height / 2, { steps: 6 });
+    await page.mouse.up();
+  };
+  const flexBasis = (page: import('@playwright/test').Page) =>
+    page.locator('#inspector').evaluate(el => parseFloat((el as HTMLElement).style.flexBasis));
+
+  test('dragging the divider left widens the inspector', async ({ page }) => {
+    const insp = page.locator('#inspector');
+    const before = (await insp.boundingBox())!.width;
+    const box = (await page.locator('#inspectorResizer').boundingBox())!;
+    await drag(page, box.x - 100);
+    expect((await insp.boundingBox())!.width).toBeGreaterThan(before + 80);
+    await expect(page.locator('body')).not.toHaveClass(/pane-resizing/);
+  });
+
+  test('the width is clamped at both ends', async ({ page }) => {
+    const main = (await page.locator('main').boundingBox())!;
+    // Stay inside the viewport: Firefox reports odd pointer positions for
+    // moves past the window edge. The far edges are well past both limits.
+    await drag(page, main.x + main.width - 2);       // far right: narrowest
+    expect(await flexBasis(page)).toBe(200);
+    await drag(page, main.x + 2);                    // far left: widest
+    expect(await flexBasis(page)).toBe(Math.min(420, main.width * 0.5));
+  });
+
+  test('double-clicking the divider restores the default width', async ({ page }) => {
+    const insp = page.locator('#inspector');
+    const before = (await insp.boundingBox())!.width;
+    const box = (await page.locator('#inspectorResizer').boundingBox())!;
+    await drag(page, box.x - 100);
+    await page.locator('#inspectorResizer').dblclick();
+    expect(await insp.evaluate(el => (el as HTMLElement).style.flexBasis)).toBe('');
+    expect((await insp.boundingBox())!.width).toBeCloseTo(before, 0);
+  });
+});
+
 test.describe('window file drop', () => {
   /* Native OS file drag can't be simulated, but a DataTransfer carrying a
      File makes `types` include 'Files' — enough to drive the real handlers.
